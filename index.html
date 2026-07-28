@@ -142,6 +142,7 @@
   <div id="enemy-box" class="panel">
     <div id="enemy-name">--</div>
     <div id="enemy-tag"></div>
+    <div id="enemy-intent" style="text-align:center;font-size:13px;color:#ffcc00;min-height:20px;margin:4px 0"></div>
     <div id="enemy-hp-bar"><div id="enemy-hp-fill"></div></div>
     <div id="enemy-hp-text">HP: --/--</div>
   </div>
@@ -235,6 +236,13 @@
   <h3>📖 妖兽图鉴</h3>
   <div id="codex-content"></div>
   <button class="restart-btn" style="margin-top:12px;width:100%" id="btn-close-codex">关闭</button>
+</div>
+
+<!-- 装备替换选择 -->
+<div id="equip-replace" class="modal">
+  <h3>🎒 装备栏已满</h3>
+  <p style="color:#8899bb;font-size:12px;margin-bottom:8px">点击一件旧装备丢弃，或点新装备取消</p>
+  <div id="equip-replace-list"></div>
 </div>
 
 <!-- 结算/死亡 -->

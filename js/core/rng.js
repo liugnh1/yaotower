@@ -8,7 +8,7 @@ export class RNG {
   }
   next() { this.seed = (this.seed * 9301 + 49297) % 233280; return this.seed / 233280; }
   range(a, b) { return Math.floor(this.next() * (b - a + 1)) + a; }
-  pick(arr) { return arr[this.range(0, arr.length - 1)]; }
+  pick(arr) { if (!arr || arr.length === 0) { console.warn("[妖塔] rng.pick 空数组"); return null; } return arr[this.range(0, arr.length - 1)]; }
   chance(p) { return this.next() < p; }
   // P2-10: 使用 Fisher-Yates 洗牌替代 sort() 比较器，保证均匀分布
   pickMulti(arr, n) {

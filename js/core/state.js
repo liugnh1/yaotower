@@ -28,6 +28,16 @@ function serializePlayer(p) {
 }
 
 function deserializePlayer(bp) {
+  // 已知字段白名单（用于识别非临时属性）
+  const KNOWN = new Set(['hp','maxHp','mp','maxMp','atk','def','critRate','critMul',
+    'skillMul','mpCost','pen','lifeSteal','thorn','goldMul','dodge','bleed','rage',
+    'doubleFirst','debuffAtk','dmgReduce','berserk','rebirth','regen']);
+  // 收集 bp 中的未知字段（新版本新增的字段），保留不丢
+  const extra = {};
+  if (bp) Object.keys(bp).forEach(k => {
+    if (!KNOWN.has(k) && !k.startsWith('_')) extra[k] = bp[k];
+  });
+
   return {
     hp: fix(bp.hp, 100), maxHp: fix(bp.maxHp, 100), mp: fix(bp.mp, 20), maxMp: fix(bp.maxMp, 20),
     atk: fix(bp.atk, 15), def: fix(bp.def, 2),
@@ -39,10 +49,32 @@ function deserializePlayer(bp) {
     dmgReduce: bp.dmgReduce || 0, berserk: !!bp.berserk,
     rebirth: !!bp.rebirth, regen: bp.regen || 0,
     // 诅咒/遗物临时字段
-    _weakHpLoss: bp._weakHpLoss, _slowDefLoss: bp._slowDefLoss,
-    _poorGoldLoss: bp._poorGoldLoss, _orbOrigCost: bp._orbOrigCost,
-    _mysticOrigCost: bp._mysticOrigCost, _chaosOrigPen: bp._chaosOrigPen,
-    _tempHp: bp._tempHp || 0
+    _weakHpLoss: bp._weakHpLoss, _weakAtkGain: bp._weakAtkGain,
+    _slowDefLoss: bp._slowDefLoss, _slowHpGain: bp._slowHpGain,
+    _poorGoldLoss: bp._poorGoldLoss, _poorLucky: !!bp._poorLucky,
+    _orbOrigCost: bp._orbOrigCost, _mysticOrigCost: bp._mysticOrigCost,
+    _chaosOrigPen: bp._chaosOrigPen, _tempHp: bp._tempHp || 0,
+    _bleedAtkGain: bp._bleedAtkGain,
+    _fearCurse: !!bp._fearCurse, _fearLucky: !!bp._fearLucky,
+    _fragileFlag: !!bp._fragileFlag,
+    _forgetfulOrigCost: bp._forgetfulOrigCost,
+    _badLuckOrig: bp._badLuckOrig,
+    _greedCurse: !!bp._greedCurse,
+    _blindCurse: !!bp._blindCurse, _blindCritGain: bp._blindCritGain,
+    _shadowBorn: !!bp._shadowBorn,
+    _luckyCharm: !!bp._luckyCharm, _alchemyStone: !!bp._alchemyStone,
+    _demonPact: !!bp._demonPact, _shadowStep: !!bp._shadowStep,
+    _glassHeart: !!bp._glassHeart, _doubleSoul: !!bp._doubleSoul,
+    _voidStone: !!bp._voidStone, _rageTotem: !!bp._rageTotem,
+    // 联动/Boss标记（防止读档丢失）
+    _synVampBlood: !!bp._synVampBlood, _synCritDice: !!bp._synCritDice,
+    _synOrbRing: !!bp._synOrbRing, _stoneGaze: !!bp._stoneGaze,
+    _synCurseMaster: !!bp._synCurseMaster, _synGoldTycoon: !!bp._synGoldTycoon,
+    _synFuryBorn: !!bp._synFuryBorn, _synShadowDance: !!bp._synShadowDance,
+    _synAlchemyGrand: !!bp._synAlchemyGrand, _synGlassDemon: !!bp._synGlassDemon,
+    _synExecutioner: !!bp._synExecutioner,
+    // 保留未来版本新增的字段
+    ...extra
   };
 }
 
@@ -67,7 +99,8 @@ function defState() {
 
 function defMeta() {
   return {
-    tp: 0, souls: 0, unlocks: ["warrior", "mage"], charExp: { warrior: 0, mage: 0 },
+    tp: 0, souls: 0, unlocks: ["warrior", "mage", "shadow"], unlockedDiffs: ["casual"],
+    charExp: { warrior: 0, mage: 0, shadow: 0 },
     upgrades: {}, soulUpgrades: {}, highestSimple: 0, highestNormal: 0,
     adWatched: 0, adDate: "", totalRuns: 0, totalWins: 0, totalDeaths: 0,
     dailyBest: 0, dailyDate: "", achievements: []
@@ -93,6 +126,8 @@ export const Game = {
       zone: s.zone ? s.zone.id : null, zoneIndex: s.zoneIndex,
       floorInZone: s.floorInZone, totalFloor: s.totalFloor,
       roomQueue: s._roomPool, roomIndex: s._bossReady ? 1 : 0,
+      currentRoomType: s._currentRoomType || null,
+      activeSynergies: s._activeSynergies || [],
       gold: s.gold, equip: s.equip, potions: s.potions,
       relics: s.relics.map(r => ({ id: r.id, applied: !!r.applied })),
       curses: s.curses.map(c => c.id),
@@ -122,9 +157,11 @@ export const Game = {
       s.zoneIndex = d.zoneIndex || 0; s.floorInZone = d.floorInZone || 1;
       s.totalFloor = d.totalFloor || 1; s._roomPool = d.roomQueue || [];
       s._bossReady = (d.roomIndex || 0) > 0; s.gold = d.gold || 0;
+      s._currentRoomType = d.currentRoomType || null;
+      s._activeSynergies = d.activeSynergies || [];
       s.zone = d.zone ? R.get('zones', d.zone) : null;
       s.equip = d.equip || []; s.potions = d.potions || [];
-      s.curses = (d.curses || []).map(id => R.get('curses').find(c => c.id === id)).filter(Boolean);
+      s.curses = (d.curses || []).map(id => (R.get('curses') || []).find(c => c.id === id)).filter(Boolean);
       s.relics = (d.relics || []).map(r => {
         const rel = R.get('relics').find(x => x.id === r.id);
         if (rel) { const c = { ...rel }; c.applied = !!r.applied; return c; }
@@ -300,7 +337,8 @@ function serializeEnemy(e) {
     tags: e.tags.map(t => ({ id: t.id, name: t.name })),
     aiTurn: e.aiTurn || 0, aiCharge: e.aiCharge || false, chargeTurns: e.chargeTurns || 0,
     aiCurse: e.aiCurse || false, doubleFirst: e.doubleFirst || false,
-    lifeSteal: e.lifeSteal || 0, thorn: e.thorn || 0
+    lifeSteal: e.lifeSteal || 0, thorn: e.thorn || 0,
+    _buffs: (e._buffs || []).map(b => ({ id: b.id, name: b.name, turns: b.turns, data: b.data || {} }))
   };
 }
 
@@ -313,6 +351,26 @@ function deserializeEnemy(d) {
     }),
     aiTurn: d.aiTurn || 0, aiCharge: d.aiCharge || false, chargeTurns: d.chargeTurns || 0,
     aiCurse: d.aiCurse || false, doubleFirst: d.doubleFirst || false,
-    lifeSteal: d.lifeSteal || 0, thorn: d.thorn || 0
+    lifeSteal: d.lifeSteal || 0, thorn: d.thorn || 0,
+    _buffs: restoreBuffs(d._buffs || [])
   };
+}
+
+// 从保存数据重建 buff（恢复 onTick/onRemove 函数）
+function restoreBuffs(saved) {
+  return saved.map(b => {
+    switch (b.id) {
+      case 'burn':
+        return { ...b, onTick: (e, bf) => { e.hp -= bf.data.dmg; if (e.hp <= 0) return 'dead'; }, onRemove: () => {} };
+      case 'slow':
+        return { ...b, onRemove: () => {} };
+      case 'stun':
+        return { ...b, onTick: () => 'stunned', onRemove: () => {} };
+      case 'crystal':
+        return { ...b, onRemove: (enemy) => { enemy.def = Math.floor(enemy.def / 2); } };
+      default:
+        console.warn("[妖塔] 未知buff类型，跳过:", b.id);
+        return { ...b, onRemove: () => {} };
+    }
+  });
 }

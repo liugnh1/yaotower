@@ -18,6 +18,7 @@ import '../content/meta-limits.js';
 import '../content/room-types.js';
 import '../content/room-templates.js';
 import '../content/synergies.js';
+import '../content/achievements.js';
 
 // ---- 核心 ----
 import { Game, onRender } from "./state.js";
@@ -60,6 +61,8 @@ Events.on(E.BATTLE_START, d => {
   if (d.type === 'slow') log("<span class='info'>❄️ 迟缓！敌人下回合攻击力降低</span>");
   if (d.type === 'stun') log(`<span class="win">⚡ ${d.name} 被眩晕！跳过下回合</span>`);
   if (d.type === 'bossSkill') log(`<span class="warn">${d.msg}</span>`);
+  if (d.type === 'bossPhase2') { log(`<span class="warn">💢 Boss进入二阶段：${d.name}！</span>`); toast("⚠️ Boss暴怒！二阶段！"); }
+  if (d.type === 'achievement') { const ach = (R.get('achievements') || []).find(a => a.id === d.id); if (ach) toast(`🏆 成就解锁：${ach.name}！`); }
   if (d.type === 'synCritDice') log("<span class='win'>🎲 命运之眼触发！伤害翻倍！</span>");
   if (d.type === 'synergy') log(`<span class="win">🔗 羁绊激活：${d.name}！${d.desc}</span>`);
   if (d.type === 'stoneGaze') log("<span class='warn'>🗿 被石化了！跳过本回合</span>");
@@ -191,7 +194,7 @@ function buildMetaPanel(onUpgrade) {
     { id: "soulStartHp", name: "生命祝福", cost: 8, desc: "每局开局生命上限+10", max: 3, apply: (s) => { s.player.maxHp += 10; s.player.hp += 10; } },
     { id: "soulStartAtk", name: "攻击祝福", cost: 8, desc: "每局开局攻击力+3", max: 3, apply: (s) => { s.player.atk += 3; } },
     { id: "soulStartPotion", name: "额外药水", cost: 10, desc: "每局开局多携带1瓶药水", max: 2, apply: (s) => { const pots = Game.getStartPotions(); s.potions.push(...pots.slice(0, 1)); } },
-    { id: "soulStartRelic", name: "远古遗物", cost: 20, desc: "开局随机获得1个普通遗物", max: 1, apply: (s) => { const commons = R.get('relics').filter(r => r.rarity === 'common'); if (commons.length) { const r = { ...s.rng.pick(commons) }; if (r.passive) { r.passive(s.player); r.applied = true; } s.relics.push(r); } } },
+    { id: "soulStartRelic", name: "远古遗物", cost: 20, desc: "开局随机获得1个普通遗物", max: 1, apply: (s) => { const commons = (R.get('relics') || []).filter(r => r.rarity === 'common'); if (commons.length) { const r = { ...s.rng.pick(commons) }; if (r.passive) { r.passive(s.player); r.applied = true; } s.relics.push(r); } } },
   ];
 
   soulItems.forEach(item => {
@@ -249,10 +252,12 @@ function pickClass(cls) {
     hp: cls.hp, maxHp: cls.maxHp, mp: cls.maxMp, maxMp: cls.maxMp,
     atk: cls.atk, def: cls.def, critRate: cls.critRate, critMul: cls.critMul,
     skillMul: cls.skillMul, mpCost: cls.mpCost, pen: cls.pen,
-    lifeSteal: 0, thorn: 0, goldMul: 1, dodge: 0, bleed: 0,
+    lifeSteal: cls.lifesteal || 0, thorn: 0, goldMul: 1, dodge: cls.dodge || 0, bleed: 0,
     rage: false, doubleFirst: false, debuffAtk: null, dmgReduce: 0,
     berserk: false, rebirth: false, regen: 0
   };
+  // 影卫被动：击杀回复20%生命
+  if (cls.id === "shadow") s.player._shadowBorn = true;
   Game.applyMetaBonus(s.player);
   // 开局药水（修复 startPotion 陷阱）
   const startPots = Game.getStartPotions();
@@ -435,9 +440,33 @@ function nextRoom() {
 }
 
 // ===================== 战斗回调 =====================
+function unlockAchievement(id) { Game.unlockAchievement(id); }
+
 function onWin(isFast) {
   const s = Game.state;
   const roomType = s._currentRoomType;
+  // 心魔镜像战：胜利给传说遗物
+  if (s._mirrorFight) {
+    s._mirrorFight = false;
+    const legendary = (R.get('relics') || []).filter(r => r.rarity === "legendary");
+    if (legendary.length > 0) {
+      const r = s.rng.pick(legendary);
+      Shop.acquireRelic({ ...r });
+      log(`<span class='win'>🪞 击败心魔！获得传说遗物：${r.name}！</span>`);
+    }
+    showReward(isFast, eq => takeEquip(eq), attr => takeAttrReward(attr, isFast, false), false);
+    showModal("reward");
+    return;
+  }
+  // 困兽斗场：胜利给对应奖励
+  if (s._arenaReward) {
+    s._arenaReward();
+    s._arenaReward = null;
+    log("<span class='win'>🏟️ 困兽斗胜利！</span>");
+    showReward(isFast, eq => takeEquip(eq), attr => takeAttrReward(attr, isFast, false), false);
+    showModal("reward");
+    return;
+  }
   if (roomType === "boss") {
     s.gold += 50 + s.totalFloor;
     showBossRelicPick(isFast);
@@ -445,6 +474,10 @@ function onWin(isFast) {
     s.gold += 30;
     showReward(isFast, eq => takeEquip(eq), attr => takeAttrReward(attr, isFast, false), true);
   } else {
+    // 矿洞环境：金币+50%
+    const goldMul = s._zoneMod?.id === "cave_gold" ? 1.5 : 1;
+    const baseGold = s.rng.range(8, 15);
+    s.gold += Math.floor(baseGold * goldMul);
     showReward(isFast, eq => takeEquip(eq), attr => takeAttrReward(attr, isFast, false), false);
   }
   showModal("reward");
@@ -474,20 +507,114 @@ function gameClear() {
   Game.meta.souls += souls;
   Game.addLeaderboard({ char: s.playerClass ? s.playerClass.name : "--", diff: s.difficulty, floor: s.totalFloor });
   Prog.awardCharExp(s);
+  // 难度递进解锁：通关简单→解锁普通，通关普通→解锁炼狱
+  const diff = R.get('difficulties', s.difficulty);
+  if (diff && diff.next) {
+    if (!Game.meta.unlockedDiffs) Game.meta.unlockedDiffs = ["casual"];
+    if (!Game.meta.unlockedDiffs.includes(diff.next)) {
+      Game.meta.unlockedDiffs.push(diff.next);
+      const nextDiff = R.get('difficulties', diff.next);
+      console.log("[妖塔] 解锁新难度:", nextDiff ? nextDiff.name : diff.next);
+    }
+  }
   Game.saveMeta();
+  // 成就：难度通关
+  if (s.difficulty === "casual") unlockAchievement("clear_casual");
+  if (s.difficulty === "standard") unlockAchievement("clear_standard");
+  if (s.difficulty === "hell") unlockAchievement("clear_hell");
   showGameOver(true, `通关奖励：${tp} 天赋点 + ${souls} 魂晶！`);
   Game.deleteSave();
 }
 
-// ===================== 奖励处理 =====================
-function takeEquip(eq) {
-  const s = Game.state, p = s.player;
-  if (s.equip.length >= 6) { log("<span class='warn'>装备栏已满，丢弃旧装备</span>"); s.equip.shift(); }
-  s.equip.push(eq); playSound("equip");
+// ===================== 装备属性管理 =====================
+function applyEquipStats(p, eq) {
   if (eq.stat === "maxHp") { p.maxHp += eq.val; p.hp = Math.min(p.hp + eq.val, p.maxHp); }
   else if (eq.stat === "maxMp") { p.maxMp += eq.val; p.mp = Math.min(p.mp + eq.val, p.maxMp); }
-  log(`${eq.icon} <span style="color:${eq.color}"><b>${eq.fullName||eq.name}</b></span> 已装备！${eq.stat.toUpperCase()}+${eq.val}`, "win");
-  hideModal("reward"); nextRoom();
+}
+function removeEquipStats(p, eq) {
+  if (eq.stat === "maxHp") { p.maxHp = Math.max(1, p.maxHp - eq.val); p.hp = Math.min(p.hp, p.maxHp); }
+  else if (eq.stat === "maxMp") { p.maxMp = Math.max(1, p.maxMp - eq.val); p.mp = Math.min(p.mp, p.maxMp); }
+}
+
+// 全局：添加装备（满时弹出替换选择）
+window._addEquip = function(eq) {
+  const s = Game.state;
+  if (s.equip.length >= 6) {
+    showEquipReplace(eq, () => { playSound("equip"); Game.sync(); });
+  } else {
+    s.equip.push(eq);
+    applyEquipStats(s.player, eq);
+    playSound("equip");
+    log(`${eq.icon} <span style="color:${eq.color}"><b>${eq.fullName||eq.name}</b></span> 已装备！${eq.stat.toUpperCase()}+${eq.val}`, "win");
+    Game.sync();
+  }
+};
+
+// 丢弃装备（从装备栏点击触发）
+window._discardEquip = function(idx) {
+  const s = Game.state;
+  if (idx < 0 || idx >= s.equip.length) return;
+  const eq = s.equip.splice(idx, 1)[0];
+  removeEquipStats(s.player, eq);
+  log(`<span class='warn'>已丢弃 ${eq.fullName||eq.name}</span>`);
+  Game.sync();
+};
+
+// 满装备时弹出替换选择
+function showEquipReplace(newEq, onDone, onCancel) {
+  const s = Game.state;
+  const el = document.getElementById("equip-replace");
+  const list = document.getElementById("equip-replace-list");
+  el.style.display = "block"; list.innerHTML = "";
+  const STAT_LABEL = { atk: '⚔️攻击', def: '🛡️防御', maxHp: '❤️生命', critRate: '💥暴击', maxMp: '🔮灵力' };
+
+  // 显示新装备（点击取消）
+  const newBtn = document.createElement("button"); newBtn.className = "modal-btn";
+  const fxTag = newEq._combatEffect ? ` · 特效:${newEq._combatEffect.type}` : '';
+  newBtn.innerHTML = `🆕 <b style="color:${newEq.color}">${newEq.fullName||newEq.name}</b> — ${STAT_LABEL[newEq.stat]||newEq.stat}+${newEq.val}${fxTag} <span style="color:#89e894">[保留此件·取消]</span>`;
+  newBtn.style.borderColor = "#89e894";
+  newBtn.onclick = () => { el.style.display = "none"; if (onCancel) onCancel(); }; // 取消，不拿新装备
+  list.appendChild(newBtn);
+
+  // 显示旧装备（点击丢弃该件，拿新装备）
+  s.equip.forEach((eq, i) => {
+    const btn = document.createElement("button"); btn.className = "modal-btn";
+    const qTag = eq.qualityName ? `[${eq.qualityName}]` : '';
+    const fxTag2 = eq._combatEffect ? ` · 特效:${eq._combatEffect.type}` : '';
+    btn.innerHTML = `${eq.icon} <b style="color:${eq.color}">${eq.fullName||eq.name}</b> — ${STAT_LABEL[eq.stat]||eq.stat}+${eq.val}${fxTag2} <span style="color:#ff7b7b;font-size:11px">${qTag}</span>`;
+    btn.onclick = () => {
+      removeEquipStats(s.player, eq);
+      s.equip.splice(i, 1);
+      s.equip.push(newEq);
+      applyEquipStats(s.player, newEq);
+      log(`<span class='warn'>替换装备：${eq.fullName||eq.name} → ${newEq.fullName||newEq.name}</span>`);
+      el.style.display = "none";
+      if (onDone) onDone();
+    };
+    list.appendChild(btn);
+  });
+}
+
+// ===================== 奖励处理 =====================
+function takeEquip(eq) {
+  const s = Game.state;
+  if (s.equip.length >= 6) {
+    hideModal("reward");
+    showEquipReplace(eq, () => {
+      playSound("equip");
+      log(`${eq.icon} <span style="color:${eq.color}"><b>${eq.fullName||eq.name}</b></span> 已装备！`, "win");
+      nextRoom();
+    }, () => {
+      // 取消替换：重新显示奖励弹窗
+      showModal("reward");
+    });
+  } else {
+    s.equip.push(eq);
+    applyEquipStats(s.player, eq);
+    playSound("equip");
+    log(`${eq.icon} <span style="color:${eq.color}"><b>${eq.fullName||eq.name}</b></span> 已装备！${eq.stat.toUpperCase()}+${eq.val}`, "win");
+    hideModal("reward"); nextRoom();
+  }
 }
 
 function takeAttrReward(type, isFast, isBoss) {
@@ -516,10 +643,20 @@ function openShop() {
   const list = document.getElementById("shop-list"); list.innerHTML = "";
   const items = Shop.getShopItems();
   const mul = s.adDiscount ? 0.5 : 1;
+  const STAT_LABEL = { atk: '⚔️攻击', def: '🛡️防御', maxHp: '❤️生命', critRate: '💥暴击', maxMp: '🔮灵力' };
   items.forEach(it => {
     const finalCost = Math.floor(it.cost * mul);
     const btn = document.createElement("button"); btn.className = "modal-btn";
-    btn.innerHTML = `${it.icon} ${it.name} — <span style="color:#ffdd77">${finalCost}G</span>${s.adDiscount ? ' <span style="color:#89e894">[5折]</span>' : ''}`;
+    let detail = '';
+    if (it.type === 'equip' && it.data) {
+      const d = it.data;
+      detail = `<br><span style="font-size:10px;color:#8899bb">${STAT_LABEL[d.stat]||d.stat}+${d.val} · ${d.qualityName||''}${d._combatEffect ? ' · 特效:'+d._combatEffect.type : ''}</span>`;
+    } else if (it.type === 'relic' && it.data) {
+      detail = `<br><span style="font-size:10px;color:#c8a8ff">${it.data.desc||''}</span>`;
+    } else if (it.type === 'potion') {
+      detail = `<br><span style="font-size:10px;color:#70a1ff">${it.name.includes('生命')?'回复50生命':it.name.includes('灵力')?'回复30灵力':'回满生命灵力'}</span>`;
+    }
+    btn.innerHTML = `${it.icon} ${it.name} — <span style="color:#ffdd77">${finalCost}G</span>${s.adDiscount ? ' <span style="color:#89e894">[5折]</span>' : ''}${detail}`;
     btn.disabled = (s.gold || 0) < finalCost;
     btn.onclick = () => { if (Shop.buyItem({ ...it, cost: it.cost })) { Game.sync(); openShop(); } };
     list.appendChild(btn);
@@ -538,8 +675,14 @@ function openEvent(roomType) {
   const s = Game.state;
   let type;
   if (roomType === "event") {
-    // 随机事件类型（包括赌博）
-    const pool = ["shrine", "altar", "gamble", "gamble", "trade", "mystery"];
+    // 随机事件类型（15种事件池）
+    const pool = [
+      "shrine", "shrine", "altar", "altar",
+      "gamble", "trade", "mystery",
+      "memory_merchant", "mirror_fight", "training_stone",
+      "beast_arena", "time_rift", "heal_spring",
+      "black_market", "wandering_sage"
+    ];
     type = s.rng.pick(pool);
   } else {
     type = roomType;
@@ -618,9 +761,8 @@ function openEvent(roomType) {
       addEventBtn(`献祭 ${eq.fullName||eq.name}：攻击+5`, () => {
         const idx = s.equip.indexOf(eq);
         if (idx >= 0) {
+          removeEquipStats(s.player, eq);
           s.equip.splice(idx, 1);
-          if (eq.stat === "maxHp") { s.player.maxHp -= eq.val; s.player.hp = Math.min(s.player.hp, s.player.maxHp); }
-          else if (eq.stat === "maxMp") { s.player.maxMp -= eq.val; s.player.mp = Math.min(s.player.mp, s.player.maxMp); }
         }
         s.player.atk += 5;
         log("<span class='win'>装备已献祭，攻击+5！</span>");
@@ -651,6 +793,166 @@ function openEvent(roomType) {
       { text: "转身离开", fn: () => { log("你绕过了迷雾……"); } }
     ];
     outcomes.forEach(o => addEventBtn(o.text, () => { o.fn(); Game.sync(); onClose(); }));
+  } else if (type === "memory_merchant") {
+    // 🧠 记忆商人：牺牲一件遗物换永久属性
+    title.textContent = "🧠 记忆商人";
+    desc.textContent = "\"给我一件遗物……我赋予你永恒的恩赐。\"";
+    if (s.relics.length > 0) {
+      const sacrifice = s.rng.pick(s.relics);
+      const bonusType = s.rng.pick(["atk", "hp", "crit"]);
+      const bonusLabel = bonusType === "atk" ? "攻击+5" : bonusType === "hp" ? "生命上限+30" : "暴击率+10%";
+      addEventBtn(`献祭 ${sacrifice.name}：${bonusLabel}`, () => {
+        const idx = s.relics.indexOf(sacrifice);
+        if (idx >= 0) {
+          if (sacrifice.onRemove) sacrifice.onRemove(s.player);
+          s.relics.splice(idx, 1);
+          Synergy.recheckSynergies(); // 防止联动加成残留
+        }
+        if (bonusType === "atk") s.player.atk += 5;
+        else if (bonusType === "hp") { s.player.maxHp += 30; s.player.hp += 30; }
+        else s.player.critRate += 0.10;
+        log(`<span class='win'>🧠 ${sacrifice.name}已献祭，${bonusLabel}！</span>`);
+        Game.sync(); onClose();
+      });
+    } else {
+      desc.textContent += "\n（你没有遗物可以交易……）";
+    }
+    addEventBtn("离开", onClose);
+  } else if (type === "mirror_fight") {
+    // 🪞 心魔镜像：和自身复制体战斗，赢了给传说遗物
+    title.textContent = "🪞 心魔镜像";
+    desc.textContent = "一面巨大的镜子……你看到了另一个自己。击败她，你将获得传说中的力量。";
+    addEventBtn("踏入镜中（挑战自身镜像）", () => {
+      hideModal("event");
+      // 创建镜像敌人（基于玩家属性）
+      const mirror = {
+        name: s.playerClass ? s.playerClass.name + "的镜像" : "心魔",
+        hp: Math.floor(s.player.maxHp * 0.8), maxHp: Math.floor(s.player.maxHp * 0.8),
+        atk: Math.floor(s.player.atk * 0.8), def: Math.max(1, s.player.def),
+        tags: [], _buffs: [], aiTurn: 0,
+        skill: { name: "镜像斩", desc: "和你的技能相同的招式", fn: (e, p) => { const d = Math.max(1, Math.floor(e.atk * 1.5) - p.def); p.hp -= d; return { dmg: d, msg: '🪞 镜像释放了你的技能！' }; } }
+      };
+      s.enemy = mirror;
+      s._mirrorFight = true; // 必须在startBattle之前设置
+      s._currentRoomType = "event";
+      updateBattleBg();
+      Combat.startBattle("normal");
+      switchScreen("main");
+    });
+    addEventBtn("转身离开", onClose);
+  } else if (type === "training_stone") {
+    // 📜 修行石碑：花金币买永久属性
+    title.textContent = "📜 修行石碑";
+    desc.textContent = "石碑上刻着古老的修行功法……";
+    addEventBtn("参悟攻击之道（40G：攻击+4）", () => {
+      if (s.gold < 40) { alert("金币不足！"); return; }
+      s.gold -= 40; s.player.atk += 4;
+      log("<span class='win'>📜 攻击+4！</span>");
+      Game.sync(); onClose();
+    });
+    addEventBtn("参悟防御之道（30G：防御+3）", () => {
+      if (s.gold < 30) { alert("金币不足！"); return; }
+      s.gold -= 30; s.player.def += 3;
+      log("<span class='win'>📜 防御+3！</span>");
+      Game.sync(); onClose();
+    });
+    addEventBtn("参悟生命之道（50G：生命上限+35）", () => {
+      if (s.gold < 50) { alert("金币不足！"); return; }
+      s.gold -= 50; s.player.maxHp += 35; s.player.hp += 35;
+      log("<span class='win'>📜 生命上限+35！</span>");
+      Game.sync(); onClose();
+    });
+    addEventBtn("离开", onClose);
+  } else if (type === "beast_arena") {
+    // 🏟️ 困兽斗：选一个敌人打，不同奖励
+    title.textContent = "🏟️ 困兽斗场";
+    desc.textContent = "选择你的对手，获胜后获得相应奖励。";
+    const beasts = [
+      { name: "困兽·蛮牛", hp: 60, atk: 14, def: 2, reward: "攻击+4", fn: () => { s.player.atk += 4; log("<span class='win'>🏟️ 击败蛮牛！攻击+4</span>"); } },
+      { name: "困兽·毒蝎", hp: 45, atk: 18, def: 1, reward: "暴击率+8%", fn: () => { s.player.critRate += 0.08; log("<span class='win'>🏟️ 击败毒蝎！暴击率+8%</span>"); } },
+      { name: "困兽·巨龟", hp: 90, atk: 10, def: 5, reward: "生命上限+40", fn: () => { s.player.maxHp += 40; s.player.hp += 40; log("<span class='win'>🏟️ 击败巨龟！生命上限+40</span>"); } }
+    ];
+    beasts.forEach(b => {
+      addEventBtn(`${b.name}（奖励：${b.reward}）`, () => {
+        hideModal("event");
+        s.enemy = { name: b.name, hp: b.hp, maxHp: b.hp, atk: b.atk, def: b.def, tags: [], _buffs: [], aiTurn: 0 };
+        s._currentRoomType = "event";
+        s._arenaReward = b.fn; // 必须在startBattle之前设置
+        updateBattleBg();
+        Combat.startBattle("normal");
+        switchScreen("main");
+      });
+    });
+    addEventBtn("离开", onClose);
+  } else if (type === "time_rift") {
+    // ⏳ 时空裂隙：跳过当前房间拿奖励
+    title.textContent = "⏳ 时空裂隙";
+    desc.textContent = "一道裂缝通向未知……跳进去可以跳过此层直接获得奖励。";
+    addEventBtn("跳入裂隙（随机遗物+跳过战斗）", () => {
+      const r = Loot.genRelic(); Shop.acquireRelic(r);
+      log(`<span class='win'>⏳ 时空裂隙赐予：${r.name}！</span>`);
+      Game.sync(); onClose();
+    });
+    addEventBtn("谨慎离开", onClose);
+  } else if (type === "heal_spring") {
+    // 💧 治愈之泉
+    title.textContent = "💧 治愈之泉";
+    desc.textContent = "一汪清泉散发着柔和的光芒……";
+    addEventBtn("饮用泉水（回复50%生命）", () => {
+      s.player.hp = Math.min(s.player.maxHp, s.player.hp + Math.floor(s.player.maxHp * 0.5));
+      log("<span class='heal'>💧 泉水治愈了你</span>");
+      Game.sync(); onClose();
+    });
+    addEventBtn("沐浴泉中（回复100%生命，但随机获得一个诅咒）", () => {
+      s.player.hp = s.player.maxHp;
+      const curse = s.rng.pick(R.get('curses'));
+      s.curses.push(curse); curse.apply(s.player);
+      log(`<span class='warn'>💧 泉水中隐藏着诅咒：${curse.desc}</span>`);
+      Game.sync(); onClose();
+    });
+    addEventBtn("离开", onClose);
+  } else if (type === "black_market") {
+    // 🌑 黑市
+    title.textContent = "🌑 黑市商人";
+    desc.textContent = "\"生命不值钱……但在这里，它可以买到一切。\"";
+    addEventBtn("消耗20%生命：获得随机遗物", () => {
+      const cost = Math.floor(s.player.maxHp * 0.2);
+      s.player.hp = Math.max(1, s.player.hp - cost);
+      const r = Loot.genRelic(); Shop.acquireRelic(r);
+      log(`<span class='win'>🌑 黑市交易：${r.name}（消耗${cost}生命）</span>`);
+      Game.sync(); onClose();
+    });
+    addEventBtn("消耗35%生命：攻击+10", () => {
+      const cost = Math.floor(s.player.maxHp * 0.35);
+      s.player.hp = Math.max(1, s.player.hp - cost);
+      s.player.atk += 10;
+      log(`<span class='win'>🌑 黑市交易：攻击+10（消耗${cost}生命）</span>`);
+      Game.sync(); onClose();
+    });
+    addEventBtn("不交易", onClose);
+  } else if (type === "wandering_sage") {
+    // 🧙 云游仙人：猜谜
+    title.textContent = "🧙 云游仙人";
+    const riddles = [
+      { q: "什么东西越分越多？", a: "快乐", hint: "是一种情绪" },
+      { q: "什么东西打破了才能用？", a: "蛋", hint: "和早餐有关" },
+      { q: "什么东西越洗越脏？", a: "水", hint: "每天都要喝的" }
+    ];
+    const riddle = s.rng.pick(riddles);
+    desc.textContent = `\"回答我的问题，正确则有赏，错误则受罚……\\n${riddle.q}\"`;
+    addEventBtn("回答（正确：稀有遗物）", () => {
+      const answer = prompt(riddle.q + "\n（提示：" + riddle.hint + "）");
+      if (answer && (answer.includes(riddle.a) || riddle.a.includes(answer))) {
+        const r = Loot.genRelic(); Shop.acquireRelic(r);
+        log(`<span class='win'>🧙 仙人颔首：${r.name}！</span>`);
+      } else {
+        const curse = s.rng.pick(R.get('curses'));
+        s.curses.push(curse); curse.apply(s.player);
+        log(`<span class='warn'>🧙 仙人大怒：${curse.desc}</span>`);
+      }
+      Game.sync(); onClose();
+    });
+    addEventBtn("不回答（安全离开）", onClose);
   }
 }
 
@@ -666,7 +968,7 @@ function applySoulUpgrades(s) {
     for (let i = 0; i < counts.soulStartPotion; i++) s.potions.push({ ...pool[i % pool.length] });
   }
   if (counts.soulStartRelic > 0) {
-    const commons = R.get('relics').filter(r => r.rarity === 'common');
+    const commons = (R.get('relics') || []).filter(r => r.rarity === 'common');
     if (commons.length) {
       const r = { ...s.rng.pick(commons) };
       if (r.passive) { r.passive(s.player); r.applied = true; }
@@ -741,10 +1043,13 @@ function showDailyPanel() {
 function buildDifficultySelect(onPick) {
   const grid = document.getElementById("diff-grid"); grid.innerHTML = "";
   const diffs = R.get('difficulties');
+  const unlocked = Game.meta.unlockedDiffs || ["casual"];
   Object.values(diffs).forEach(d => {
     const div = document.createElement("div"); div.className = "card"; div.dataset.diff = d.id;
-    div.innerHTML = `<div class="icon">${d.icon}</div><div class="name">${d.name}</div><div class="desc">${d.desc}</div>`;
-    div.onclick = () => onPick(d); grid.appendChild(div);
+    const locked = !unlocked.includes(d.id);
+    div.innerHTML = `<div class="icon">${d.icon}</div><div class="name">${d.name}${locked ? ' 🔒' : ''}</div><div class="desc">${locked ? '通关上一难度解锁' : d.desc}</div>`;
+    if (!locked) div.onclick = () => onPick(d); else div.style.opacity = "0.4";
+    grid.appendChild(div);
   });
 }
 
@@ -797,15 +1102,6 @@ function buildZoneSelect(choices, onPick) {
   });
 }
 
-function showRoomInfo(s) {
-  const roomId = s.roomQueue[s.roomIndex]; if (!roomId) return;
-  const rt = R.get('roomTypes', roomId) || R.get('roomTypes', 'battle');
-  const isBoss = roomId === 'boss';
-  document.getElementById("room-info").textContent = `第 ${s.totalFloor} 层 · ${s.zone.name}`;
-  document.getElementById("room-desc").innerHTML = `<span style="color:${rt.color};font-size:32px">${rt.icon}</span><br><b>${rt.name}</b><br><span style="color:#8899bb">${rt.desc}</span>${isBoss ? '<br><span style="color:#ff4444;font-size:14px">⚠️ 关底首领 · 准备迎战！</span>' : ''}`;
-  if (isBoss) document.getElementById("room-info").style.color = "#ff4444";
-  else document.getElementById("room-info").style.color = "";
-}
 
 // ---- 战利品弹窗 ----
 function showReward(isFast, onEquip, onAttr, isElite) {

@@ -9,8 +9,9 @@ export function applyMetaBonus(p) {
 
 // ---- 结算天赋点 ----
 export function calcTP(floor, isWin) {
-  if (isWin) return 5 + Math.floor(floor / 10);
-  return Math.max(0, Math.floor(floor / 10));
+  const f = (typeof floor === 'number' && !isNaN(floor)) ? floor : 0;
+  if (isWin) return 5 + Math.floor(f / 10);
+  return Math.max(0, Math.floor(f / 10));
 }
 
 // ---- 角色经验结算 ----

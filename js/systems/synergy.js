@@ -26,6 +26,29 @@ export function checkSynergies() {
   return activated;
 }
 
+// 重新检查：遗物被替换后，清除不再满足条件的联动
+export function recheckSynergies() {
+  const s = Game.state;
+  if (!s._activeSynergies || !s._activeSynergies.length) return;
+
+  const relicIds = s.relics.map(r => r.id);
+  const allSynergies = R.get('synergies') || [];
+  const toRemove = [];
+
+  for (const synId of s._activeSynergies) {
+    const syn = allSynergies.find(s => s.id === synId);
+    if (!syn) { toRemove.push(synId); continue; }
+    // 遗物不齐 → 移除联动
+    if (!syn.relics.every(rid => relicIds.includes(rid))) {
+      if (syn.onRemove && s.player) syn.onRemove(s.player);
+      toRemove.push(synId);
+    }
+  }
+
+  s._activeSynergies = s._activeSynergies.filter(id => !toRemove.includes(id));
+  if (toRemove.length) { console.log("[妖塔] 联动已移除:", toRemove); }
+}
+
 // 获取当前已激活的联动（用于UI展示）
 export function getActiveSynergies() {
   const s = Game.state;

@@ -3,7 +3,7 @@ import { Game } from '../core/state.js';
 import { R } from '../core/registry.js';
 import { E, Events } from '../core/event-bus.js';
 import { genEquip, genRelic } from './loot.js';
-import { checkSynergies } from './synergy.js';
+import { checkSynergies, recheckSynergies } from './synergy.js';
 
 // ---- 获取可购商品列表 ----
 export function getShopItems() {
@@ -17,7 +17,7 @@ export function getShopItems() {
     fn: () => { s.player.hp = s.player.maxHp; s.player.mp = s.player.maxMp; Events.emit(E.PLAYER_HEALED, { amount: s.player.maxHp, hp: s.player.hp, maxHp: s.player.maxHp }); } });
   const eq = genEquip(); eq.cost = 25 + Math.floor(eq.val * 3);
   items.push({ name: eq.fullName || eq.name, cost: eq.cost, icon: eq.icon, type: 'equip', data: eq,
-    fn: () => { if (s.equip.length >= 6) s.equip.shift(); s.equip.push(eq); Events.emit(E.EQUIP_GAINED, { equip: eq }); } });
+    fn: () => { window._addEquip(eq); Events.emit(E.EQUIP_GAINED, { equip: eq }); } });
   if (s.rng.chance(0.5)) {
     const rel = genRelic();
     items.push({ name: rel.name, cost: 80, icon: rel.icon, type: 'relic', data: rel,
@@ -29,7 +29,8 @@ export function getShopItems() {
 // ---- 购买 ----
 export function buyItem(item) {
   const s = Game.state;
-  const mul = s.adDiscount ? 0.5 : 1;
+  let mul = s.adDiscount ? 0.5 : 1;
+  if (s.player?._greedCurse) mul *= 2; // 贪婪诅咒：商店价格翻倍
   const cost = Math.floor(item.cost * mul);
   if ((s.gold || 0) < cost) return false;
   s.gold -= cost;
@@ -47,10 +48,11 @@ export function acquireRelic(rel) {
     Events.emit(E.RELIC_REMOVED, { relic: old });
     s.relics.shift();
   }
+  // 替换旧遗物时，先清理联动再重算
   if (rel.passive && !rel.applied) { rel.passive(s.player); rel.applied = true; }
   s.relics.push(rel);
   Events.emit(E.RELIC_GAINED, { relic: rel });
-  // 检查遗物联动（商店/宝箱/祭坛获得时也能触发）
+  recheckSynergies(); // 旧遗物移除后，取消不再满足的联动
   const activated = checkSynergies();
   activated.forEach(syn => Events.emit(E.BATTLE_START, { type: 'synergy', name: syn.name, desc: syn.desc }));
 }

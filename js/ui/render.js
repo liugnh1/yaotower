@@ -5,6 +5,7 @@ import { E, Events } from '../core/event-bus.js';
 import { log, toast, float } from './effects.js';
 import { switchScreen, showModal, hideModal, hideAllModals } from './screens.js';
 import { RARITY_COLOR } from '../content/relics.js';
+import { getIntent } from '../systems/combat.js';
 
 export function render(s) {
   // 城池界面：有存档时显示"记忆之书"
@@ -15,6 +16,9 @@ export function render(s) {
   if (s.player) {
     const hpPct = s.player.maxHp > 0 ? Math.max(0, s.player.hp) / s.player.maxHp * 100 : 0;
     const mpPct = s.player.maxMp > 0 ? s.player.mp / s.player.maxMp * 100 : 0;
+    // 低血量红屏效果
+    const mainEl = document.getElementById("main");
+    if (mainEl) { if (hpPct < 25 && s.enemy) mainEl.classList.add("low-hp"); else mainEl.classList.remove("low-hp"); }
     document.getElementById("pl-hp").textContent = `${Math.max(0, s.player.hp)}/${s.player.maxHp}`;
     document.getElementById("hp-fill").style.width = hpPct + "%";
     document.getElementById("pl-mp").textContent = `${s.player.mp || 0}/${s.player.maxMp || 0}`;
@@ -28,14 +32,25 @@ export function render(s) {
     document.getElementById("pl-skill-name").textContent = sk ? `${sk.icon} ${sk.name}` : "无技能";
   }
 
-  // 装备列表
+  // 装备列表（可点击丢弃）
   const eqList = document.getElementById("equip-list");
   const STAT_LABEL = { atk: '⚔️攻击', def: '🛡️防御', maxHp: '❤️生命', critRate: '💥暴击', maxMp: '🔮灵力' };
   if (s.equip.length === 0) eqList.innerHTML = '<span style="color:#445566">暂无</span>';
-  else eqList.innerHTML = s.equip.map(e => {
-    const qTag = e.qualityName ? `<span style="font-size:10px;color:${e.color}">[${e.qualityName}]</span>` : '';
-    return `<span style="color:${e.color}" title="${e.fullName||e.name} ${STAT_LABEL[e.stat]||e.stat}+${e.val}">${qTag}${e.icon}<b>${e.fullName||e.name}</b> ${STAT_LABEL[e.stat]||e.stat}+${e.val}</span>`;
-  }).join(" ");
+  else {
+    eqList.innerHTML = '';
+    s.equip.forEach((e, i) => {
+      const span = document.createElement("span");
+      const qTag = e.qualityName ? `<span style="font-size:10px;color:${e.color}">[${e.qualityName}]</span>` : '';
+      const fxTag = e._combatEffect ? ` <span style="font-size:9px;color:#ffa502">·${e._combatEffect.type}</span>` : '';
+      span.innerHTML = `${qTag}${e.icon}<b>${e.fullName||e.name}</b> ${STAT_LABEL[e.stat]||e.stat}+${e.val}${fxTag}`;
+      span.style.cssText = `color:${e.color};cursor:pointer;margin-right:4px;display:inline-block;padding:2px 4px;border-radius:3px;transition:background .2s`;
+      span.title = `点击丢弃 ${e.fullName||e.name}`;
+      span.onclick = () => { if (confirm(`确定丢弃 ${e.fullName||e.name}？`)) window._discardEquip(i); };
+      span.onmouseenter = () => { span.style.background = 'rgba(255,100,100,0.25)'; };
+      span.onmouseleave = () => { span.style.background = 'transparent'; };
+      eqList.appendChild(span);
+    });
+  }
 
   // 遗物列表
   const relList = document.getElementById("relic-list");
@@ -68,11 +83,26 @@ export function render(s) {
     const ne = document.getElementById("enemy-name");
     ne.style.color = isBoss ? "#ffa502" : "#ff7b7b"; ne.textContent = s.enemy.name;
     document.getElementById("enemy-tag").textContent = s.enemy.tags.map(t => t.name).join(" ");
-    document.getElementById("enemy-hp-text").textContent = `HP: ${Math.max(0, s.enemy.hp)}/${s.enemy.maxHp}`;
+    // 敌人意图显示（失明诅咒时隐藏）
+    const intentEl = document.getElementById("enemy-intent");
+    if (intentEl) {
+      if (s.player?._blindCurse) {
+        intentEl.textContent = "???";
+      } else {
+        const intent = getIntent();
+        intentEl.textContent = intent ? `${intent.icon} 下回合：${intent.name}` : "";
+      }
+    }
+    // 失明时隐藏HP信息
+    const blind = s.player?._blindCurse;
+    document.getElementById("enemy-hp-text").textContent = blind ? "HP: ???/???" : `HP: ${Math.max(0, s.enemy.hp)}/${s.enemy.maxHp}`;
+    if (blind) { const fill = document.getElementById("enemy-hp-fill"); fill.style.width = "100%"; fill.style.background = "linear-gradient(90deg,#333,#555)"; }
   } else {
     document.getElementById("enemy-name").textContent = "--";
     document.getElementById("enemy-name").style.color = "#ff7b7b";
     document.getElementById("enemy-tag").textContent = "";
+    const intentEl2 = document.getElementById("enemy-intent");
+    if (intentEl2) intentEl2.textContent = "";
     document.getElementById("enemy-hp-fill").style.width = "0%";
     document.getElementById("enemy-hp-text").textContent = "HP: --/--";
   }

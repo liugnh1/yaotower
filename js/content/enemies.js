@@ -1,20 +1,74 @@
-// 怪物定义（按主题分组）
+// 怪物定义（按主题分组 —— 每Zone独立池，5-6种）
 import { R } from '../core/registry.js';
 
 R.registerAll('enemies', {
+  // ===== 迷雾平原（Tier 0）= 妖兽+游荡者 =====
   plains: [
     { name: "野兔精",  hp: 25, atk: 6,  def: 0, exp: "不堪一击", icon: "🐰" },
     { name: "山魈",    hp: 40, atk: 8,  def: 1, exp: "略有身手", icon: "👹" },
-    { name: "野狼",    hp: 55, atk: 10, def: 1, exp: "凶性毕露", icon: "🐺" }
+    { name: "野狼",    hp: 55, atk: 10, def: 1, exp: "凶性毕露", icon: "🐺" },
+    { name: "石魔像",  hp: 65, atk: 7,  def: 4, exp: "坚如磐石", icon: "🗿" },
+    { name: "流浪剑客",hp: 50, atk: 14, def: 1, exp: "剑术精湛", icon: "⚔️" },
+    { name: "毒寡妇",  hp: 38, atk: 11, def: 0, exp: "剧毒蛰刺", icon: "🕷️" }
   ],
+
+  // ===== 幽暗森林（Tier 1）= 毒物+精怪 =====
   forest: [
     { name: "毒蜂",    hp: 35, atk: 12, def: 0, exp: "成群结队", icon: "🐝" },
     { name: "树妖",    hp: 70, atk: 10, def: 3, exp: "根深蒂固", icon: "🌳" },
-    { name: "幽灵狼",  hp: 60, atk: 14, def: 1, exp: "来去无踪", icon: "👻" }
+    { name: "幽灵狼",  hp: 60, atk: 14, def: 1, exp: "来去无踪", icon: "👻" },
+    { name: "食人花",  hp: 55, atk: 16, def: 1, exp: "血盆大口", icon: "🌸" },
+    { name: "暗夜精灵",hp: 48, atk: 13, def: 2, exp: "魅影重重", icon: "🧝" },
+    { name: "藤蟒",    hp: 80, atk: 11, def: 2, exp: "绞杀缠绕", icon: "🐍" }
   ],
+
+  // ===== 废弃矿洞（Tier 1）= 矿兽+异形 =====
   cave: [
     { name: "矿洞鼠",  hp: 30, atk: 8,  def: 2, exp: "成群出没", icon: "🐀" },
     { name: "岩石怪",  hp: 90, atk: 9,  def: 6, exp: "坚如磐石", icon: "🪨" },
-    { name: "蝙蝠群",  hp: 50, atk: 13, def: 0, exp: "遮天蔽日", icon: "🦇" }
+    { name: "蝙蝠群",  hp: 50, atk: 13, def: 0, exp: "遮天蔽日", icon: "🦇" },
+    { name: "晶簇怪",  hp: 60, atk: 14, def: 3, exp: "晶刺飞射", icon: "💎" },
+    { name: "矿洞僵尸",hp: 75, atk: 12, def: 1, exp: "不死矿工", icon: "🧟" },
+    { name: "熔岩蜥蜴",hp: 55, atk: 17, def: 2, exp: "灼热吐息", icon: "🦎" }
+  ],
+
+  // ===== 远古废墟（Tier 2）= 遗物活化+亡魂 =====
+  ruins: [
+    { name: "石像守卫",hp: 85, atk: 11, def: 5, exp: "千年不动", icon: "🗿" },
+    { name: "远古亡魂",hp: 55, atk: 16, def: 0, exp: "怨念不散", icon: "👻" },
+    { name: "诅咒铠甲",hp: 70, atk: 13, def: 4, exp: "内里空空", icon: "🛡️" },
+    { name: "遗迹蜘蛛",hp: 50, atk: 15, def: 1, exp: "丝网缠身", icon: "🕸️" },
+    { name: "失落祭司",hp: 60, atk: 18, def: 2, exp: "古老咒术", icon: "🧙" },
+    { name: "活化雕像",hp: 100,atk: 10, def: 3, exp: "不灭守护", icon: "🗽" }
+  ],
+
+  // ===== 冰封小径（Tier 2）= 冰原巨兽+雪妖 =====
+  frozen: [
+    { name: "冰霜巨狼",hp: 65, atk: 15, def: 2, exp: "寒冰獠牙", icon: "🐺" },
+    { name: "雪妖",    hp: 55, atk: 17, def: 1, exp: "摄魂冰吻", icon: "👻" },
+    { name: "冰晶元素",hp: 80, atk: 10, def: 4, exp: "冻结万物", icon: "❄️" },
+    { name: "冻土巨魔",hp: 110,atk: 12, def: 5, exp: "冰甲护体", icon: "👹" },
+    { name: "极地幽魂",hp: 50, atk: 19, def: 0, exp: "刺骨寒意", icon: "💨" },
+    { name: "霜翼鸟",  hp: 45, atk: 14, def: 1, exp: "俯冲冰锥", icon: "🦅" }
+  ],
+
+  // ===== 虚空裂隙（Tier 2）= 异界实体+混沌生物 =====
+  voidgate: [
+    { name: "虚空行者",hp: 70, atk: 16, def: 1, exp: "裂隙穿梭", icon: "🌀" },
+    { name: "裂痕魔",  hp: 90, atk: 18, def: 3, exp: "撕裂现实", icon: "👿" },
+    { name: "混沌之眼",hp: 55, atk: 20, def: 0, exp: "凝视深渊", icon: "👁️" },
+    { name: "相位蜘蛛",hp: 60, atk: 14, def: 2, exp: "闪现突袭", icon: "🕷️" },
+    { name: "虚无之影",hp: 45, atk: 22, def: 0, exp: "无形无相", icon: "🌑" },
+    { name: "熵魔",    hp: 85, atk: 15, def: 3, exp: "万物归熵", icon: "💀" }
+  ],
+
+  // ===== 魔塔门前（Tier 3 · 最强杂兵）= 塔卫+堕落者 =====
+  tower: [
+    { name: "塔卫兵",  hp: 90, atk: 16, def: 4, exp: "魔塔卫士", icon: "⚔️" },
+    { name: "魔塔石像",hp: 120,atk: 12, def: 6, exp: "不灭守卫", icon: "🗿" },
+    { name: "暗影骑士",hp: 80, atk: 20, def: 3, exp: "堕落剑术", icon: "🐴" },
+    { name: "塔灵",    hp: 65, atk: 22, def: 1, exp: "魔法具现", icon: "🔮" },
+    { name: "深渊法师",hp: 70, atk: 19, def: 2, exp: "禁忌咒文", icon: "🧙" },
+    { name: "魔塔守卫",hp: 105,atk: 17, def: 5, exp: "终极防线", icon: "🛡️" }
   ]
 });

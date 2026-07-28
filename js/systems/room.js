@@ -14,6 +14,15 @@ export function initZone(zoneId) {
   s.zoneIndex = entry.depth;
   s.floorInZone = 1;
 
+  // 应用Zone环境效果
+  s._zoneMod = s.zone.modifier || null;
+  if (s._zoneMod) {
+    // 矿洞：防御-2
+    if (s._zoneMod.id === "cave_gold" && s.player) s.player.def = Math.max(0, s.player.def - 2);
+    if (s._zoneMod.id === "tower_regen" && s.player) s.player.regen = (s.player.regen || 0) + Math.floor(s.player.maxHp * 0.03);
+    console.log("[妖塔] Zone环境效果:", s._zoneMod.desc);
+  }
+
   // 生成房间池：模板洗牌 + Boss 单独标记
   const templates = R.get('roomTemplates').simple;
   let template = s.rng.pick(templates).slice();
@@ -101,4 +110,10 @@ export function prepareRoomEntry() {
   const s = Game.state;
   s.potionAtk = 0; s.potionDef = 0;
   s.adDiscount = false; s.adRefreshCount = 0;
+  // 诅咒：恐惧（每进入新房间扣5%当前生命）
+  if (s.player && s.player._fearCurse) {
+    const loss = Math.max(1, Math.floor(s.player.hp * 0.05));
+    s.player.hp -= loss;
+    console.log("[妖塔] 恐惧诅咒触发，损失", loss, "生命");
+  }
 }
