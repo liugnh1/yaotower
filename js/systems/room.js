@@ -1,69 +1,104 @@
-// ===================== 房间/关卡系统 =====================
+// ===================== 房间/关卡系统（肉鸽分岔路版）=====================
 import { Game } from '../core/state.js';
 import { R } from '../core/registry.js';
 import { E, Events } from '../core/event-bus.js';
 
-// ---- 初始化关卡（只设置数据，不进入房间）----
-export function initZone(idx) {
+// ---- 初始化关卡（按 Zone ID 路由）----
+export function initZone(zoneId) {
   const s = Game.state;
-  s.zoneIndex = idx;
   const route = R.get('simpleRoute');
-  const routeEntry = route[idx];
-  if (!routeEntry) { console.error("No route for zone index", idx); return false; }
-  s.zone = R.get('zones', routeEntry.zone);
+  const entry = route[zoneId];
+  if (!entry) { console.error("No route for zone:", zoneId); return false; }
+
+  s.zone = R.get('zones', zoneId);
+  s.zoneIndex = entry.depth;
   s.floorInZone = 1;
-  // 随机选取一个房间结构模板（不包含Boss，Boss固定追加在末尾）
+
+  // 生成房间池：模板洗牌 + Boss 单独标记
   const templates = R.get('roomTemplates').simple;
   let template = s.rng.pick(templates).slice();
   if (s.extraElite) {
     const bi = template.findIndex(r => r === "battle");
     if (bi >= 0) template[bi] = "elite";
   }
-  // Boss 固定在最末尾，其余房间保持模板中的固定顺序（不再全量 shuffle）
-  s.roomQueue = template.concat("boss");
-  s.roomIndex = 0;
-  Events.emit(E.ZONE_CHANGE, { zone: s.zone, zoneIndex: idx });
-  // 返回 false 表示需要玩家选路线，true 表示可直接进入
-  if (idx > 0) {
-    const prevRoute = route[idx - 1];
-    if (prevRoute && prevRoute.choices.length > 1) return false;
+  // Fisher-Yates 洗牌（除了前3间保持战斗暖场）
+  const warmup = template.splice(0, 3);       // 前3间固定战斗
+  const rest = s.rng.shuffle(template);        // 其余打乱
+  s._roomPool = warmup.concat(rest);           // 暖场在前，其余洗乱
+  s._bossReady = false;
+  s._roomForkUsed = false;
+
+  Events.emit(E.ZONE_CHANGE, { zone: s.zone, zoneIndex: entry.depth });
+
+  // 返回：是否有分支选择
+  return entry.choices && entry.choices.length > 1 ? entry.choices : null;
+}
+
+// ---- 从房间池顺序出牌（暖场在前，已洗牌在后）----
+export function drawOne() {
+  const s = Game.state;
+  const pool = s._roomPool;
+
+  // 池子空了 → Boss 或 Zone 结束
+  if (pool.length === 0) {
+    if (!s._bossReady) { s._bossReady = true; return "boss"; }
+    return null;
   }
-  return true;
+
+  return pool.shift(); // 顺序出牌：前3暖场战斗 → 洗乱的特殊房间+战斗
 }
 
-// ---- 获取当前房间ID（不改变状态）----
-export function getCurrentRoomId() {
+// ---- 从池子抽一张不同类型（岔路用），无不同类型返回 null ----
+export function tryDrawDifferent(excludeType) {
   const s = Game.state;
-  return s.roomQueue[s.roomIndex] || null;
+  const pool = s._roomPool;
+
+  const candidates = [];
+  for (let i = 0; i < pool.length; i++) {
+    if (pool[i] !== excludeType) candidates.push(i);
+  }
+  if (candidates.length === 0) return null;
+
+  const idx = s.rng.pick(candidates);
+  return pool.splice(idx, 1)[0];
 }
 
-// ---- 进入房间后的状态重置 ----
-export function prepareRoomEntry() {
-  const s = Game.state;
-  s.potionAtk = 0; s.potionDef = 0;
-  s.adDiscount = false; s.adRefreshCount = 0;
+// ---- 把未选择的房间放回池子 ----
+export function returnRoom(type) {
+  if (!type || type === "boss") return;
+  Game.state._roomPool.push(type);
 }
 
-// ---- 检查是否本关结束 ----
+// ---- 检查是否 Zone 结束 ----
 export function isZoneEnd() {
   const s = Game.state;
-  return s.roomIndex >= s.roomQueue.length;
+  return s._roomPool.length === 0 && s._bossReady;
 }
 
-// ---- 下一房间（推进房间索引）----
-export function advanceRoom() {
-  const s = Game.state;
-  s.roomIndex++;
-}
-
-// ---- 推进楼层（totalFloor++）----
+// ---- 推进楼层 ----
 export function advanceFloor() {
   const s = Game.state;
   s.totalFloor++;
   s.floorInZone++;
 }
 
-// ---- 简单模式通关检查 ----
-export function isSimpleRouteEnd(zoneIndex) {
-  return zoneIndex >= 4;
+// ---- 检查是否最终 Zone ----
+export function isFinalZone(zoneId) {
+  const route = R.get('simpleRoute');
+  const entry = route[zoneId];
+  return entry && (!entry.choices || entry.choices.length === 0);
+}
+
+// ---- 获取 Zone 分支 ----
+export function getZoneChoices(zoneId) {
+  const route = R.get('simpleRoute');
+  const entry = route[zoneId];
+  return entry ? (entry.choices || []) : [];
+}
+
+// ---- 进入房间前状态重置 ----
+export function prepareRoomEntry() {
+  const s = Game.state;
+  s.potionAtk = 0; s.potionDef = 0;
+  s.adDiscount = false; s.adRefreshCount = 0;
 }

@@ -3,6 +3,7 @@ import { Game } from '../core/state.js';
 import { R } from '../core/registry.js';
 import { E, Events } from '../core/event-bus.js';
 import { genEquip, genRelic } from './loot.js';
+import { checkSynergies } from './synergy.js';
 
 // ---- 获取可购商品列表 ----
 export function getShopItems() {
@@ -15,7 +16,7 @@ export function getShopItems() {
   items.push({ name: "强力药水", cost: 35, icon: "🧴", type: 'potion',
     fn: () => { s.player.hp = s.player.maxHp; s.player.mp = s.player.maxMp; Events.emit(E.PLAYER_HEALED, { amount: s.player.maxHp, hp: s.player.hp, maxHp: s.player.maxHp }); } });
   const eq = genEquip(); eq.cost = 25 + Math.floor(eq.val * 3);
-  items.push({ name: (eq.prefix || "") + eq.name, cost: eq.cost, icon: eq.icon, type: 'equip', data: eq,
+  items.push({ name: eq.fullName || eq.name, cost: eq.cost, icon: eq.icon, type: 'equip', data: eq,
     fn: () => { if (s.equip.length >= 6) s.equip.shift(); s.equip.push(eq); Events.emit(E.EQUIP_GAINED, { equip: eq }); } });
   if (s.rng.chance(0.5)) {
     const rel = genRelic();
@@ -49,6 +50,9 @@ export function acquireRelic(rel) {
   if (rel.passive && !rel.applied) { rel.passive(s.player); rel.applied = true; }
   s.relics.push(rel);
   Events.emit(E.RELIC_GAINED, { relic: rel });
+  // 检查遗物联动（商店/宝箱/祭坛获得时也能触发）
+  const activated = checkSynergies();
+  activated.forEach(syn => Events.emit(E.BATTLE_START, { type: 'synergy', name: syn.name, desc: syn.desc }));
 }
 
 // ---- 广告 ----

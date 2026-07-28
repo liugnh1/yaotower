@@ -7,7 +7,9 @@ import { switchScreen, showModal, hideModal, hideAllModals } from './screens.js'
 import { RARITY_COLOR } from '../content/relics.js';
 
 export function render(s) {
-  document.getElementById("continue-box").style.display = Game.hasSave() ? "block" : "none";
+  // 城池界面：有存档时显示"记忆之书"
+  const cb = document.getElementById("continue-box");
+  if (cb) cb.style.display = Game.hasSave() ? "block" : "none";
   document.getElementById("gold-text").textContent = s.gold || 0;
 
   if (s.player) {
@@ -30,7 +32,10 @@ export function render(s) {
   const eqList = document.getElementById("equip-list");
   const STAT_LABEL = { atk: '⚔️攻击', def: '🛡️防御', maxHp: '❤️生命', critRate: '💥暴击', maxMp: '🔮灵力' };
   if (s.equip.length === 0) eqList.innerHTML = '<span style="color:#445566">暂无</span>';
-  else eqList.innerHTML = s.equip.map(e => `<span style="color:${e.color}" title="${e.prefix || ''}${e.name} ${STAT_LABEL[e.stat]||e.stat}+${e.val}">${e.icon}${e.prefix||''}${e.name} <b>${STAT_LABEL[e.stat]||e.stat}+${e.val}</b></span>`).join(" ");
+  else eqList.innerHTML = s.equip.map(e => {
+    const qTag = e.qualityName ? `<span style="font-size:10px;color:${e.color}">[${e.qualityName}]</span>` : '';
+    return `<span style="color:${e.color}" title="${e.fullName||e.name} ${STAT_LABEL[e.stat]||e.stat}+${e.val}">${qTag}${e.icon}<b>${e.fullName||e.name}</b> ${STAT_LABEL[e.stat]||e.stat}+${e.val}</span>`;
+  }).join(" ");
 
   // 遗物列表
   const relList = document.getElementById("relic-list");
@@ -59,7 +64,7 @@ export function render(s) {
     if (ehp > 60) fill.style.background = "linear-gradient(90deg,#8b0000,#ff4444)";
     else if (ehp > 30) fill.style.background = "linear-gradient(90deg,#8b4500,#ffaa00)";
     else fill.style.background = "linear-gradient(90deg,#550000,#ff0000)";
-    const isBoss = s.roomQueue[s.roomIndex - 1] === "boss";
+    const isBoss = s._currentRoomType === "boss";
     const ne = document.getElementById("enemy-name");
     ne.style.color = isBoss ? "#ffa502" : "#ff7b7b"; ne.textContent = s.enemy.name;
     document.getElementById("enemy-tag").textContent = s.enemy.tags.map(t => t.name).join(" ");

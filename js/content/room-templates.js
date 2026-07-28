@@ -3,20 +3,21 @@
 // 前2间固定为战斗（暖场攒钱），Boss固定末尾，其余位置有限随机打乱
 import { R } from '../core/registry.js';
 
-// 每关10间房的结构模板（不含Boss，Boss由initZone固定追加在末尾）
+// 每关9间房 + Boss的结构模板
+// 规则：前3间强制战斗暖场 → 商店最早在第4间 → 精英/特殊房分布中后段
 // battle=战斗 shop=商店 chest=宝箱 event=随机事件 shrine=神龛 altar=祭坛 elite=精英
 const STRUCTURES = [
-  // 模板1：常规，精英在中段
+  // 模板1：常规 — 店在第4，精英第7，神龛第8
   ["battle","battle","battle","shop","chest","battle","elite","shrine","battle"],
-  // 模板2：精英靠后
-  ["battle","battle","shop","battle","chest","battle","event","elite","battle"],
-  // 模板3：双特殊房
+  // 模板2：店靠后 — 店在第6，精英第8
+  ["battle","battle","battle","chest","battle","shop","battle","elite","battle"],
+  // 模板3：双特殊 — 店在第4，神龛第5，精英在末
   ["battle","battle","battle","shop","shrine","battle","chest","battle","elite"],
-  // 模板4：祭坛变体
-  ["battle","battle","shop","battle","altar","chest","battle","elite","battle"],
-  // 模板5：店靠前变体
-  ["battle","battle","shop","battle","battle","chest","elite","event","battle"],
-  // 模板6：精英在前的挑战型
+  // 模板4：祭坛变体 — 店在第4，祭坛第6
+  ["battle","battle","battle","shop","battle","altar","chest","elite","battle"],
+  // 模板5：事件流 — 店在第4，事件第7，精英第8
+  ["battle","battle","battle","shop","chest","battle","event","elite","battle"],
+  // 模板6：精英前置 — 店在第4，精英第2（高回报高风险）
   ["battle","elite","battle","shop","battle","chest","shrine","battle","battle"],
 ];
 

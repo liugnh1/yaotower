@@ -3,43 +3,90 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<link rel="icon" href="data:,">
 <title>妖塔 v0.32 · 肉鸽爬塔</title>
 <link rel="stylesheet" href="css/main.css">
 </head>
 <body>
 <div id="game">
 
-<!-- 启动页 -->
+<!-- 边境城池 · 主界面 -->
 <div id="start">
-  <h1>妖塔 <span style="font-size:16px;color:#667788">v0.32</span></h1>
-  <p>无尽爬塔，每局皆不同。<br>选择道途与天赋，收集遗物，斩尽妖邪。</p>
-  <input id="seed-input" placeholder="输入种子（留空随机）" maxlength="20">
-  <div class="btn-row">
-    <button class="start-btn" id="btn-newgame">🎮 新游戏</button>
+  <div class="city-sky">
+    <h1>妖塔 <span class="ver-tag">v0.32</span></h1>
+    <p class="city-lore">边境城池 · 魔塔前最后的庇护所<br><span class="lore-sub">整装待发，踏入迷雾……</span></p>
   </div>
-  <div id="continue-box" style="display:none">
-    <button class="start-btn" style="background:#2a5a3b" id="btn-continue">📂 继续冒险</button>
+
+  <div class="city-map">
+    <!-- 种子输入 -->
+    <div class="seed-row">
+      <input id="seed-input" placeholder="输入种子（留空随机）" maxlength="20">
+    </div>
+
+    <!-- NPC 网格 -->
+    <div class="npc-grid">
+      <div class="npc-card npc-gate" id="btn-newgame">
+        <div class="npc-icon">🏰</div>
+        <div class="npc-name">城门</div>
+        <div class="npc-hint">出城探险</div>
+      </div>
+
+      <div class="npc-card npc-altar" id="btn-meta">
+        <div class="npc-icon">🔮</div>
+        <div class="npc-name">女神祭坛</div>
+        <div class="npc-hint">局外成长</div>
+      </div>
+
+      <div class="npc-card npc-guild" id="btn-codex">
+        <div class="npc-icon">📖</div>
+        <div class="npc-name">学者公会</div>
+        <div class="npc-hint">妖兽图鉴</div>
+      </div>
+
+      <div class="npc-card npc-board" id="btn-daily">
+        <div class="npc-icon">📅</div>
+        <div class="npc-name">悬赏板</div>
+        <div class="npc-hint">每日挑战</div>
+      </div>
+
+      <div id="continue-box" style="display:none">
+        <div class="npc-card npc-save" id="btn-continue">
+          <div class="npc-icon">📂</div>
+          <div class="npc-name">记忆之书</div>
+          <div class="npc-hint">继续冒险</div>
+        </div>
+      </div>
+
+      <div class="npc-card npc-fountain" id="btn-delete">
+        <div class="npc-icon">🌊</div>
+        <div class="npc-name">遗忘之泉</div>
+        <div class="npc-hint">重置旅程</div>
+      </div>
+
+      <div class="npc-card npc-lb" id="btn-show-lb-start">
+        <div class="npc-icon">📊</div>
+        <div class="npc-name">功勋柱</div>
+        <div class="npc-hint">排行榜</div>
+      </div>
+    </div>
   </div>
-  <div class="btn-row" style="margin-top:8px">
-    <button class="start-btn sm" style="background:#4a3b8b" id="btn-codex">📖 妖兽图鉴</button>
-    <button class="start-btn sm" style="background:#555" id="btn-daily">📅 每日挑战</button>
-    <button class="start-btn sm" style="background:#6a3b8b" id="btn-meta">🔮 局外成长</button>
-    <button class="start-btn sm" style="background:#333" id="btn-delete">🗑️ 删档</button>
-  </div>
-  <div style="margin-top:10px;color:#667788;font-size:11px">TapTap 本地游戏 · 竖屏体验最佳</div>
+
+  <div class="city-footer">「魔塔的阴影正在蔓延……勇士，请做好准备。」</div>
 </div>
 
-<!-- 难度选择 -->
+<!-- 出征准备：难度+职业 -->
 <div id="difficulty-select" class="hidden">
-  <h2>⚔️ 选择难度</h2>
+  <h2>⚔️ 出征准备</h2>
+  <p style="color:#8899bb;font-size:12px;margin-bottom:8px">选择难度</p>
   <div class="card-grid" id="diff-grid"></div>
+  <p style="color:#8899bb;font-size:12px;margin:12px 0 8px">选择道途</p>
+  <div class="card-grid" id="class-grid"></div>
 </div>
 
-<!-- 职业选择 -->
+<!-- 每日挑战职业选择（独立页面）-->
 <div id="class-select" class="hidden">
   <h2>⚔️ 选择你的道途</h2>
-  <div class="card-grid" id="class-grid"></div>
-  <div style="color:#667788;font-size:12px">选择后无法更改</div>
+  <div class="card-grid" id="class-grid-daily"></div>
 </div>
 
 <!-- 技能选择 -->
@@ -63,13 +110,25 @@
   <div class="card-grid" id="zone-grid"></div>
 </div>
 
-<!-- 房间选择 -->
+<!-- 房间分岔路 -->
 <div id="room-select" class="hidden">
-  <h2>🚪 进入房间</h2>
+  <h2>🚪 选择前路</h2>
   <div class="floor-info" id="room-info">第 1 层</div>
-  <div class="room-desc" id="room-desc"></div>
+  <div class="fork-grid" id="fork-grid">
+    <div class="fork-door" id="fork-left">
+      <div class="door-icon"></div>
+      <div class="door-name"></div>
+      <div class="door-hint"></div>
+    </div>
+    <div class="fork-vs">VS</div>
+    <div class="fork-door" id="fork-right">
+      <div class="door-icon"></div>
+      <div class="door-name"></div>
+      <div class="door-hint"></div>
+    </div>
+  </div>
   <div class="btn-row" style="margin-top:20px">
-    <button class="start-btn" id="btn-enter-room">进入</button>
+    <button class="start-btn" id="btn-enter-room" style="display:none">进入</button>
   </div>
 </div>
 

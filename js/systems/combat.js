@@ -15,7 +15,7 @@ export function startBattle(type) {
   s.auto = false; s.defending = false; s.nextBoost = 0; s.turnInFloor = 0;
   s.enemy = null; let base;
   if (type === "boss") {
-    const boss = R.get('bosses', s.zoneIndex + 1);
+    const boss = R.get('bosses', s.zone ? s.zone.id : (s.zoneIndex + 1));
     const endless = R.get('endlessBosses');
     const endlessIdx = Math.max(0, Math.min(s.zoneIndex - 4, (endless || []).length - 1));
     const bossData = boss || (endless && endless.length > 0 ? endless[endlessIdx] : null);
@@ -30,7 +30,9 @@ export function startBattle(type) {
     base = { ...s.rng.pick(pool) };
   }
   const diff = R.get('difficulties', s.difficulty) || R.get('difficulties', 'standard');
-  base.hp = Math.floor(base.hp * diff.monsterMul); base.atk = Math.floor(base.atk * diff.monsterMul);
+  const zoneScale = s.zone ? (s.zone.scale || 1.0) : 1.0;
+  base.hp = Math.floor(base.hp * diff.monsterMul * zoneScale);
+  base.atk = Math.floor(base.atk * diff.monsterMul * (1 + (zoneScale - 1) * 0.5)); // 攻击增长减半，避免秒杀
   // 每日修饰器
   if (s.enemyHpMul) base.hp = Math.floor(base.hp * s.enemyHpMul);
   if (s.enemyAtkMul) base.atk = Math.floor(base.atk * s.enemyAtkMul);
@@ -57,7 +59,9 @@ function addTag(s) {
 // ---- 玩家动作 ----
 export function doAttack() {
   const s = Game.state; if (s.gameOver || !s.enemy || s.enemy.hp <= 0) return;
-  s.defending = false; let dmg = calcDmg(false); applyDmg(dmg, false);
+  s.defending = false;
+  if (s.player._stoneGaze) { delete s.player._stoneGaze; Events.emit(E.BATTLE_START, { type: 'stoneGaze' }); enemyTurn(); Game.sync(); if (s.auto) setTimeout(autoLoop, 700); return; }
+  let dmg = calcDmg(false); applyDmg(dmg, false);
   if (s.player.doubleFirst && s.turnInFloor === 0) {
     Events.emit(E.BATTLE_START, { type: 'doubleAttack' });
     applyDmg(calcDmg(false), false); s.player.doubleFirst = false;
@@ -68,7 +72,9 @@ export function doAttack() {
 
 export function doSkill() {
   const s = Game.state; if (s.gameOver || !s.enemy || s.enemy.hp <= 0 || s.player.mp < s.player.mpCost) return;
-  s.defending = false; s.player.mp -= s.player.mpCost;
+  s.defending = false;
+  if (s.player._stoneGaze) { delete s.player._stoneGaze; Events.emit(E.BATTLE_START, { type: 'stoneGaze' }); enemyTurn(); Game.sync(); if (s.auto) setTimeout(autoLoop, 700); return; }
+  s.player.mp -= s.player.mpCost;
   // 魔力共鸣羁绊: 技能消耗5%最大生命
   if (s.player._synOrbRing) { const cost = Math.max(1, Math.floor(s.player.maxHp * 0.05)); s.player.hp -= cost; Events.emit(E.PLAYER_DAMAGED, { dmg: cost, source: 'synergy', target: 'self' }); if (s.player.hp <= 0) { s.player.hp = 0; Game.sync(); setTimeout(() => gameOver(), 500); return; } }
   let dmg = calcDmg(true); applyDmg(dmg, true);
@@ -297,6 +303,12 @@ function win() {
   if (fast) { g = Math.floor(g * 2); }
   s.gold += g;
   Events.emit(E.GOLD_CHANGED, { gold: s.gold, delta: g, fast });
+  // 魂晶掉落：精英1-2，Boss 2-5
+  const roomType = s._currentRoomType || '';
+  let souls = 0;
+  if (roomType === 'elite') souls = s.rng.range(1, 2);
+  else if (roomType === 'boss') souls = 2 + s.zoneIndex; // Boss越后面掉越多
+  if (souls > 0) { Game.meta.souls += souls; Game.saveMeta(); Events.emit(E.GOLD_CHANGED, { souls }); }
   s.relics.forEach(r => { if (r.onKill) r.onKill(s.player); });
   s.stats.roomsCleared++;
   Game.sync();

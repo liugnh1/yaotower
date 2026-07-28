@@ -51,7 +51,7 @@ function defState() {
   return {
     seed: "", rng: null, mode: "simple", difficulty: "standard",
     zone: null, zoneIndex: 0, floorInZone: 1, totalFloor: 1,
-    roomQueue: [], roomIndex: 0,
+    _roomPool: [], _bossReady: false, _currentRoomType: null,
     player: null, enemy: null, gold: 0,
     equip: [], relics: [], potions: [],
     talent: null, playerClass: null, activeSkill: null, curses: [],
@@ -67,8 +67,8 @@ function defState() {
 
 function defMeta() {
   return {
-    tp: 0, unlocks: ["warrior", "mage"], charExp: { warrior: 0, mage: 0 },
-    upgrades: {}, highestSimple: 0, highestNormal: 0,
+    tp: 0, souls: 0, unlocks: ["warrior", "mage"], charExp: { warrior: 0, mage: 0 },
+    upgrades: {}, soulUpgrades: {}, highestSimple: 0, highestNormal: 0,
     adWatched: 0, adDate: "", totalRuns: 0, totalWins: 0, totalDeaths: 0,
     dailyBest: 0, dailyDate: "", achievements: []
   };
@@ -92,7 +92,7 @@ export const Game = {
       seed: s.seed, mode: s.mode, difficulty: s.difficulty,
       zone: s.zone ? s.zone.id : null, zoneIndex: s.zoneIndex,
       floorInZone: s.floorInZone, totalFloor: s.totalFloor,
-      roomQueue: s.roomQueue, roomIndex: s.roomIndex,
+      roomQueue: s._roomPool, roomIndex: s._bossReady ? 1 : 0,
       gold: s.gold, equip: s.equip, potions: s.potions,
       relics: s.relics.map(r => ({ id: r.id, applied: !!r.applied })),
       curses: s.curses.map(c => c.id),
@@ -120,8 +120,8 @@ export const Game = {
       s.seed = d.seed || ("" + Date.now()); s.rng = new RNG(s.seed);
       s.mode = d.mode || "simple"; s.difficulty = d.difficulty || "standard";
       s.zoneIndex = d.zoneIndex || 0; s.floorInZone = d.floorInZone || 1;
-      s.totalFloor = d.totalFloor || 1; s.roomQueue = d.roomQueue || [];
-      s.roomIndex = d.roomIndex || 0; s.gold = d.gold || 0;
+      s.totalFloor = d.totalFloor || 1; s._roomPool = d.roomQueue || [];
+      s._bossReady = (d.roomIndex || 0) > 0; s.gold = d.gold || 0;
       s.zone = d.zone ? R.get('zones', d.zone) : null;
       s.equip = d.equip || []; s.potions = d.potions || [];
       s.curses = (d.curses || []).map(id => R.get('curses').find(c => c.id === id)).filter(Boolean);
@@ -155,28 +155,57 @@ export const Game = {
   _loadMeta() {
     try {
       const raw = localStorage.getItem(META_KEY);
-      if (raw) this.meta = { ...defMeta(), ...JSON.parse(raw) };
-    } catch (e) { this.meta = defMeta(); }
+      if (raw) { this.meta = { ...defMeta(), ...JSON.parse(raw) }; }
+      else { this.meta = defMeta(); }
+    } catch (e) { console.warn("[妖塔] 元数据损坏，已重置"); this.meta = defMeta(); }
     this._checkAdReset();
   },
   saveMeta() { try { localStorage.setItem(META_KEY, JSON.stringify(this.meta)); } catch (e) { console.error("妖塔3.0: 元数据保存失败", e); } },
 
   _checkAdReset() {
+    if (!this.meta) return;
+    // 防御：确保 adWatched 是合法数字
+    if (typeof this.meta.adWatched !== 'number' || isNaN(this.meta.adWatched) || this.meta.adWatched < 0 || this.meta.adWatched > 50) {
+      console.warn("[妖塔] adWatched 异常值，已重置:", this.meta.adWatched);
+      this.meta.adWatched = 0;
+    }
+    // 一次性修复：旧版本bug可能导致adWatched异常累积到上限，自动清零一次
+    const FIX_FLAG = "yaotower_v3.2_ad_fix_done";
+    if (!localStorage.getItem(FIX_FLAG)) {
+      console.warn("[妖塔] 执行广告计数一次性修复：adWatched", this.meta.adWatched, "→ 0");
+      this.meta.adWatched = 0;
+      this.meta.adDate = "";
+      localStorage.setItem(FIX_FLAG, "1");
+      this.saveMeta();
+    }
     const d = new Date(); const today = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-    if (this.meta.adDate !== today) { this.meta.adDate = today; this.meta.adWatched = 0; this.saveMeta(); }
+    if (this.meta.adDate !== today) {
+      console.log("[妖塔] 新的一天，重置广告计数:", this.meta.adDate, "→", today);
+      this.meta.adDate = today; this.meta.adWatched = 0; this.saveMeta();
+    }
   },
 
-  addTP(n) { this.meta.tp += n; this.saveMeta(); },
+  addTP(n) { if (!this.meta) return; this.meta.tp += n; this.saveMeta(); },
   canWatchAd() {
+    if (!this.meta) { console.warn("[妖塔] canWatchAd: meta 未初始化"); return false; }
     this._checkAdReset();
     const diff = R.get('difficulties', this.state.difficulty) || R.get('difficulties', 'standard');
-    return this.meta.adWatched < diff.adLimit;
+    const watched = Number(this.meta.adWatched) || 0;
+    const limit = diff ? (Number(diff.adLimit) || 10) : 10;
+    console.log("[妖塔] canWatchAd:", { watched, limit, diffId: this.state.difficulty, canWatch: watched < limit });
+    return watched < limit;
   },
   watchAd() {
+    if (!this.meta) { console.warn("[妖塔] watchAd: meta 未初始化"); return false; }
     this._checkAdReset();
     const diff = R.get('difficulties', this.state.difficulty) || R.get('difficulties', 'standard');
-    if (this.meta.adWatched >= diff.adLimit) return false;
-    this.meta.adWatched++; this.saveMeta(); return true;
+    const limit = diff ? (Number(diff.adLimit) || 10) : 10;
+    const watched = Number(this.meta.adWatched) || 0;
+    if (watched >= limit) { console.log("[妖塔] watchAd: 已达上限", { watched, limit }); return false; }
+    this.meta.adWatched = watched + 1;
+    this.saveMeta();
+    console.log("[妖塔] watchAd: 成功, 已观看", this.meta.adWatched, "/", limit);
+    return true;
   },
 
   // ---- 局外成长（修复隐形陷阱）----

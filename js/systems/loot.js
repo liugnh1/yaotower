@@ -26,9 +26,10 @@ export function genEquip() {
   if (p.statBonus && p.statBonus[t.stat]) {
     val += p.statBonus[t.stat];
   }
+  const fullName = p.name ? `${p.name}的${t.name}` : t.name;
   return {
-    icon: t.icon, name: t.name, prefix: p.name || '',
-    stat: t.stat, val: val, color: q.color, type: t.type
+    icon: t.icon, name: t.name, prefix: p.name || '', fullName,
+    stat: t.stat, val: val, color: q.color, qualityName: q.name, type: t.type
   };
 }
 
