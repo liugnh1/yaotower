@@ -10,9 +10,9 @@ export class RNG {
   range(a, b) { return Math.floor(this.next() * (b - a + 1)) + a; }
   pick(arr) { return arr[this.range(0, arr.length - 1)]; }
   chance(p) { return this.next() < p; }
+  // P2-10: 使用 Fisher-Yates 洗牌替代 sort() 比较器，保证均匀分布
   pickMulti(arr, n) {
-    const a = arr.slice().sort(() => this.next() - 0.5);
-    return a.slice(0, n);
+    return this.shuffle(arr).slice(0, n);
   }
   // 洗牌
   shuffle(arr) {

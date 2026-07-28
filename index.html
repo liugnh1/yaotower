@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>妖塔3.0 · 肉鸽爬塔</title>
+<title>妖塔 v0.32 · 肉鸽爬塔</title>
 <link rel="stylesheet" href="css/main.css">
 </head>
 <body>
@@ -11,7 +11,7 @@
 
 <!-- 启动页 -->
 <div id="start">
-  <h1>妖塔 3.0</h1>
+  <h1>妖塔 <span style="font-size:16px;color:#667788">v0.32</span></h1>
   <p>无尽爬塔，每局皆不同。<br>选择道途与天赋，收集遗物，斩尽妖邪。</p>
   <input id="seed-input" placeholder="输入种子（留空随机）" maxlength="20">
   <div class="btn-row">
@@ -23,6 +23,7 @@
   <div class="btn-row" style="margin-top:8px">
     <button class="start-btn sm" style="background:#4a3b8b" id="btn-codex">📖 妖兽图鉴</button>
     <button class="start-btn sm" style="background:#555" id="btn-daily">📅 每日挑战</button>
+    <button class="start-btn sm" style="background:#6a3b8b" id="btn-meta">🔮 局外成长</button>
     <button class="start-btn sm" style="background:#333" id="btn-delete">🗑️ 删档</button>
   </div>
   <div style="margin-top:10px;color:#667788;font-size:11px">TapTap 本地游戏 · 竖屏体验最佳</div>
@@ -46,6 +47,13 @@
   <h2>🔥 领悟技能</h2>
   <div class="card-grid" id="skill-grid"></div>
   <div style="color:#667788;font-size:12px">每局随机，改变你的战斗方式</div>
+</div>
+
+<!-- 天赋选择 -->
+<div id="talent-select" class="hidden">
+  <h2>✨ 选择天赋</h2>
+  <div class="card-grid" id="talent-grid"></div>
+  <div style="color:#667788;font-size:12px">三选一，每局一次</div>
 </div>
 
 <!-- 关卡（主题）选择 -->
@@ -177,6 +185,15 @@
   <div id="meta-reward" style="color:#ffa502;font-size:14px;margin-bottom:12px"></div>
   <button class="restart-btn" id="btn-hard-restart">🔄 重新开始</button>
   <button class="restart-btn" style="background:#2a5a3b" id="btn-read-save">📂 读取存档</button>
+  <button class="restart-btn" style="background:#4a3b8b" id="btn-show-lb">📊 排行榜</button>
+</div>
+
+<!-- 局外成长 -->
+<div id="meta-panel" class="modal">
+  <h3>🔮 局外成长</h3>
+  <div style="color:#ffa502;margin-bottom:10px">天赋点: <b id="meta-tp">0</b></div>
+  <div id="meta-content" style="text-align:left;font-size:13px;max-height:50vh;overflow-y:auto"></div>
+  <button class="restart-btn" style="margin-top:10px;width:100%" id="btn-close-meta">关闭</button>
 </div>
 
 <!-- 排行榜 -->
@@ -190,5 +207,6 @@
 </div>
 
 <script type="module" src="js/core/main.js"></script>
+<script>document.getElementById("btn-close-meta").onclick=()=>{document.getElementById("meta-panel").style.display="none";};</script>
 </body>
 </html>
