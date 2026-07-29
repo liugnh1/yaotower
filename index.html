@@ -114,6 +114,7 @@
 
 <!-- 出征准备：难度+职业 -->
 <div id="difficulty-select" class="hidden">
+  <button class="city-back-btn" style="position:absolute;top:10px;left:10px;z-index:10" onclick="document.getElementById('difficulty-select').classList.add('hidden');document.getElementById('start').classList.remove('hidden')">← 返回</button>
   <h2>⚔️ 出征准备</h2>
   <p style="color:#8899bb;font-size:12px;margin-bottom:8px">选择难度</p>
   <div class="card-grid" id="diff-grid"></div>
@@ -123,12 +124,14 @@
 
 <!-- 每日挑战职业选择（独立页面）-->
 <div id="class-select" class="hidden">
+  <button class="city-back-btn" style="position:absolute;top:10px;left:10px;z-index:10" onclick="document.getElementById('class-select').classList.add('hidden');document.getElementById('start').classList.remove('hidden')">← 返回</button>
   <h2>⚔️ 选择你的道途</h2>
   <div class="card-grid" id="class-grid-daily"></div>
 </div>
 
 <!-- 技能选择 -->
 <div id="skill-select" class="hidden">
+  <button class="city-back-btn" style="position:absolute;top:10px;left:10px;z-index:10" onclick="document.getElementById('skill-select').classList.add('hidden');document.getElementById('start').classList.remove('hidden')">← 返回</button>
   <h2>🔥 领悟技能</h2>
   <div class="card-grid" id="skill-grid"></div>
   <div style="color:#667788;font-size:12px">每局随机，改变你的战斗方式</div>
@@ -136,6 +139,7 @@
 
 <!-- 天赋选择 -->
 <div id="talent-select" class="hidden">
+  <button class="city-back-btn" style="position:absolute;top:10px;left:10px;z-index:10" onclick="document.getElementById('talent-select').classList.add('hidden');document.getElementById('start').classList.remove('hidden')">← 返回</button>
   <h2>✨ 选择天赋</h2>
   <div class="card-grid" id="talent-grid"></div>
   <div style="color:#667788;font-size:12px">三选一，每局一次</div>
@@ -143,6 +147,7 @@
 
 <!-- 关卡（主题）选择 -->
 <div id="zone-select" class="hidden">
+  <button class="city-back-btn" style="position:absolute;top:10px;left:10px;z-index:10" onclick="document.getElementById('zone-select').classList.add('hidden');document.getElementById('start').classList.remove('hidden')">← 返回</button>
   <h2>🗺️ 前路分支</h2>
   <div class="zone-info" id="zone-info">第 1 关</div>
   <div class="card-grid" id="zone-grid"></div>
@@ -209,10 +214,10 @@
     </div>
   </div>
 
-  <div id="inv-bar" class="panel" style="display:none">
-    <div class="sec">🎒 <span style="color:#445566;font-size:11px">装备</span></div>
+  <div id="inv-bar" class="panel">
+    <div class="sec">🎒 装备 <span id="equip-set-info" style="color:#ffa502;font-size:10px"></span></div>
     <div id="equip-list"></div>
-    <div class="sec" style="margin-top:4px">🔮 <span style="color:#445566;font-size:11px">遗物</span></div>
+    <div class="sec" style="margin-top:4px">🔮 遗物</div>
     <div id="relic-list"></div>
   </div>
 
@@ -226,6 +231,7 @@
     <button id="btn-atk" class="act-btn big-btn">⚔️ 攻击</button>
     <button id="btn-skill" class="act-btn big-btn">⚡ 技能</button>
     <button id="btn-def" class="act-btn big-btn">🛡️ 闪避</button>
+    <button id="btn-auto" class="act-btn big-btn" style="grid-column:1/-1;min-height:36px;font-size:12px;background:rgba(30,40,60,.8)">▶️ 手动</button>
   </div>
 </div>
 

@@ -251,11 +251,42 @@ export const Game = {
   // ---- 局外成长（修复隐形陷阱）----
   applyMetaBonus(p) {
     const up = this.meta.upgrades;
+    // 成就加成只在新游戏时应用一次
+    if (!p._achApplied) {
+      var achList = R.get('achievements') || [];
+      var unlocked = this.meta.achievements || [];
+      unlocked.forEach(function(id) {
+        var ach = achList.find(function(a) { return a.id === id; });
+        if (ach && ach.bonus) {
+          if (ach.bonus.atkBonus) p.atk = Math.floor(p.atk * (1 + ach.bonus.atkBonus));
+          if (ach.bonus.hpBonus) { p.maxHp = Math.floor(p.maxHp * (1 + ach.bonus.hpBonus)); p.hp = Math.floor(p.hp * (1 + ach.bonus.hpBonus)); }
+          if (ach.bonus.defBonus) p.def = Math.floor(p.def * (1 + ach.bonus.defBonus));
+          if (ach.bonus.critBonus) p.critRate += ach.bonus.critBonus;
+          if (ach.bonus.goldBonus) p.goldMul = (p.goldMul || 1) * (1 + ach.bonus.goldBonus);
+          if (ach.bonus.allBonus) { p.atk = Math.floor(p.atk*(1+ach.bonus.allBonus)); p.def = Math.floor(p.def*(1+ach.bonus.allBonus)); }
+        }
+      });
+      p._achApplied = true;
+    }
     if (up.atkBonus)  p.atk  = Math.floor(p.atk  * (1 + up.atkBonus));
     if (up.hpBonus)   { p.maxHp = Math.floor(p.maxHp * (1 + up.hpBonus)); p.hp = Math.floor(p.hp * (1 + up.hpBonus)); }
     if (up.defBonus)  p.def  = Math.floor(p.def * (1 + up.defBonus));
     if (up.critBonus) p.critRate += up.critBonus;
     if (up.goldBonus) p.goldMul = (p.goldMul || 1) * (1 + up.goldBonus);
+    // 成就加成
+    var achList = R.get('achievements') || [];
+    var unlocked = this.meta.achievements || [];
+    unlocked.forEach(function(id) {
+      var ach = achList.find(function(a) { return a.id === id; });
+      if (ach && ach.bonus) {
+        if (ach.bonus.atkBonus) p.atk = Math.floor(p.atk * (1 + ach.bonus.atkBonus));
+        if (ach.bonus.hpBonus) { p.maxHp = Math.floor(p.maxHp * (1 + ach.bonus.hpBonus)); p.hp = Math.floor(p.hp * (1 + ach.bonus.hpBonus)); }
+        if (ach.bonus.defBonus) p.def = Math.floor(p.def * (1 + ach.bonus.defBonus));
+        if (ach.bonus.critBonus) p.critRate += ach.bonus.critBonus;
+        if (ach.bonus.goldBonus) p.goldMul = (p.goldMul || 1) * (1 + ach.bonus.goldBonus);
+        if (ach.bonus.allBonus) { p.atk = Math.floor(p.atk*(1+ach.bonus.allBonus)); p.def = Math.floor(p.def*(1+ach.bonus.allBonus)); }
+      }
+    });
   },
 
   // 获取开局药水数量（修复 startPotion 陷阱）

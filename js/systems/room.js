@@ -2,6 +2,7 @@
 import { Game } from '../core/state.js';
 import { R } from '../core/registry.js';
 import { E, Events } from '../core/event-bus.js';
+import { showBossNarrative } from '../ui/effects.js';
 
 // 根据难度获取路由choices
 function getChoices(entry, diff) {
@@ -27,11 +28,19 @@ export function initZone(zoneId) {
   if (s._zoneMod) {
     if (s._zoneMod.id === "cave_gold" && s.player) s.player.def = Math.max(0, s.player.def - 2);
     if (s._zoneMod.id === "tower_regen" && s.player) s.player.regen = (s.player.regen || 0) + Math.floor(s.player.maxHp * 0.03);
+    if (s._zoneMod.id === "tower_upper_seal") {
+      setTimeout(function() {
+        showBossNarrative(["魔王的威压笼罩了整个空间……","你的每一个动作都在他的注视之下。","此路极度危险——","但也是唯一的荣光之路。"], function(){});
+      }, 600);
+    }
     console.log("[妖塔] Zone环境效果:", s._zoneMod.desc);
   }
 
-  // 生成房间池
-  const templates = R.get('roomTemplates').simple;
+  // 生成房间池：按难度前缀选模板（兼容Ascension）
+  var diff = s.difficulty || 'casual';
+  var templateKey = diff.startsWith('hell') ? 'hell' : (diff.startsWith('standard') ? 'normal' : 'simple');
+  var allTemplates = R.get('roomTemplates');
+  var templates = allTemplates[templateKey] || allTemplates.simple;
   let template = s.rng.pick(templates).slice();
   if (s.extraElite) {
     const bi = template.findIndex(r => r === "battle");

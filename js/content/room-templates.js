@@ -10,7 +10,20 @@ const STRUCTURES = [
   ["battle","elite","battle","shop","chest"],
 ];
 
+// 普通模式：10间
+var NORMAL_STRUCTURES = [
+  ["battle","battle","battle","shop","battle","chest","battle","shrine","battle","elite"],
+  ["battle","battle","battle","chest","battle","shop","battle","event","elite","battle"],
+  ["battle","battle","shop","battle","battle","altar","battle","chest","elite","battle"],
+];
+// 炼狱模式：20间
+var HELL_STRUCTURES = [
+  ["battle","battle","battle","shop","battle","chest","battle","shrine","battle","elite","battle","event","battle","shop","battle","altar","battle","chest","elite","battle"],
+  ["battle","battle","shop","battle","battle","chest","battle","elite","battle","shrine","battle","event","battle","shop","battle","chest","battle","altar","elite","battle"],
+];
+
 R.registerAll('roomTemplates', {
   simple: STRUCTURES,
-  normal: []
+  normal: NORMAL_STRUCTURES,
+  hell: HELL_STRUCTURES
 });

@@ -105,12 +105,31 @@ export function render(s) {
     if (ai) ai.textContent = s._speedMode ? "⚡ 加速战斗中..." : (s.auto ? "🤖 自动战斗中..." : "");
   }
 
-  // 装备列表（可点击丢弃）
+  // 装备列表（可点击丢弃）+ 套装进度
   const eqList = document.getElementById("equip-list");
   const STAT_LABEL = { atk: '⚔️攻击', def: '🛡️防御', maxHp: '❤️生命', critRate: '💥暴击', maxMp: '🔮灵力' };
   if (s.equip.length === 0) eqList.innerHTML = '<span style="color:#445566">暂无</span>';
   else {
     eqList.innerHTML = '';
+    // 统计套装进度
+    var setCounts = {};
+    s.equip.forEach(function(e) { if (e._zoneSet) { setCounts[e._zoneSet] = (setCounts[e._zoneSet]||0)+1; } });
+    // 显示套装进度条
+    var setKeys = Object.keys(setCounts);
+    if (setKeys.length > 0) {
+      var setDiv = document.createElement("div");
+      setDiv.style.cssText = "margin-bottom:4px;font-size:10px;color:#ffa502";
+      setDiv.innerHTML = setKeys.map(function(k) {
+        var c = setCounts[k];
+        var zone2 = null; Object.values(R.get('zones')||{}).forEach(function(z) { if (z.equipSet === k) zone2 = z; });
+	        var active2 = c >= 4 ? '4件' : (c >= 2 ? '2件' : '');
+	        var bonusText2 = '';
+	        if (c >= 4 && zone2 && zone2.equipBonus4) { bonusText2 = JSON.stringify(zone2.equipBonus4).replace(/[{}"]/g,'').replace(/,/g,' '); }
+	        else if (c >= 2 && zone2 && zone2.equipBonus) { bonusText2 = JSON.stringify(zone2.equipBonus).replace(/[{}"]/g,'').replace(/,/g,' '); }
+	        return '🏷️' + k + '(' + c + '/2)(' + (c>=4?4:c) + '/4)' + (active2 ? ' ✅' + active2 + ':+' + bonusText2 : '');
+      }).join(' ');
+      eqList.appendChild(setDiv);
+    }
     s.equip.forEach((e, i) => {
       const span = document.createElement("span");
       const qTag = e.qualityName ? `<span style="font-size:10px;color:${e.color}">[${e.qualityName}]</span>` : '';
@@ -137,14 +156,14 @@ export function render(s) {
     else potList.innerHTML = s.potions.map((p, i) => `<span style="color:#70a1ff;cursor:pointer" onclick="window._usePotion(${i})">${p.icon}${p.name}</span>`).join(" ");
   }
 
-  // 战斗遗物栏（左上角）
+  // 战斗遗物栏
   var relicBar = document.getElementById("relic-bar");
   if (relicBar) {
     if (s.relics && s.relics.length > 0) {
       relicBar.innerHTML = s.relics.map(function(r) {
         var stars = (r.stars && r.stars > 1) ? '<sup style="color:#ffa502;font-size:9px">' + '⭐'.repeat(r.stars - 1) + '</sup>' : '';
-        return '<span style="color:' + (RARITY_COLOR[r.rarity] || '#ccc') + '" title="' + r.desc + '">' + r.icon + stars + '</span>';
-      }).join('');
+        return '<span style="color:' + (RARITY_COLOR[r.rarity] || '#ccc') + ';font-size:11px" title="' + r.desc + '">' + r.icon + stars + r.name + '</span>';
+      }).join(' · ');
       relicBar.style.display = '';
     } else {
       relicBar.style.display = 'none';

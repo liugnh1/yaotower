@@ -5,7 +5,7 @@ import { R } from '../core/registry.js';
 import { E, Events } from '../core/event-bus.js';
 import { playSound, startHeartbeat, stopHeartbeat } from '../core/audio.js';
 import { addBuff, tickBuffs, hasBuff, removeBuff } from './buff.js';
-import { animPlayerAttack, animEnemyAttack, showBossNarrative, bigFloat, screenShake } from '../ui/effects.js';
+import { animPlayerAttack, animEnemyAttack, showBossNarrative, bigFloat, screenShake, log } from '../ui/effects.js';
 
 let _onWin = null, _onOver = null, _autoTimer = null;
 export function setCB(w, o) { _onWin = w; _onOver = o; }
@@ -41,7 +41,11 @@ export function startBattle(type) {
   // 生成敌人（1-3只）
   var enemies = [];
   if (type === "boss") {
-    const boss = R.get('bosses', s.zone ? s.zone.id : (s.zoneIndex + 1));
+    // 炼狱20层：后半段用hell专属Boss
+    var isHellDeep = (s.difficulty||'').startsWith('hell') && s.floorInZone > 10;
+    var bossKey = s.zone ? s.zone.id : (s.zoneIndex + 1);
+    var boss = isHellDeep ? (R.get('bosses_hell')||{})[bossKey] : null;
+    if (!boss) boss = R.get('bosses', bossKey);
     const endless = R.get('endlessBosses');
     const endlessIdx = Math.max(0, Math.min(s.zoneIndex - 4, (endless || []).length - 1));
     const bossData = boss || (endless && endless.length > 0 ? endless[endlessIdx] : null);
@@ -96,6 +100,34 @@ export function startBattle(type) {
     });
     s.enemy = s.enemies[0];
     s.selectedTarget = 0;
+    // 装备套装效果：清旧值→同zoneSet计数→直接应用到属性
+    ['_set_atk','_set_def','_set_maxHp','_set_dodge','_set_lifeSteal','_set_critRate','_set_critMul','_set_pen','_set_maxMp','_set_dmgReduce'].forEach(function(k){ s.player[k]=0; });
+    s.player._setActive2 = null; s.player._setActive4 = null;
+    var setCounts = {};
+    s.equip.forEach(function(eq) { if (eq._zoneSet) { setCounts[eq._zoneSet] = (setCounts[eq._zoneSet]||0)+1; } });
+    Object.keys(setCounts).forEach(function(setName) {
+      var count = setCounts[setName];
+      var zone = null;
+      Object.values(R.get('zones')||{}).forEach(function(z) { if (z.equipSet === setName) zone = z; });
+      if (!zone) return;
+      var bonus = (count >= 4 && zone.equipBonus4) ? zone.equipBonus4 : ((count >= 2 && zone.equipBonus) ? zone.equipBonus : null);
+      if (!bonus) return;
+      s.player._setActive2 = (count >= 2) ? setName : null;
+      s.player._setActive4 = (count >= 4) ? setName : null;
+      if (bonus.atk) s.player.atk += bonus.atk;
+      if (bonus.def) s.player.def += bonus.def;
+      if (bonus.maxHp) { s.player.maxHp += bonus.maxHp; s.player.hp += bonus.maxHp; }
+      if (bonus.dodge) s.player.dodge = (s.player.dodge||0) + bonus.dodge;
+      if (bonus.lifeSteal) s.player.lifeSteal = (s.player.lifeSteal||0) + bonus.lifeSteal;
+      if (bonus.critRate) s.player.critRate += bonus.critRate;
+      if (bonus.critMul) s.player.critMul += bonus.critMul;
+      if (bonus.pen) s.player.pen = (s.player.pen||0) + bonus.pen;
+      if (bonus.maxMp) { s.player.maxMp += bonus.maxMp; s.player.mp += bonus.maxMp; }
+      if (bonus.dmgReduce) s.player.dmgReduce = (s.player.dmgReduce||0) + bonus.dmgReduce;
+    });
+    // 套装激活日志
+    if (s.player._setActive4) { setTimeout(function(){ log('<span class="win">🏷️ 套装激活：' + s.player._setActive4 + ' 4件套！</span>'); }, 200); }
+    else if (s.player._setActive2) { setTimeout(function(){ log('<span class="info">🏷️ 套装激活：' + s.player._setActive2 + ' 2件套</span>'); }, 200); }
     // 恢复怪物标签系统
     if (s._zoneMod?.id === "ruins_ancient") addTag(s);
     if (s.floorInZone > 3 && s.rng.chance(0.55)) addTag(s);
@@ -373,6 +405,9 @@ function applyDmg(dmg, skill, targetEnemy) {
     Events.emit(E.PLAYER_HEALED, { amount: h, hp: p.hp, maxHp: p.maxHp, source: 'lifeSteal' });
   }
   s.relics.forEach(r => { if (r.onAttack) r.onAttack(p, dmg); });
+  // 遗物特效反馈
+  if (p._medusaHead && s.rng.chance(0.1) && e && e.hp > 0) { e.hp = 0; bigFloat("🗿 石化！", "big-crit", 1000); playSound("crit"); }
+  if (p._gamblersDice && !crit && dmg > 0) { bigFloat("🎲", "float-dmg", 500); }
   if (dmg >= 200) checkAchievement(s, "one_shot_200");
   if (e.thorn) {
     const th = Math.floor(dmg * e.thorn);
@@ -476,6 +511,8 @@ function enemyTurn() {
       dmg = 0; Events.emit(E.BATTLE_START, { type: 'dodge' });
       return;
     }
+    // 镜盾格挡
+    if (p._mirrorShield && s.rng && s.rng.chance(0.2)) { dmg = 0; bigFloat("🛡️ 格挡！", "big-dodge", 700); return; }
     strike(dmg, e);
     if (p.hp <= 0) return;
   });

@@ -52,18 +52,20 @@ R.registerAll('zones', {
 //   plains → forest/cave/ruins → voidgate/frozen → tower（终局）
 // 加新地图：在zones注册 + 在下面加一行路由即可
 R.registerAll('simpleRoute', {
-  plains:   { depth: 0, choices: ["forest", "cave", "ruins", "desert", "swamp"] },
-  forest:   { depth: 1, choices: ["voidgate", "frozen"] },
-  cave:     { depth: 1, choices: ["voidgate", "ruins", "frozen"] },
-  ruins:    { depth: 1, choices: ["frozen", "voidgate"] },
-  desert:   { depth: 1, choices: ["voidgate", "frozen"] },
-  swamp:    { depth: 1, choices: ["frozen", "voidgate"] },
-  frozen:   { depth: 2, choices: ["tower"] },
-  voidgate: { depth: 2, choices: ["tower"] },
-  // 简单模式：塔外止步
-  tower:    { depth: 3, choices_simple: [], choices_standard: ["tower_lower"], choices_hell: ["tower_lower"] },
-  // 普通模式：塔下层止步
-  tower_lower: { depth: 4, choices_simple: [], choices_standard: [], choices_hell: ["tower_upper"] },
-  // 炼狱模式：通到塔上层
-  tower_upper: { depth: 5, choices_simple: [], choices_standard: [], choices_hell: [] }
+  // Tier 0：起点
+  plains:   { depth: 0, choices: ["desert", "swamp"] },
+  // Tier 1：沙漠/沼泽（2选1）
+  desert:   { depth: 1, choices: ["forest", "cave"] },
+  swamp:    { depth: 1, choices: ["ruins", "forest"] },
+  // Tier 2：森林/矿洞/废墟（3选1）
+  forest:   { depth: 2, choices: ["voidgate", "frozen"] },
+  cave:     { depth: 2, choices: ["voidgate", "frozen"] },
+  ruins:    { depth: 2, choices: ["frozen", "voidgate"] },
+  // Tier 3：冰原/虚空（2选1）
+  frozen:   { depth: 3, choices: ["tower"] },
+  voidgate: { depth: 3, choices: ["tower"] },
+  // Tier 4-6：塔
+  tower:    { depth: 4, choices_simple: [], choices_standard: ["tower_lower"], choices_hell: ["tower_lower"] },
+  tower_lower: { depth: 5, choices_simple: [], choices_standard: [], choices_hell: ["tower_upper"] },
+  tower_upper: { depth: 6, choices_simple: [], choices_standard: [], choices_hell: [] }
 });

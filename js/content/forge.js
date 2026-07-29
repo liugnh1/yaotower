@@ -12,6 +12,10 @@ R.registerAll('bossMaterials', {
   frozen:   { id: "mat_ice_soul",     name: "永冻之魂", icon: "❄️", dropRate: 0.35 },
   voidgate: { id: "mat_void_shard",   name: "虚空碎片", icon: "🌀", dropRate: 0.35 },
   tower:    { id: "mat_tower_heart",  name: "魔塔之心", icon: "🖤", dropRate: 0.35 },
+  desert:   { id: "mat_desert_core", name: "沙漠之核", icon: "🏜️", dropRate: 0.35 },
+  swamp:    { id: "mat_swamp_venom", name: "沼泽毒晶", icon: "🌿", dropRate: 0.35 },
+  tower_lower: { id: "mat_general_seal", name: "将军徽记", icon: "🛡️", dropRate: 0.30 },
+  tower_upper: { id: "mat_demon_soul", name: "魔王之魂", icon: "👑", dropRate: 0.30 },
 });
 
 // 额外稀有材料

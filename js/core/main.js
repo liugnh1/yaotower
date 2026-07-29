@@ -127,7 +127,9 @@ Events.on(E.BATTLE_START, d => {
   if (d.type === 'doubleFirst') log("<span class='info'>💨 天赋触发·首回合连击！</span>");
   if (d.type === 'doubleAttack' || d.type === 'doubleSkill') log("<span class='info'>💨 连击！</span>");
   if (d.type === 'defend') { log("🛡️ 防御姿态！下回合反击+35%", "info"); animPlayerDefend(); }
-  if (d.type === 'dodge') { log("🍃 闪避！"); animPlayerDodge(); bigFloat("闪避！", "big-dodge", 800); playSound("dodge"); }
+  if (d.type === 'dodge') { log("🍃 闪避！"); animPlayerDodge(); bigFloat("闪避！", "big-dodge", 800); playSound("dodge");
+    var wf = document.createElement("div"); wf.className = "white-flash"; document.body.appendChild(wf); setTimeout(function(){wf.remove();}, 400);
+  }
   if (d.type === 'chargeAttack') { log(`<span class="warn">⚠️ ${d.name} 蓄力攻击！伤害翻倍！</span>`); animEnemyAttack(); }
   if (d.type === 'potion') { log(`<span class="heal">🧪 使用了 ${d.name}！${d.desc}</span>`); trackQuest('potion', 1); }
   if (d.type === 'cleanse' && d.name) log(`<span class="info">🧴 清除了诅咒：${d.name}</span>`);
@@ -135,12 +137,21 @@ Events.on(E.BATTLE_START, d => {
   if (d.type === 'slow') log("<span class='info'>❄️ 迟缓！敌人下回合攻击力降低</span>");
   if (d.type === 'stun') log(`<span class="win">⚡ ${d.name} 被眩晕！跳过下回合</span>`);
   if (d.type === 'bossSkill') log(`<span class="warn">${d.msg}</span>`);
-  if (d.type === 'bossPhase2') { log(`<span class="warn">💢 Boss进入二阶段：${d.name}！</span>`); toast("⚠️ Boss暴怒！二阶段！"); playSound("bossRoar"); screenShake(2); }
+  if (d.type === 'bossPhase2') { log(`<span class="warn">💢 Boss进入二阶段：${d.name}！</span>`); toast("⚠️ Boss暴怒！二阶段！"); playSound("bossRoar"); screenShake(2);
+    var main = document.getElementById("main"); if (main) { main.classList.add("boss-rage"); setTimeout(function(){main.classList.remove("boss-rage");}, 8000); }
+  }
   if (d.type === 'achievement') { const ach = (R.get('achievements') || []).find(a => a.id === d.id); if (ach) { toast(`🏆 成就解锁：${ach.name}！`); playSound("achievement"); showAchievementCard(ach); } }
   if (d.type === 'synCritDice') log("<span class='win'>🎲 命运之眼触发！伤害翻倍！</span>");
-  if (d.type === 'synergy') { log(`<span class="win">🔗 羁绊激活：${d.name}！${d.desc}</span>`); bigFloat("🔗 羁绊激活！", "big-crit", 1200); screenShake(1); }
+  if (d.type === 'synergy') { log(`<span class="win">🔗 羁绊激活：${d.name}！${d.desc}</span>`); bigFloat("🔗 羁绊激活！", "big-crit", 1200); screenShake(1);
+    var sr = document.createElement("div"); sr.id = "synergy-ring"; document.body.appendChild(sr); setTimeout(function(){sr.remove();}, 1300);
+  }
   if (d.type === 'stoneGaze') log("<span class='warn'>🗿 被石化了！跳过本回合</span>");
   if (d.tags) log(`<span class="warn">⚠️ 第${d.floor}层·${d.zone.name}：${d.enemy.name} ${d.tags}</span>`);
+  // Boss登场暗幕
+  if (d.intent && Game.state._currentRoomType === 'boss') {
+    var bo = document.getElementById("boss-entrance-overlay"); if (!bo) { bo = document.createElement("div"); bo.id = "boss-entrance-overlay"; document.body.appendChild(bo); }
+    bo.classList.add("fire"); setTimeout(function(){bo.classList.remove("fire");}, 1500);
+  }
 });
 
 Events.on(E.PLAYER_DAMAGED, d => {
@@ -149,6 +160,9 @@ Events.on(E.PLAYER_DAMAGED, d => {
     float(d.dmg+"!","float-crit");
     animPlayerCrit(); animEnemyHit();
     trackQuest('crit', 1);
+    // 暴击裂纹特效
+    var co = document.getElementById("crit-overlay"); if (!co) { co = document.createElement("div"); co.id = "crit-overlay"; document.body.appendChild(co); }
+    co.classList.add("fire"); setTimeout(function(){co.classList.remove("fire");}, 300);
   }
   else if (d.counter) { log(`⚔️ <b style="color:#ffa502">反击！</b>造成 <span class="dmg">${d.dmg}</span> 点伤害`); float(d.dmg,"float-dmg"); animEnemyHit(); }
   else if (d.source === 'thorn' && d.target === 'enemy') { log(`<span class="warn">荆棘反弹 ${d.dmg}！</span>`); }
@@ -168,7 +182,10 @@ Events.on(E.PLAYER_DAMAGED, d => {
 Events.on(E.PLAYER_HEALED, d => {
   if (d.source === 'lifeSteal') log(`<span class="heal">恢复 ${d.amount} 生命</span>`);
   if (d.source === 'regen') log(`<span class="heal">恢复 ${d.amount} 生命</span>`);
-  if (d.source === 'rebirth') { log(`<span class="win">🔥 凤凰羽触发！浴火重生！</span>`); bigFloat("重生！", "big-heal", 1200); }
+  if (d.source === 'rebirth') { log(`<span class="win">🔥 凤凰羽触发！浴火重生！</span>`); bigFloat("重生！", "big-heal", 1200);
+    var main = document.getElementById("main"); if (main) { main.classList.add("heal-glow"); setTimeout(function(){main.classList.remove("heal-glow");}, 900); }
+  }
+  if (d.amount >= 30) { var main = document.getElementById("main"); if (main) { main.classList.add("heal-glow"); setTimeout(function(){main.classList.remove("heal-glow");}, 900); } }
 });
 
 Events.on(E.ENEMY_KILLED, d => {
@@ -231,6 +248,7 @@ document.getElementById("btn-atk").onclick = _safe(function() { Combat.clearAuto
 document.getElementById("btn-skill").onclick = _safe(function() { Combat.clearAuto(); showSkillPopup(); }, "openSkillPopup");
 // 闪避按钮
 document.getElementById("btn-def").onclick = _safe(function() { Combat.clearAuto(); Combat.doDefend(); }, "doDefend");
+document.getElementById("btn-auto").onclick = _safe(Combat.toggleAuto, "toggleAuto");
 
 Combat.setCB(onWin, () => {}); // onOver 由 Events 处理
 
@@ -444,6 +462,14 @@ function enterRoom() {
 
   const roomType = Room.drawOne();
   console.log("[妖塔] drawOne:", roomType, "pool剩余:", s._roomPool.length);
+
+  // 无尽深渊：池空→下一张无尽图
+  if (!roomType && s.endless) {
+    s.endlessFloor++;
+    if (s.endlessFloor % 10 === 0) { showChaosModifier(); return; }
+    initEndlessZone();
+    return;
+  }
 
   // Zone 结束 → 分支或通关
   if (!roomType) {
@@ -681,6 +707,11 @@ function onWin(isFast) {
 function onGameOver() {
   const s = Game.state;
   Game.meta.totalDeaths++;
+  // 无尽最高记录
+  if (s.endless && s.endlessFloor > (Game.meta.highestEndless||0)) {
+    Game.meta.highestEndless = s.endlessFloor;
+    document.getElementById("end-score").innerHTML += '<br><span style="color:#ffa502">🌀无尽最高:' + s.endlessFloor + '层</span>';
+  }
   // 战斗记录
   saveRunHistory(false);
   var legacy = saveLegacy();
@@ -754,10 +785,136 @@ function showEnding(onDone) {
 
 function gameClear() {
   const s = Game.state;
+  // 炼狱塔上层通关后→无尽深渊选择
+  if (s.zone && s.zone.id === 'tower_upper' && !s.endless) {
+    showEndlessChoice();
+    return;
+  }
   // 显示结局→结算
   showEnding(function() {
     doGameClear();
   });
+}
+
+function showEndlessChoice() {
+  var el = document.getElementById("endless-choice");
+  el.style.display = "block";
+  document.getElementById("btn-next-zone").textContent = "🌀 进入无尽深渊";
+  document.getElementById("btn-next-zone").onclick = function() {
+    el.style.display = "none";
+    Game.state.endless = true;
+    Game.state.endlessFloor = 0;
+    Game.state.zoneIndex = 99;
+    initEndlessZone();
+  };
+  document.getElementById("btn-end-run").textContent = "🏠 见好就收（结算）";
+  document.getElementById("btn-end-run").onclick = function() {
+    el.style.display = "none";
+    showEnding(function() { doGameClear(); });
+  };
+}
+
+// ===================== 无尽深渊混沌词条 =====================
+var CHAOS_MODS = [
+  { name: "敌人狂暴", desc: "所有敌人攻击+30%", apply: function(s) { s.enemyAtkMul = (s.enemyAtkMul||1) * 1.3; } },
+  { name: "敌人血牛", desc: "所有敌人血量+40%", apply: function(s) { s.enemyHpMul = (s.enemyHpMul||1) * 1.4; } },
+  { name: "诅咒缠身", desc: "开局获得1个随机诅咒", apply: function(s) { var curse = s.rng.pick(R.get('curses')||[]); if(curse){s.curses.push(curse);curse.apply(s.player);} } },
+  { name: "灵力压制", desc: "技能CD+1回合", apply: function(s) { s.activeSkills.forEach(function(sk){sk.cooldown++;}); } },
+  { name: "生命透支", desc: "每回合扣3%生命，但攻击+25%", apply: function(s) { s.player.atk = Math.floor(s.player.atk*1.25); s._chaosDrain = true; } },
+  { name: "暴击失控", desc: "双方暴击率+30%", apply: function(s) { s.player.critRate += 0.3; s._chaosCrit = true; } },
+  { name: "技能狂欢", desc: "所有技能CD-1，但敌人+1只", apply: function(s) { s.activeSkills.forEach(function(sk){if(sk.cooldown>1)sk.cooldown--;}); s._chaosExtraEnemy = true; } },
+  { name: "财富诅咒", desc: "金币翻倍，但商店价格×3", apply: function(s) { s.player.goldMul = (s.player.goldMul||1)*2; s._chaosPrice = true; } },
+];
+
+function showChaosModifier() {
+  var s = Game.state;
+  var el = document.getElementById("reward");
+  el.style.display = "block";
+  var list = document.getElementById("reward-list");
+  list.innerHTML = "";
+  var hdr = document.createElement("div");
+  hdr.style.cssText = "color:#ff4444;font-size:16px;font-weight:bold;margin-bottom:8px;text-align:center;grid-column:1/-1";
+  hdr.textContent = "🌀 混沌降临 · 第" + s.endlessFloor + "层";
+  list.appendChild(hdr);
+  list.style.display = "grid"; list.style.gridTemplateColumns = "1fr 1fr"; list.style.gap = "8px";
+
+  var picks = s.rng.pickMulti(CHAOS_MODS, 3);
+  picks.forEach(function(mod) {
+    var card = document.createElement("div");
+    card.style.cssText = "background:#1a0a0a;border:2px solid #8b0000;border-radius:10px;padding:14px;text-align:center;cursor:pointer;transition:all .15s";
+    card.innerHTML = "<div style=\"font-size:28px;margin-bottom:6px\">🌀</div><div style=\"color:#ff7b7b;font-weight:bold;font-size:14px\">" + mod.name + "</div><div style=\"color:#8899bb;font-size:11px\">" + mod.desc + "</div>";
+    card.onmouseenter = function(){this.style.borderColor="#ff4444";this.style.transform="scale(1.04)";};
+    card.onmouseleave = function(){this.style.borderColor="#8b0000";this.style.transform="scale(1)";};
+    card.onclick = function() {
+      mod.apply(s);
+      log("<span class='warn'>🌀 混沌词条：" + mod.name + "</span>");
+      el.style.display = "none";
+      initEndlessZone();
+    };
+    list.appendChild(card);
+  });
+  showModal("reward");
+}
+
+// ===================== 离线小屋 =====================
+function showHunterLodge() {
+  var el = document.getElementById("meta-panel");
+  el.style.display = "block"; el.querySelector("h3").textContent = "🏚️ 猎人小屋";
+  var content = document.getElementById("meta-content"); content.innerHTML = "";
+  var meta = Game.meta;
+
+  var lastLogin = meta.lastLogin || '';
+  var now = new Date();
+  var offlineMs = 0;
+  if (lastLogin) {
+    var last = new Date(lastLogin);
+    if (!isNaN(last.getTime())) offlineMs = Math.max(0, now.getTime() - last.getTime());
+  }
+  var offlineHours = Math.floor(offlineMs / 3600000);
+  // 衰减：前1小时100%，第2小时80%，之后每小时间50%
+  var decayedHours = offlineHours <= 1 ? offlineHours : (1 + (offlineHours - 1) * 0.5);
+  var offlineStones = Math.min(50, Math.floor(decayedHours * 3));
+  var offlineSouls = Math.min(20, Math.floor(decayedHours * 1));
+
+  var info = document.createElement("div");
+  info.style.cssText = "text-align:center;padding:12px;margin-bottom:10px;background:#1a1520;border-radius:8px";
+  info.innerHTML = '<div style="font-size:40px;margin-bottom:8px">🏚️</div>' +
+    '<div style="color:#8899bb;font-size:12px">离线时长：' + offlineHours + '小时</div>' +
+    '<div style="color:#ffa502;font-size:13px;margin-top:6px">累计收益：💎' + offlineStones + '灵石 · 💀' + offlineSouls + '魂晶</div>';
+  content.appendChild(info);
+
+  if (offlineStones > 0 || offlineSouls > 0) {
+    var claimBtn = document.createElement("button");
+    claimBtn.className = "modal-btn";
+    claimBtn.textContent = "📦 一键领取";
+    claimBtn.onclick = function() {
+      meta.stones = (meta.stones||0) + offlineStones;
+      meta.souls = (meta.souls||0) + offlineSouls;
+      meta.lastLogin = now.toISOString();
+      Game.saveMeta();
+      showHunterLodge();
+      toast('📦 领取了' + offlineStones + '灵石 + ' + offlineSouls + '魂晶！');
+    };
+    content.appendChild(claimBtn);
+  }
+
+  var closeBtn = document.createElement("button");
+  closeBtn.className = "restart-btn"; closeBtn.style.cssText = "margin-top:10px;width:100%";
+  closeBtn.textContent = "关闭"; closeBtn.onclick = function() { el.style.display = "none"; };
+  content.appendChild(closeBtn);
+  showModal("meta-panel");
+}
+
+function initEndlessZone() {
+  var s = Game.state;
+  s.zone = { id: "endless", name: "无尽深渊", icon: "🌀", enemyPool: "tower_upper", scale: 1 + s.endlessFloor * 0.02, modifier: { id: "endless", desc: "🌀 无尽深渊第" + s.endlessFloor + "层" } };
+  s.floorInZone = 1;
+  s._zoneMod = s.zone.modifier;
+  // 生成房间：5-6间纯战斗+精英
+  var templates = [["battle","battle","elite","battle","battle","battle"]];
+  s._roomPool = s.rng.pick(templates).slice();
+  s._bossReady = false;
+  enterRoom();
 }
 
 function doGameClear() {
@@ -1905,7 +2062,8 @@ function buildClassSelect(onPick, gridId = "class-grid") {
   Object.values(classes).forEach(c => {
     const div = document.createElement("div"); div.className = "card";
     const locked = !unlocked.includes(c.id);
-    div.innerHTML = `<div class="icon">${c.icon}</div><div class="name">${c.name}${locked ? '🔒' : ''}</div><div class="desc">${c.desc}</div>`;
+    var portraitFile = 'portrait_' + c.id + '.jpg';
+    div.innerHTML = '<div style="width:80px;height:80px;border-radius:50%;overflow:hidden;margin:0 auto 8px;border:2px solid ' + (locked ? '#333' : '#c8a8ff') + '"><img src="img/' + portraitFile + '" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display=\'none\'"></div><div class="icon" style="font-size:20px">' + c.icon + '</div><div class="name">' + c.name + (locked ? ' 🔒' : '') + '</div><div class="desc">' + c.desc + '</div>';
     if (!locked) div.onclick = () => onPick(c); else div.style.opacity = "0.4";
     grid.appendChild(div);
   });
@@ -2158,7 +2316,7 @@ function showAchievementPanel() {
       var eqBtn = document.createElement("button");
       eqBtn.className = "modal-btn"; eqBtn.style.cssText = "font-size:10px;padding:3px 8px;width:auto";
       eqBtn.textContent = "装备";
-      eqBtn.onclick = function() { meta.equippedTitle = t.id; Game.saveMeta(); showAchievementPanel(); toast('👑 已装备称号：' + t.name); };
+      eqBtn.onclick = function() { meta.equippedTitle = t.id; Game.saveMeta(); render(Game.state); showAchievementPanel(); toast('👑 已装备称号：' + t.name); };
       div.appendChild(eqBtn);
     }
     if (isEquipped) { var badge = document.createElement("span"); badge.style.cssText = "color:#ffa502;font-size:10px"; badge.textContent = "✅使用中"; div.appendChild(badge); }
@@ -2452,6 +2610,7 @@ function showCityHub() {
     { id: 'forge', name: '铁匠 · 锻炉', icon: '👨‍🏭', quote: cityLv >= 5 ? '"这些灵石……足够打造神器了。"' : '"好钢用在刀刃上……你有材料吗？"', func: '⚒️ 装备分解 · 锻造升级', unlockLv: 2 },
     { id: 'compendium', name: '大学士 · 奥兰多', icon: '📖', quote: cityLv >= 5 ? '"所有的知识，都已汇聚于此。"' : '"知识就是力量，记录即是对抗遗忘。"', func: '🔬 遗物研究 · 万象宝典', unlockLv: 3 },
     { id: 'daily', name: '悬赏官 · 卡斯特', icon: '📋', quote: cityLv >= 5 ? '"已经没有猎物能难倒你了。"' : '"今天的猎物已经张贴出来了。"', func: '🎯 Boss猎杀令 · 每日悬赏', unlockLv: 4 },
+    { id: 'lodge', name: '猎人 · 老格林', icon: '🏚️', quote: '"歇歇脚吧勇士，小屋永远欢迎你。"', func: '🏚️ 离线收益 · 猎人小屋', unlockLv: 1 },
     { id: 'leaderboard', name: '史官 · 格里芬', icon: '📜', quote: cityLv >= 5 ? '"你的传奇，将永载史册。"' : '"每一位英雄的故事都应该被铭记。"', func: '📊 征战记录 · 历代最强', unlockLv: 5 },
   ];
 
@@ -2474,6 +2633,7 @@ function showCityHub() {
           case 'class': showClassShrine(); break;
           case 'forge': showForgePanel(); break;
           case 'compendium': showScholarPanel(); break;
+          case 'lodge': showHunterLodge(); break;
           case 'leaderboard': showHistorianPanel(); break;
           case 'daily': showBountyHunterPanel(); break;
         }
@@ -2499,7 +2659,7 @@ function showClassShrine() {
     var hasClass = unlocked.includes(c.id);
     var div = document.createElement("div");
     div.style.cssText = "margin-bottom:10px;padding:10px;background:#0d1117;border-radius:6px;border-left:3px solid " + (hasClass ? "#89e894" : "#333");
-    div.innerHTML = '<b>' + c.icon + ' ' + c.name + '</b> ' + (hasClass ? '<span style="color:#89e894">已解锁</span>' : '<span style="color:#555">🔒 20魂晶解锁</span>') +
+    div.innerHTML = '<div style="display:flex;align-items:center;gap:10px"><img src="img/portrait_' + c.id + '.jpg" style="width:48px;height:48px;border-radius:50%;object-fit:cover;border:2px solid ' + (hasClass ? '#c8a8ff' : '#333') + '" onerror="this.style.display=\'none\'"><div><b>' + c.icon + ' ' + c.name + '</b> ' + (hasClass ? '<span style="color:#89e894">已解锁</span>' : '<span style="color:#555">🔒 20魂晶解锁</span>') + '</div></div>' +
       '<br><span style="color:#8899bb;font-size:11px">' + c.desc + '</span>';
     if (!hasClass) {
       var btn = document.createElement("button");

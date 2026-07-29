@@ -7,7 +7,7 @@ class Registry {
   constructor() {
     // 按类别存储：对象（按id索引）或数组（列表）
     this._store = {
-      classes: {}, zones: {}, enemies: {}, bosses: {},
+      classes: {}, zones: {}, enemies: {}, bosses: {}, bosses_hell: {},
       endlessBosses: [], talents: [], relics: [], curses: [],
       monsterTags: [], equipQualities: [], equipTypes: [],
       equipPrefixes: [], potions: [], difficulties: {},
