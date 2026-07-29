@@ -49,8 +49,9 @@ export function startBattle(type) {
     s._bossIntro = bossData.intro || null;
     s._bossPhase2Intro = bossData.phase2Intro || null;
     enemies.push({ ...bossData, maxHp: bossData.hp, hp: bossData.hp, aiTurn: 0, tags: [], _buffs: [] });
-    // Boss偶尔带小怪
-    if (s.rng.chance(0.4)) {
+    // Ascension Boss小怪
+    var diffCfg = R.get('difficulties', s.difficulty) || {};
+    if (diffCfg.bossExtra || s.rng.chance(0.4)) {
       var minionPool = R.get('enemies', s.zone?.enemyPool) || R.get('enemies', 'plains');
       var minion = { ...s.rng.pick(minionPool) };
       minion.hp = Math.floor(minion.hp * 0.5); minion.maxHp = minion.hp;
@@ -59,7 +60,11 @@ export function startBattle(type) {
     }
   } else {
     var pool = R.get('enemies', s.zone?.enemyPool) || R.get('enemies', 'plains');
-    var count = type === "elite" ? s.rng.range(2, 3) : s.rng.range(1, 3);
+    var baseCount = type === "elite" ? 2 : 1;
+    // Ascension难度额外敌人
+    var diff2 = R.get('difficulties', s.difficulty) || {};
+    if (diff2.extraEnemy) baseCount += diff2.extraEnemy;
+    var count = Math.min(4, baseCount + (type === "elite" ? 1 : s.rng.range(0, 1)));
     for (var i = 0; i < count; i++) {
       var pick = s.rng.pick(pool);
       if (!pick) continue;
@@ -95,6 +100,7 @@ export function startBattle(type) {
     if (s._zoneMod?.id === "ruins_ancient") addTag(s);
     if (s.floorInZone > 3 && s.rng.chance(0.55)) addTag(s);
     if (diff2.extraTag && s.rng.chance(0.35)) addTag(s);
+    if (diff2.doubleTag && s.rng.chance(0.5)) { addTag(s); addTag(s); }
     // 恢复意图系统
     s.enemies.forEach(function(em) { if (em.hp > 0) updateIntentFor(em, s); });
     Events.emit(E.BATTLE_START, { type: type, floor: s.totalFloor, zone: s.zone });
@@ -288,6 +294,7 @@ export function doDefend() {
   if (s.gameOver) return;
   if (!anyAlive) { win(); return; }
   s.defending = true; s.nextBoost = 0.35;
+  s._interrupted = true; // 打断敌人本回合技能/蓄力
   Events.emit(E.BATTLE_START, { type: 'defend' });
   playSound("hit"); enemyTurn(); Game.sync(); if (s.auto) setTimeout(autoLoop, 700);
 }
@@ -449,9 +456,13 @@ function enemyTurn() {
     var status = tickBuffs(e, true);
     if (status === 'dead') { return; }
     if (status === 'stunned') return;
+    // 打断检查
+    if (s._interrupted && (e.aiCharge || (e._intent && (e._intent.type === 'skill' || e._intent.type === 'heavy')))) {
+      e._intent = null; e.chargeTurns = 0;
+    }
     var dmg = Math.max(1, e.atk - p.def);
     if (hasBuff(e, 'slow')) { dmg = Math.floor(dmg * 0.7); removeBuff(e, 'slow'); }
-    if (e.aiCharge) { e.chargeTurns = (e.chargeTurns || 0) + 1; if (e.chargeTurns % 3 === 0) dmg = Math.floor(dmg * 2); }
+    if (!s._interrupted && e.aiCharge) { e.chargeTurns = (e.chargeTurns || 0) + 1; if (e.chargeTurns % 3 === 0) dmg = Math.floor(dmg * 2); }
     if (s.defending) dmg = Math.floor(dmg * 0.5);
     if (s.nextBoost > 0.3) { dmg = Math.floor(dmg * 0.5); } // 防御减伤
     if (p.dodge && s.rng.chance(p.dodge)) {
@@ -463,7 +474,7 @@ function enemyTurn() {
   });
 
   if (p.hp <= 0) { p.hp = 0; Game.sync(); setTimeout(() => gameOver(), 500); return; }
-  // 重新检查真实存活（荆棘反弹可能杀了敌人）
+  s._interrupted = false;
   var realAlive = (s.enemies || []).some(function(e) { return e.hp > 0; });
   if (!realAlive) { win(); return; }
   if (s.defending) s.defending = false;

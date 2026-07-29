@@ -18,7 +18,8 @@ export function getShopItems() {
   const eq = genEquip(); eq.cost = 25 + Math.floor(eq.val * 3);
   items.push({ name: eq.fullName || eq.name, cost: eq.cost, icon: eq.icon, type: 'equip', data: eq,
     fn: () => { window._addEquip(eq); Events.emit(E.EQUIP_GAINED, { equip: eq }); } });
-  if (s.rng.chance(0.5)) {
+  var relicChance = (s.blessingType === '🔮') ? 0.8 : 0.5;
+  if (s.rng.chance(relicChance)) {
     const rel = genRelic();
     items.push({ name: rel.name, cost: 80, icon: rel.icon, type: 'relic', data: rel,
       fn: () => { acquireRelic(rel); } });
@@ -52,6 +53,12 @@ export function acquireRelic(rel) {
   if (rel.onAcquire && !rel.applied) { rel.onAcquire(s.player, s); rel.applied = true; }
   if (rel.passive && !rel.applied) { rel.passive(s.player); rel.applied = true; }
   s.relics.push(rel);
+  // 遗物发现追踪
+  if (!Game.meta.discoveredRelics) Game.meta.discoveredRelics = [];
+  if (!Game.meta.discoveredRelics.includes(rel.id)) {
+    Game.meta.discoveredRelics.push(rel.id);
+    Game.saveMeta();
+  }
   Events.emit(E.RELIC_GAINED, { relic: rel });
   recheckSynergies(); // 旧遗物移除后，取消不再满足的联动
   const activated = checkSynergies();

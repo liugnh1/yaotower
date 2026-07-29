@@ -1,5 +1,5 @@
 // ===================== 屏幕/弹窗切换 =====================
-export const SCREENS = ["start","difficulty-select","class-select","skill-select","talent-select","zone-select","room-select","main","gameover"];
+export const SCREENS = ["start","city-hub","difficulty-select","class-select","skill-select","talent-select","zone-select","room-select","main","gameover"];
 export const MODALS = ["reward","shop","event","endless-choice","potion-modal","daily-panel","leaderboard","compendium","skill-popup"];
 
 export function switchScreen(id) {

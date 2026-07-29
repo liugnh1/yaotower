@@ -94,7 +94,8 @@ function defState() {
     dailyMods: { globalId: null, playerId: null, enemyId: null },
     potionAtk: 0, potionDef: 0,
     adDiscount: false, adRefreshCount: 0,
-    endless: false, _activeSynergies: [], forgeMats: {}
+    endless: false, _activeSynergies: [], forgeMats: {},
+    blessingType: '', difficultyCoins: 0
   };
 }
 
@@ -104,6 +105,7 @@ function defMeta() {
     charExp: { warrior: 0, mage: 0, shadow: 0 },
     upgrades: {}, soulUpgrades: {}, highestSimple: 0, highestNormal: 0,
     adWatched: 0, adDate: "", totalRuns: 0, totalWins: 0, totalDeaths: 0,
+    stones: 0, buildingLevels: {}, awakenedClasses: {},
     dailyBest: 0, dailyDate: "", achievements: []
   };
 }

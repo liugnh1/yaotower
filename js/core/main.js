@@ -137,7 +137,7 @@ Events.on(E.BATTLE_START, d => {
   if (d.type === 'bossPhase2') { log(`<span class="warn">💢 Boss进入二阶段：${d.name}！</span>`); toast("⚠️ Boss暴怒！二阶段！"); playSound("bossRoar"); screenShake(2); }
   if (d.type === 'achievement') { const ach = (R.get('achievements') || []).find(a => a.id === d.id); if (ach) { toast(`🏆 成就解锁：${ach.name}！`); playSound("achievement"); } }
   if (d.type === 'synCritDice') log("<span class='win'>🎲 命运之眼触发！伤害翻倍！</span>");
-  if (d.type === 'synergy') log(`<span class="win">🔗 羁绊激活：${d.name}！${d.desc}</span>`);
+  if (d.type === 'synergy') { log(`<span class="win">🔗 羁绊激活：${d.name}！${d.desc}</span>`); bigFloat("🔗 羁绊激活！", "big-crit", 1200); screenShake(1); }
   if (d.type === 'stoneGaze') log("<span class='warn'>🗿 被石化了！跳过本回合</span>");
   if (d.tags) log(`<span class="warn">⚠️ 第${d.floor}层·${d.zone.name}：${d.enemy.name} ${d.tags}</span>`);
 });
@@ -174,7 +174,9 @@ Events.on(E.ENEMY_KILLED, d => {
   log(`<span class="win">✨ ${d.name} 被斩杀！</span>`);
   animEnemyKill();
   bigFloat("击杀！", "big-kill", 1000);
-  // 任务追踪
+  // 击杀闪白
+  var flash = document.getElementById("kill-flash");
+  if (flash) { flash.classList.add("fire"); setTimeout(function() { flash.classList.remove("fire"); }, 250); }
   const roomType = Game.state._currentRoomType;
   trackQuest('kill', 1);
   if (roomType === 'boss') trackQuest('boss', 1);
@@ -214,6 +216,8 @@ document.getElementById("btn-show-lb-start").onclick = () => { if (!TapLeaderboa
 document.getElementById("btn-close-daily").onclick = () => hideModal("daily-panel");
 document.getElementById("btn-close-lb").onclick = () => hideModal("leaderboard");
 document.getElementById("btn-compendium").onclick = () => showCompendium();
+document.getElementById("btn-city-enter").onclick = () => showCityHub();
+document.getElementById("btn-city-back").onclick = () => switchScreen("start");
 document.getElementById("btn-close-compendium").onclick = () => hideModal("compendium");
 document.getElementById("btn-hard-restart").onclick = () => { Game.hardReset(); switchScreen("start"); render(Game.state); };
 document.getElementById("btn-read-save").onclick = () => { if (Game.load()) continueGame(); };
@@ -401,16 +405,20 @@ function pickClass(cls) {
     s.activeSkill = s.activeSkills[0];
     s.skillLevels = {};
     s.skillLevels[sk.id] = 1;
-    if (!s.noTalent) {
-      buildTalentSelect(function(tal) {
-        s.talent = tal;
-        tal.apply(s.player);
+    // 开局变数三选一
+    buildStartBonus(function() {
+      if (!s.noTalent) {
+        buildTalentSelect(function(tal) {
+          s.talent = tal;
+          tal.apply(s.player);
+          initZone("plains");
+        });
+        switchScreen("talent-select");
+      } else {
         initZone("plains");
-      });
-      switchScreen("talent-select");
-    } else {
-      initZone("plains");
-    }
+      }
+    });
+    switchScreen("talent-select"); // 复用天赋选择屏幕
   });
   switchScreen("skill-select");
 }
@@ -660,9 +668,14 @@ function onGameOver() {
 function gameClear() {
   const s = Game.state;
   Game.meta.totalWins++;
+  // 难度币+灵石：通关奖励
+  if (!Game.meta.difficultyCoins) Game.meta.difficultyCoins = 0;
+  Game.meta.difficultyCoins++;
+  if (!Game.meta.stones) Game.meta.stones = 0;
+  Game.meta.stones += 5 + (s.zoneIndex || 0) * 2;
   if (s.mode === "simple" && Game.meta.highestSimple < s.totalFloor) Game.meta.highestSimple = s.totalFloor;
   const tp = Prog.calcTP(s.totalFloor, true);
-  const souls = 10 + s.totalFloor; // 通关: 10+层数额外魂晶
+  const souls = 10 + s.totalFloor;
   Game.addTP(tp);
   Game.meta.souls += souls;
   Game.addLeaderboard({ char: s.playerClass ? s.playerClass.name : "--", diff: s.difficulty, floor: s.totalFloor });
@@ -810,7 +823,8 @@ function openShop() {
   document.getElementById("shop-gold").textContent = s.gold || 0;
   const list = document.getElementById("shop-list"); list.innerHTML = "";
   const items = Shop.getShopItems();
-  const mul = s.adDiscount ? 0.5 : 1;
+  var diffCfg = R.get('difficulties', s.difficulty) || {};
+  const mul = (s.adDiscount ? 0.5 : 1) * (diffCfg.shopMul || 1);
   const STAT_LABEL = { atk: '⚔️攻击', def: '🛡️防御', maxHp: '❤️生命', critRate: '💥暴击', maxMp: '🔮灵力' };
   items.forEach(it => {
     const finalCost = Math.floor(it.cost * mul);
@@ -1737,14 +1751,55 @@ function showQuestBoard() {
 function buildDifficultySelect(onPick) {
   const grid = document.getElementById("diff-grid"); grid.innerHTML = "";
   const diffs = R.get('difficulties');
-  const unlocked = Game.meta.unlockedDiffs || ["casual"];
-  Object.values(diffs).forEach(d => {
-    const div = document.createElement("div"); div.className = "card"; div.dataset.diff = d.id;
-    const locked = !unlocked.includes(d.id);
-    div.innerHTML = `<div class="icon">${d.icon}</div><div class="name">${d.name}${locked ? ' 🔒' : ''}</div><div class="desc">${locked ? '通关上一难度解锁' : d.desc}</div>`;
-    if (!locked) div.onclick = () => onPick(d); else div.style.opacity = "0.4";
+  const coins = Game.meta.difficultyCoins || 0;
+  // 只显示基础难度（asc=0），折叠显示进阶
+  var baseDiffs = Object.values(diffs).filter(function(d) { return d.asc === 0; });
+  baseDiffs.forEach(function(d) {
+    var div = document.createElement("div"); div.className = "card";
+    div.innerHTML = '<div class="icon">' + d.icon + '</div><div class="name">' + d.name + '</div><div class="desc">' + d.desc + '</div>';
+    div.onclick = function() {
+      // 显示该难度的Ascension选项
+      grid.innerHTML = "";
+      var backBtn = document.createElement("div");
+      backBtn.className = "card"; backBtn.style.cssText = "background:#1a1a2a;border:1px dashed #3a3a5a";
+      backBtn.innerHTML = '<div class="icon">↩</div><div class="name">返回</div>';
+      backBtn.onclick = function() { buildDifficultySelect(onPick); };
+      grid.appendChild(backBtn);
+
+      var ascLevels = Object.values(diffs).filter(function(x) { return x.id.startsWith(d.id); });
+      ascLevels.forEach(function(asc) {
+        var card = document.createElement("div"); card.className = "card";
+        var unlocked = Game.meta.unlockedDiffs ? Game.meta.unlockedDiffs.includes(asc.id) : (asc.asc === 0);
+        if (!unlocked) {
+          card.style.opacity = "0.4";
+          card.innerHTML = '<div class="icon">🔒</div><div class="name">' + asc.name + '</div><div class="desc">花费1难度币解锁（持有:' + coins + '）</div>';
+          card.onclick = function() {
+            if (coins > 0) {
+              Game.meta.difficultyCoins--;
+              if (!Game.meta.unlockedDiffs) Game.meta.unlockedDiffs = ["casual"];
+              Game.meta.unlockedDiffs.push(asc.id);
+              Game.saveMeta();
+              buildDifficultySelect(onPick);
+              toast("🔓 已解锁 " + asc.name);
+            } else { toast("难度币不足！通关任意难度可获得"); }
+          };
+        } else {
+          var rewardText = asc.asc > 0 ? ' · 魂晶×' + (2 + asc.asc * 2) : '';
+          card.innerHTML = '<div class="icon">' + asc.icon + '</div><div class="name">' + asc.name + '</div><div class="desc">' + asc.desc + rewardText + '</div>';
+          card.onclick = function() { onPick(asc); };
+        }
+        grid.appendChild(card);
+      });
+    };
     grid.appendChild(div);
   });
+  // 难度币显示
+  if (coins > 0) {
+    var coinInfo = document.createElement("div");
+    coinInfo.style.cssText = "text-align:center;color:#ffa502;font-size:11px;margin-top:8px";
+    coinInfo.textContent = "🪙 持有难度币: " + coins + "（通关获得）";
+    grid.appendChild(coinInfo);
+  }
 }
 
 function buildClassSelect(onPick, gridId = "class-grid") {
@@ -1766,6 +1821,33 @@ function buildSkillSelect(cls, onPick) {
     const div = document.createElement("div"); div.className = "card";
     div.innerHTML = `<div class="icon">${sk.icon}</div><div class="name">${sk.name}</div><div class="desc">${sk.desc}</div>`;
     div.onclick = () => onPick(sk); grid.appendChild(div);
+  });
+}
+
+function buildStartBonus(onDone) {
+  var grid = document.getElementById("talent-grid"); grid.innerHTML = "";
+  var h2 = document.querySelector("#talent-select h2");
+  if (h2) h2.textContent = "🎁 开局赐福 · 三选一";
+  var bonuses = [
+    { icon: "🔮", name: "遗物赐福", desc: "随机获得一件稀有品质遗物", apply: function(s) {
+      var rares = (R.get('relics') || []).filter(function(r) { return r.rarity === 'rare' || r.rarity === 'epic'; });
+      if (rares.length > 0) { var r = { ...s.rng.pick(rares) }; if (r.passive) { r.passive(s.player); r.applied = true; } s.relics.push(r); log("<span class='win'>🎁 " + r.name + "</span>"); }
+    }},
+    { icon: "💰", name: "财宝赐福", desc: "开局额外获得80金币", apply: function(s) { s.gold += 80; } },
+    { icon: "⚡", name: "迅捷赐福", desc: "本局所有技能CD-1回合", apply: function(s) {
+      s.activeSkills.forEach(function(sk) { if (sk.cooldown > 1) sk.cooldown--; });
+    }},
+    { icon: "❤️", name: "生命赐福", desc: "生命上限+25", apply: function(s) { s.player.maxHp += 25; s.player.hp += 25; } },
+    { icon: "📦", name: "装备赐福", desc: "开局随机获得2件装备", apply: function(s) {
+      for (var i = 0; i < 2; i++) { var eq = Loot.genEquip(s.zone ? s.zone.id : null); s.equip.push(eq); applyEquipStats(s.player, eq); }
+    }},
+  ];
+  var picks = Game.state.rng ? Game.state.rng.pickMulti(bonuses, 3) : bonuses.slice(0, 3);
+  picks.forEach(function(b) {
+    var div = document.createElement("div"); div.className = "card";
+    div.innerHTML = '<div class="icon">' + b.icon + '</div><div class="name">' + b.name + '</div><div class="desc">' + b.desc + '</div>';
+    div.onclick = function() { b.apply(Game.state); Game.state.blessingType = b.icon; Game.sync(); if (h2) h2.textContent = "✨ 选择天赋"; onDone(); };
+    grid.appendChild(div);
   });
 }
 
@@ -1824,10 +1906,8 @@ function showReward(isFast, onEquip, onAttr, isElite) {
     list.appendChild(card);
   }
 
-  // 属性选项
   var attrs = [
-    { id: "atk", name: "⚔️ 攻击+" + (isFast ? 10 : 5), icon: "" },
-    { id: "heal", name: "💚 回满生命", icon: "" }
+    { id: "atk", name: "⚔️ 攻击+" + (isFast ? 10 : 5), icon: "" }
   ];
   attrs.forEach(function(a) {
     var btn = document.createElement("button");
@@ -1874,9 +1954,9 @@ function showBossRelicPick(isFast) {
 
   var skipBtn = document.createElement("button");
   skipBtn.className = "modal-btn";
-  skipBtn.style.cssText = "grid-column:1/-1;text-align:center";
-  skipBtn.textContent = "💚 回满生命（放弃遗物）";
-  skipBtn.onclick = function() { takeAttrReward("heal", isFast, true); };
+  skipBtn.style.cssText = "grid-column:1/-1;text-align:center;background:#1a1a2a;color:#667788";
+  skipBtn.textContent = "放弃遗物（+30金币）";
+  skipBtn.onclick = function() { Game.state.gold += 30; hideModal("reward"); nextRoom(); };
   list.appendChild(skipBtn);
 }
 
@@ -1933,6 +2013,146 @@ function openPotionModal() {
       list.appendChild(btn);
     });
   }
+}
+
+// ===================== 主城建造界面 =====================
+function showCityHub() {
+  switchScreen("city-hub");
+  // 资源显示
+  var res = document.getElementById("city-resources");
+  var meta = Game.meta;
+  var spiritStones = meta.stones || 0;
+  var coins = meta.difficultyCoins || 0;
+  res.innerHTML = '💎灵石:' + spiritStones + ' · 🪙难度币:' + coins + ' · ⭐TP:' + (meta.tp || 0);
+
+  // NPC点击
+  document.querySelectorAll('.city-npc').forEach(function(bld) {
+    bld.onclick = function() {
+      var id = bld.dataset.bld;
+      switch (id) {
+        case 'altar': showMetaPanel(); break;
+        case 'class': showClassShrine(); break;
+        case 'forge': showForgePanel(); break;
+        case 'compendium': showCompendium(); break;
+        case 'leaderboard': if (!TapLeaderboard.showPanel('total')) showLeaderboard(); break;
+        case 'daily': showQuestBoard(); break;
+      }
+    };
+  });
+}
+
+// 职业神殿（转职/觉醒）
+function showClassShrine() {
+  var el = document.getElementById("meta-panel");
+  el.style.display = "block";
+  el.querySelector("h3").textContent = "🎭 职业神殿";
+  var content = document.getElementById("meta-content");
+  content.innerHTML = "";
+
+  var classes = R.get('classes');
+  var unlocked = Game.meta.unlocks || ["warrior","mage","shadow"];
+  var spiritStones = Game.meta.stones || 0;
+
+  Object.values(classes).forEach(function(c) {
+    var hasClass = unlocked.includes(c.id);
+    var div = document.createElement("div");
+    div.style.cssText = "margin-bottom:10px;padding:10px;background:#0d1117;border-radius:6px;border-left:3px solid " + (hasClass ? "#89e894" : "#333");
+    div.innerHTML = '<b>' + c.icon + ' ' + c.name + '</b> ' + (hasClass ? '<span style="color:#89e894">已解锁</span>' : '<span style="color:#555">🔒 20魂晶解锁</span>') +
+      '<br><span style="color:#8899bb;font-size:11px">' + c.desc + '</span>';
+    if (!hasClass) {
+      var btn = document.createElement("button");
+      btn.className = "modal-btn"; btn.style.cssText = "margin-top:4px;font-size:11px";
+      btn.textContent = "20魂晶解锁";
+      btn.disabled = (Game.meta.souls || 0) < 20;
+      btn.onclick = function() {
+        if ((Game.meta.souls || 0) >= 20) {
+          Game.meta.souls -= 20;
+          if (!Game.meta.unlocks) Game.meta.unlocks = ["warrior","mage","shadow"];
+          Game.meta.unlocks.push(c.id);
+          Game.saveMeta();
+          showClassShrine();
+          toast('🎭 ' + c.name + ' 已解锁！');
+        }
+      };
+      div.appendChild(btn);
+    }
+    // 觉醒按钮（已解锁职业且spiritStones足够）
+    if (hasClass && spiritStones >= 10) {
+      var awakenBtn = document.createElement("button");
+      awakenBtn.className = "modal-btn"; awakenBtn.style.cssText = "margin-top:4px;font-size:11px;background:#2a1a0a;border-color:#8a6030;color:#ffcc88";
+      awakenBtn.textContent = "⭐ 觉醒（10灵石）";
+      awakenBtn.onclick = function() {
+        Game.meta.stones -= 10;
+        if (!Game.meta.awakenedClasses) Game.meta.awakenedClasses = {};
+        Game.meta.awakenedClasses[c.id] = true;
+        Game.saveMeta();
+        showClassShrine();
+        toast('⭐ ' + c.name + ' 已觉醒！属性提升');
+      };
+      div.appendChild(awakenBtn);
+    }
+    content.appendChild(div);
+  });
+
+  var closeBtn = document.createElement("button");
+  closeBtn.className = "restart-btn"; closeBtn.style.cssText = "margin-top:10px;width:100%";
+  closeBtn.textContent = "关闭";
+  closeBtn.onclick = function() { el.style.display = "none"; };
+  content.appendChild(closeBtn);
+  showModal("meta-panel");
+}
+
+// 锻造工坊面板
+function showForgePanel() {
+  var el = document.getElementById("meta-panel");
+  el.style.display = "block";
+  el.querySelector("h3").textContent = "⚒️ 锻造工坊";
+  var content = document.getElementById("meta-content");
+  content.innerHTML = "";
+
+  var spiritStones = Game.meta.stones || 0;
+  var levels = Game.meta.buildingLevels || {};
+  var forgeLv = levels.forge || 1;
+
+  var info = document.createElement("div");
+  info.style.cssText = "color:#8899bb;font-size:12px;margin-bottom:10px;text-align:center";
+  info.innerHTML = '锻造台 Lv.' + forgeLv + ' · 可用灵石:' + spiritStones + '<br><span style="color:#667788">升级锻造台可解锁更多合成配方</span>';
+  content.appendChild(info);
+
+  // 升级按钮
+  var upBtn = document.createElement("button");
+  upBtn.className = "modal-btn";
+  upBtn.textContent = "⬆ 升级锻造台（" + (forgeLv * 15) + "灵石）";
+  upBtn.disabled = spiritStones < forgeLv * 15;
+  upBtn.onclick = function() {
+    var cost = forgeLv * 15;
+    if (spiritStones >= cost) {
+      Game.meta.stones -= cost;
+      if (!Game.meta.buildingLevels) Game.meta.buildingLevels = {};
+      Game.meta.buildingLevels.forge = forgeLv + 1;
+      Game.saveMeta();
+      showForgePanel();
+      toast('⚒️ 锻造台升至Lv.' + (forgeLv + 1));
+    }
+  };
+  content.appendChild(upBtn);
+
+  // 合成配方说明
+  var forgeDiv = document.createElement("div");
+  forgeDiv.style.cssText = "margin-top:10px;color:#667788;font-size:11px;text-align:left";
+  forgeDiv.innerHTML = '<b style="color:#ffaa88">锻造台功能：</b><br>' +
+    '· 在探索中遇到<b>锻造石台</b>事件时可进行装备合成<br>' +
+    '· Boss掉落材料可在锻造石台锻造神话装备<br>' +
+    '· Lv.2: 合成费用-30%<br>' +
+    '· Lv.3: 可锻造出双属性装备';
+  content.appendChild(forgeDiv);
+
+  var closeBtn = document.createElement("button");
+  closeBtn.className = "restart-btn"; closeBtn.style.cssText = "margin-top:10px;width:100%";
+  closeBtn.textContent = "关闭";
+  closeBtn.onclick = function() { el.style.display = "none"; };
+  content.appendChild(closeBtn);
+  showModal("meta-panel");
 }
 
 // ===================== 万象宝典 =====================
@@ -2065,6 +2285,13 @@ function renderCompEquip(content) {
 function renderCompRelics(content) {
   content.className = '';
   const relics = R.get('relics') || [];
+  // 遗物发现追踪
+  if (!Game.meta.discoveredRelics) Game.meta.discoveredRelics = [];
+  var discovered = Game.meta.discoveredRelics;
+  var foundCount = discovered.length;
+  var progHtml = '<div style="text-align:center;margin-bottom:8px"><span style="color:#ffa502;font-size:13px;font-weight:bold">已发现 ' + foundCount + ' / ' + relics.length + ' 件遗物</span>';
+  progHtml += '<div style="width:100%;height:6px;background:#1a1a2a;border-radius:3px;margin-top:4px;overflow:hidden">';
+  progHtml += '<div style="height:100%;background:linear-gradient(90deg,#c8a8ff,#ffa502);width:' + (relics.length > 0 ? Math.floor(foundCount / relics.length * 100) : 0) + '%;border-radius:3px"></div></div></div>';
   const RARITY_ORDER = ['legendary','epic','rare','common'];
   const RARITY_LABEL = { legendary:'传说', epic:'史诗', rare:'稀有', common:'普通' };
   const RARITY_ICON = { legendary:'🟠', epic:'🟣', rare:'🔵', common:'⚪' };
@@ -2075,17 +2302,25 @@ function renderCompRelics(content) {
     else grouped.common.push(r);
   });
 
-  let html = '';
+  let html = progHtml;
   RARITY_ORDER.forEach(rarity => {
     const list = grouped[rarity];
     if (!list || list.length === 0) return;
     html += `<div style="color:#ccaa88;font-weight:bold;margin:8px 0 4px;font-size:12px">${RARITY_ICON[rarity]} ${RARITY_LABEL[rarity]}（${list.length}）</div>`;
     html += '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-bottom:8px">';
     list.forEach(r => {
-      html += '<div class="comp-item comp-rarity-' + rarity + '">' +
-        '<div class="comp-item-icon">' + r.icon + '</div>' +
-        '<div class="comp-item-name">' + r.name + '</div>' +
-        '<div class="comp-item-desc">' + r.desc + '</div></div>';
+      var found = discovered.includes(r.id);
+      if (found) {
+        html += '<div class="comp-item comp-rarity-' + rarity + '">' +
+          '<div class="comp-item-icon">' + r.icon + '</div>' +
+          '<div class="comp-item-name">' + r.name + '</div>' +
+          '<div class="comp-item-desc">' + r.desc + '</div></div>';
+      } else {
+        html += '<div class="comp-item" style="opacity:0.3;border-color:#1a1a2a">' +
+          '<div class="comp-item-icon" style="filter:grayscale(1)">❓</div>' +
+          '<div class="comp-item-name" style="color:#333">???</div>' +
+          '<div class="comp-item-desc" style="color:#222">尚未发现</div></div>';
+      }
     });
     html += '</div>';
   });

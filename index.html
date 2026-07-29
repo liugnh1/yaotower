@@ -87,7 +87,78 @@
   <!-- 书卷装饰底部 -->
   <div class="tome-bottom"></div>
 
-  <div class="city-footer">「魔塔的阴影正在蔓延……勇士，请做好准备。」</div>
+  <div style="text-align:center;margin:8px 0">
+    <button id="btn-city-enter" style="padding:10px 28px;background:linear-gradient(180deg,#5a3a1a,#3a2010);border:2px solid #8a6030;color:#ffcc88;border-radius:8px;font-size:14px;cursor:pointer;font-weight:bold">🏰 进入主城</button>
+  </div>
+  <div class="city-footer">
+    <span id="relic-progress" style="cursor:pointer" onclick="document.getElementById('btn-compendium').click()">📚 遗物 0/0</span>
+    <br>「魔塔的阴影正在蔓延……勇士，请做好准备。」
+  </div>
+</div>
+
+<!-- 主城 · NPC聚集地 -->
+<div id="city-hub" class="hidden">
+  <div class="city-hub-header">
+    <button class="city-back-btn" id="btn-city-back">← 返回城门</button>
+    <h2>🏰 边境主城</h2>
+    <div id="city-resources" style="color:#ffa502;font-size:12px"></div>
+  </div>
+  <div class="city-npc-list">
+    <!-- 女神祭司 -->
+    <div class="city-npc" data-bld="altar">
+      <div class="npc-portrait">🧙‍♀️</div>
+      <div class="npc-body">
+        <div class="npc-role">女神祭司 · 艾琳娜</div>
+        <div class="npc-quote">"女神的光辉指引着每一位勇士……"</div>
+        <div class="npc-func">🔮 天赋强化 · 魂晶兑换</div>
+      </div>
+    </div>
+    <!-- 职业导师 -->
+    <div class="city-npc" data-bld="class">
+      <div class="npc-portrait">🗡️</div>
+      <div class="npc-body">
+        <div class="npc-role">战斗大师 · 雷恩</div>
+        <div class="npc-quote">"想变强？选对路比拼命更重要。"</div>
+        <div class="npc-func">🎭 职业解锁 · 觉醒转职</div>
+      </div>
+    </div>
+    <!-- 铁匠 -->
+    <div class="city-npc" data-bld="forge">
+      <div class="npc-portrait">👨‍🏭</div>
+      <div class="npc-body">
+        <div class="npc-role">铁匠 · 锻炉</div>
+        <div class="npc-quote">"好钢用在刀刃上……你有材料吗？"</div>
+        <div class="npc-func">⚒️ 锻造工坊 · 装备合成</div>
+      </div>
+    </div>
+    <!-- 学者 -->
+    <div class="city-npc" data-bld="compendium">
+      <div class="npc-portrait">📖</div>
+      <div class="npc-body">
+        <div class="npc-role">大学士 · 奥兰多</div>
+        <div class="npc-quote">"知识就是力量，记录即是对抗遗忘。"</div>
+        <div class="npc-func">📚 万象宝典 · 遗物收藏</div>
+      </div>
+    </div>
+    <!-- 悬赏官 -->
+    <div class="city-npc" data-bld="daily">
+      <div class="npc-portrait">📋</div>
+      <div class="npc-body">
+        <div class="npc-role">悬赏官 · 卡斯特</div>
+        <div class="npc-quote">"今天的猎物已经张贴出来了。"</div>
+        <div class="npc-func">📅 每日挑战 · 悬赏任务</div>
+      </div>
+    </div>
+    <!-- 记录官 -->
+    <div class="city-npc" data-bld="leaderboard">
+      <div class="npc-portrait">📜</div>
+      <div class="npc-body">
+        <div class="npc-role">史官 · 格里芬</div>
+        <div class="npc-quote">"每一位英雄的故事都应该被铭记。"</div>
+        <div class="npc-func">🏆 功勋柱 · 排行榜</div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- 出征准备：难度+职业 -->
@@ -186,17 +257,16 @@
     </div>
   </div>
 
-  <div id="inv-bar" class="panel">
-    <div class="sec">🎒 装备 <span style="color:#445566;font-size:11px">(最多6件)</span></div>
-    <div id="equip-list"><span style="color:#445566">暂无</span></div>
-    <div class="sec" style="margin-top:6px">🔮 遗物 <span style="color:#445566;font-size:11px">(最多6个)</span></div>
-    <div id="relic-list"><span style="color:#445566">暂无</span></div>
-    <div class="sec" style="margin-top:6px">🧪 药水 <span style="color:#445566;font-size:11px">(最多5个)</span></div>
-    <div id="potion-list"><span style="color:#445566">暂无</span></div>
+  <div id="inv-bar" class="panel" style="display:none">
+    <div class="sec">🎒 <span style="color:#445566;font-size:11px">装备</span></div>
+    <div id="equip-list"></div>
+    <div class="sec" style="margin-top:4px">🔮 <span style="color:#445566;font-size:11px">遗物</span></div>
+    <div id="relic-list"></div>
   </div>
 
   <div id="debuff-bar"></div>
   <div id="log"></div>
+  <div id="kill-flash"></div>
   <div id="float-container"></div>
 
   <div id="auto-indicator"></div>

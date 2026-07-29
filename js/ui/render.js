@@ -12,6 +12,14 @@ export function render(s) {
   // 城池界面：有存档时显示"记忆之书"
   const cb = document.getElementById("continue-box");
   if (cb) cb.style.display = Game.hasSave() ? "block" : "none";
+  // 遗物收集进度
+  var relProgress = document.getElementById("relic-progress");
+  if (relProgress) {
+    var discovered = (Game.meta && Game.meta.discoveredRelics) ? Game.meta.discoveredRelics.length : 0;
+    var total = (R.get('relics') || []).length;
+    relProgress.textContent = '📚 遗物 ' + discovered + '/' + total;
+    relProgress.style.color = discovered >= total ? '#ffa502' : '#667788';
+  }
   document.getElementById("gold-text").textContent = s.gold || 0;
 
   if (s.player) {
@@ -86,8 +94,10 @@ export function render(s) {
 
   // 药水列表
   const potList = document.getElementById("potion-list");
-  if (s.potions.length === 0) potList.innerHTML = '<span style="color:#445566">暂无</span>';
-  else potList.innerHTML = s.potions.map((p, i) => `<span style="color:#70a1ff;cursor:pointer" onclick="window._usePotion(${i})">${p.icon}${p.name}</span>`).join(" ");
+  if (potList) {
+    if (s.potions.length === 0) potList.innerHTML = '<span style="color:#445566">暂无</span>';
+    else potList.innerHTML = s.potions.map((p, i) => `<span style="color:#70a1ff;cursor:pointer" onclick="window._usePotion(${i})">${p.icon}${p.name}</span>`).join(" ");
+  }
 
   // Debuff栏
   const dbEl = document.getElementById("debuff-bar"); let db = "";
