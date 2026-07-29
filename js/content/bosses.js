@@ -89,3 +89,43 @@ R.registerAll('endlessBosses', [
   { name: "妖塔之主·终极", hp: 4000, atk: 120, def: 45, exp: "超越一切", icon: "👑",
     skill: { name: "万物归无", desc: "造成80点固定伤害+回复满血", fn: (e, p) => { p.hp -= 80; e.hp = e.maxHp; return { dmg: 80, heal: e.maxHp, msg: '👑 万物归无……妖塔之主展现了真正的力量' }; } } }
 ]);
+
+// ===== 新增Boss =====
+R.registerAll('bosses', {
+  desert: {
+    name: "沙漠之主·沙王", hp: 280, atk: 22, def: 6, exp: "万沙之王", icon: "🏜️",
+    intro: ["热浪扭曲了视线……","黄沙之中，一尊巨大的身影缓缓升起。","它是沙漠的主宰，万沙之王。","—— 沙漠之主 · 沙王"],
+    phase2Intro: ["沙王发出震天的咆哮！","沙暴席卷整个战场——","它的力量来自脚下无尽的黄沙。","—— 沙漠之主 · 沙暴化身"],
+    skill: { name: "沙暴", desc: "造成伤害+降低玩家命中2回合", fn: (e, p) => { const d = Math.max(1, e.atk - p.def + 5); p.hp -= d; return { dmg: d, msg: '🏜️ 沙王召唤沙暴！命中率下降' }; } },
+    phase2: { name: "沙漠之主·沙暴化身", atkMul: 1.4, defBonus: 3,
+      skill: { name: "流沙吞噬", desc: "造成2倍伤害+吸血", fn: (e, p) => { const d = Math.max(1, Math.floor(e.atk * 2) - p.def); p.hp -= d; const h = Math.floor(d * 0.3); e.hp = Math.min(e.maxHp, e.hp + h); return { dmg: d, msg: '🏜️💢 流沙吞噬！沙王吸取了你的生命' }; } }
+    }
+  },
+  swamp: {
+    name: "沼泽女王·藤母", hp: 320, atk: 20, def: 7, exp: "万藤之祖", icon: "🌿",
+    intro: ["沼泽深处，无数藤蔓向你伸来……","它们汇成一张巨大的面孔。","沼泽的女王已经苏醒。","—— 沼泽女王 · 藤母"],
+    phase2Intro: ["藤母发出刺耳的嘶吼！","成千上万的藤蔓从地底涌出——","每一根都带着腐沼的剧毒。","—— 沼泽女王 · 万藤之怒"],
+    skill: { name: "缠绕", desc: "造成伤害+降低攻击2回合", fn: (e, p) => { const d = Math.max(1, e.atk - p.def + 3); p.hp -= d; p.debuffAtk = { turns: 3, value: 3 }; return { dmg: d, msg: '🌿 藤母释放缠绕！攻击力降低' }; } },
+    phase2: { name: "沼泽女王·万藤之怒", atkMul: 1.3, defBonus: 4,
+      skill: { name: "剧毒孢子", desc: "造成伤害+全屏中毒3回合", fn: (e, p) => { p.hp -= 12; p.bleed = (p.bleed || 0) + 5; return { dmg: 12, msg: '🌿💢 剧毒孢子爆发！你开始中毒' }; } }
+    }
+  },
+  tower_lower: {
+    name: "魔塔将军·铁壁", hp: 650, atk: 35, def: 18, exp: "魔塔军团长", icon: "🛡️",
+    intro: ["魔塔的深处，沉重的脚步声回荡……","一副漆黑的铠甲挡在你的面前。","他是魔塔的将军，魔王最信任的部下。","—— 魔塔将军 · 铁壁"],
+    phase2Intro: ["将军的铠甲开始崩裂——","但裂缝中透出的不是血肉，","而是纯粹的魔气。","—— 魔塔将军 · 魔化将军"],
+    skill: { name: "军团冲锋", desc: "造成1.5倍伤害+召唤增援", fn: (e, p) => { const d = Math.max(1, Math.floor(e.atk * 1.5) - p.def); p.hp -= d; e.atk += 2; return { dmg: d, msg: '🛡️ 铁壁发起军团冲锋！攻击力提升' }; } },
+    phase2: { name: "魔塔将军·魔化", atkMul: 1.5, defBonus: 5,
+      skill: { name: "魔气斩", desc: "造成2倍伤害+降低防御", fn: (e, p) => { const d = Math.max(1, Math.floor(e.atk * 2) - p.def); p.hp -= d; p.def = Math.max(0, p.def - 3); return { dmg: d, msg: '🛡️💢 魔气斩！防御被削弱' }; } }
+    }
+  },
+  tower_upper: {
+    name: "魔王·终焉", hp: 1000, atk: 45, def: 22, exp: "魔塔之主", icon: "👑",
+    intro: ["魔塔的顶端，黑暗凝聚成实体……","一双猩红的眼睛在黑暗中睁开。","它就是魔塔的主人，万魔之王。","—— 魔王 · 终焉"],
+    phase2Intro: ["魔王发出震彻天地的狂笑！","黑暗吞噬了所有的光——","现在，你面对的是真正的恶魔。","—— 魔王 · 真·魔王形态"],
+    skill: { name: "黑暗降临", desc: "造成30点固定伤害+全属性降低", fn: (e, p) => { p.hp -= 30; p.debuffAtk = { turns: 4, value: 6 }; p.def = Math.max(0, p.def - 3); return { dmg: 30, msg: '👑 黑暗降临！全属性被削弱' }; } },
+    phase2: { name: "魔王·真·终焉", atkMul: 1.8, defBonus: 10,
+      skill: { name: "终焉审判", desc: "造成50点固定伤害+封印技能1回合", fn: (e, p) => { p.hp -= 50; p._stoneGaze = true; return { dmg: 50, msg: '👑💢 终焉审判！你的技能被封印' }; } }
+    }
+  }
+});

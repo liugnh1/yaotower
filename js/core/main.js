@@ -67,6 +67,7 @@ var _origAddLB = Game.addLeaderboard.bind(Game);
 Game.addLeaderboard = function(entry) { _origAddLB(entry); TapLeaderboard.submitScore('total', entry.floor); };
 
 window._usePotion = i => { Combat.usePotion(i); };
+window._showAchPanel = () => { showAchievementPanel(); };
 
 // ===================== 序幕（首次访问） =====================
 const PROLOGUE_KEY = "yaotower_v3.2_prologue_done";
@@ -135,7 +136,7 @@ Events.on(E.BATTLE_START, d => {
   if (d.type === 'stun') log(`<span class="win">⚡ ${d.name} 被眩晕！跳过下回合</span>`);
   if (d.type === 'bossSkill') log(`<span class="warn">${d.msg}</span>`);
   if (d.type === 'bossPhase2') { log(`<span class="warn">💢 Boss进入二阶段：${d.name}！</span>`); toast("⚠️ Boss暴怒！二阶段！"); playSound("bossRoar"); screenShake(2); }
-  if (d.type === 'achievement') { const ach = (R.get('achievements') || []).find(a => a.id === d.id); if (ach) { toast(`🏆 成就解锁：${ach.name}！`); playSound("achievement"); } }
+  if (d.type === 'achievement') { const ach = (R.get('achievements') || []).find(a => a.id === d.id); if (ach) { toast(`🏆 成就解锁：${ach.name}！`); playSound("achievement"); showAchievementCard(ach); } }
   if (d.type === 'synCritDice') log("<span class='win'>🎲 命运之眼触发！伤害翻倍！</span>");
   if (d.type === 'synergy') { log(`<span class="win">🔗 羁绊激活：${d.name}！${d.desc}</span>`); bigFloat("🔗 羁绊激活！", "big-crit", 1200); screenShake(1); }
   if (d.type === 'stoneGaze') log("<span class='warn'>🗿 被石化了！跳过本回合</span>");
@@ -365,12 +366,8 @@ function startNewGame() {
   buildDifficultySelect(diff => {
     pickedDiff = diff;
     s.difficulty = diff.id;
-    // 应用每日运势
-    var fortune = getDailyFortune();
-    fortune.apply(s);
-    s._fortuneName = fortune.name;
-    // 应用遗产
-    applyLegacy(s);
+    // 运势和遗产延后到pickClass中(player创建后)应用
+    s._pendingFortune = getDailyFortune();
     Game.saveMeta();
     // 高亮已选难度
     document.querySelectorAll("#diff-grid .card").forEach(c => c.style.opacity = "0.5");
@@ -404,6 +401,10 @@ function pickClass(cls) {
   s.potions.push(...startPots);
   // 应用魂晶升级
   applySoulUpgrades(s);
+
+  // 应用运势和遗产（player已创建）
+  if (s._pendingFortune) { s._pendingFortune.apply(s); s._fortuneName = s._pendingFortune.name; s._pendingFortune = null; }
+  applyLegacy(s);
 
   // 开局选1个本命技能
   buildSkillSelect(cls, function(sk) {
@@ -448,7 +449,7 @@ function enterRoom() {
   if (!roomType) {
     if (Room.isFinalZone(s.zone.id)) { gameClear(); return; }
     const route = R.get("simpleRoute");
-    const nextChoices = route[s.zone.id] ? route[s.zone.id].choices : [];
+    const nextChoices = Room.getZoneChoices(s.zone.id);
     if (nextChoices.length > 1) {
       buildZoneSelect(nextChoices, z => initZone(z.id));
       switchScreen("zone-select");
@@ -588,7 +589,7 @@ function nextRoom() {
   if (Room.isZoneEnd()) {
     if (Room.isFinalZone(s.zone.id)) { gameClear(); return; }
     const route = R.get("simpleRoute");
-    const nextChoices = route[s.zone.id] ? route[s.zone.id].choices : [];
+    const nextChoices = Room.getZoneChoices(s.zone.id);
     if (nextChoices.length > 1) {
       showModal("endless-choice");
       document.getElementById("btn-next-zone").onclick = () => { hideModal("endless-choice"); Room.advanceFloor(); buildZoneSelect(nextChoices, z => initZone(z.id)); switchScreen("zone-select"); };
@@ -695,7 +696,71 @@ function onGameOver() {
   showGameOver(false, rewards || "无奖励");
 }
 
+// ===================== 结局系统 =====================
+var ENDINGS = {
+  casual: {
+    icon: "🏰", title: "守门人陨落",
+    lines: ["你击败了魔塔的守门人。","大门在你面前缓缓开启——","但门后，是无尽的黑暗与更深的回廊。","魔塔的秘密远不止于此……","—— 这只是开始。","（在普通难度下继续探索真正的魔塔）"],
+    cls: "ending-casual"
+  },
+  standard: {
+    icon: "⚔️", title: "将军之殇",
+    lines: ["魔塔将军倒下了。","他的铠甲化为齑粉，魔气四散。","然而，塔顶传来令人战栗的狂笑——","那是魔王的声音。","魔塔的真正主人，仍在最高处等待。","—— 你以为的终点，只是起点。","（在炼狱难度下挑战魔王·终焉）"],
+    cls: "ending-standard"
+  },
+  hell: {
+    icon: "👑", title: "终焉之陨",
+    lines: ["魔王发出最后的嘶吼……","黑暗从魔塔中褪去。","边境城池迎来了久违的黎明。","勇士，你的名字将被刻入史册。","—— 妖塔 · 终章 ——","感谢游玩。"],
+    cls: "ending-hell"
+  }
+};
+
+function showEnding(onDone) {
+  var s = Game.state;
+  var diff = s.difficulty || 'standard';
+  var ending = ENDINGS[diff] || ENDINGS.standard;
+  var el = document.getElementById("ending-screen");
+  el.className = ending.cls;
+  el.style.display = "flex";
+  document.getElementById("ending-icon").textContent = ending.icon;
+  document.getElementById("ending-title").textContent = ending.title;
+  var txt = document.getElementById("ending-text");
+  txt.innerHTML = "";
+  // 打字机：逐行显示（全部在同一卡片内）
+  var li = 0, ci = 0;
+  function typeLine() {
+    if (li >= ending.lines.length) return;
+    if (ci === 0) { var d = document.createElement("div"); d.id = "end-line-" + li; txt.appendChild(d); }
+    var lineEl = document.getElementById("end-line-" + li);
+    if (ci < ending.lines[li].length) {
+      lineEl.textContent = ending.lines[li].substring(0, ci + 1);
+      ci++;
+      setTimeout(typeLine, 50 + Math.random() * 30);
+    } else {
+      ci = 0; li++;
+      setTimeout(typeLine, 300);
+    }
+  }
+  setTimeout(typeLine, 400);
+
+  // 点击跳过→直接显示全部→0.8s后调用回调
+  var done = false;
+  el.onclick = function() {
+    if (done) return; done = true;
+    txt.innerHTML = ending.lines.map(function(l) { return "<div>" + l + "</div>"; }).join("");
+    setTimeout(function() { el.style.display = "none"; if (onDone) onDone(); }, 800);
+  };
+}
+
 function gameClear() {
+  const s = Game.state;
+  // 显示结局→结算
+  showEnding(function() {
+    doGameClear();
+  });
+}
+
+function doGameClear() {
   const s = Game.state;
   Game.meta.totalWins++;
   saveRunHistory(true);
@@ -2046,6 +2111,104 @@ function openPotionModal() {
   }
 }
 
+// ===================== 称号系统 =====================
+var TITLES = [
+  { id: "t_newbie", name: "初入江湖", icon: "🌱", cond: function(m) { return true; } },
+  { id: "t_clear_casual", name: "守门人克星", icon: "🏰", cond: function(m) { return (m.achievements||[]).includes("clear_casual"); } },
+  { id: "t_clear_standard", name: "魔塔征服者", icon: "⚔️", cond: function(m) { return (m.achievements||[]).includes("clear_standard"); } },
+  { id: "t_clear_hell", name: "炼狱主宰", icon: "🔥", cond: function(m) { return (m.achievements||[]).includes("clear_hell"); } },
+  { id: "t_relic_10", name: "遗物猎人", icon: "📦", cond: function(m) { return (m.discoveredRelics||[]).length >= 10; } },
+  { id: "t_relic_20", name: "遗物大师", icon: "🔮", cond: function(m) { return (m.discoveredRelics||[]).length >= 20; } },
+  { id: "t_relic_all", name: "万象皆通", icon: "🌟", cond: function(m) { var all = R.get('relics')||[]; return (m.discoveredRelics||[]).length >= all.length; } },
+  { id: "t_wins_5", name: "身经百战", icon: "💪", cond: function(m) { return (m.totalWins||0) >= 5; } },
+  { id: "t_wins_20", name: "不败传说", icon: "👑", cond: function(m) { return (m.totalWins||0) >= 20; } },
+  { id: "t_deaths_10", name: "不死小强", icon: "🪳", cond: function(m) { return (m.totalDeaths||0) >= 10; } },
+  { id: "t_city_max", name: "城主大人", icon: "🏰", cond: function(m) { return (m.cityLevel||1) >= 5; } },
+  { id: "t_forge_myth", name: "神话锻造师", icon: "⚒️", cond: function(m) { return (m.forgedItems||[]).length > 0; } },
+];
+
+function showAchievementPanel() {
+  var el = document.getElementById("meta-panel");
+  el.style.display = "block"; el.querySelector("h3").textContent = "🏆 成就与称号";
+  var content = document.getElementById("meta-content"); content.innerHTML = "";
+  var meta = Game.meta;
+
+  // 称号选择
+  if (!meta.equippedTitle) meta.equippedTitle = "t_newbie";
+  var equipped = TITLES.find(function(t) { return t.id === meta.equippedTitle; }) || TITLES[0];
+
+  var titleDiv = document.createElement("div");
+  titleDiv.style.cssText = "text-align:center;margin-bottom:12px;padding:10px;background:#1a1520;border-radius:8px;border:1px solid #ffa502";
+  titleDiv.innerHTML = '<div style="color:#8899bb;font-size:10px;margin-bottom:4px">当前称号</div>' +
+    '<div style="font-size:24px">' + equipped.icon + '</div>' +
+    '<div style="color:#ffa502;font-size:16px;font-weight:bold">' + equipped.name + '</div>';
+  content.appendChild(titleDiv);
+
+  // 可选称号列表
+  var unlockedCount = 0;
+  TITLES.forEach(function(t) {
+    var isUnlocked = t.cond(meta);
+    if (isUnlocked) unlockedCount++;
+    var isEquipped = meta.equippedTitle === t.id;
+    var div = document.createElement("div");
+    div.style.cssText = "margin-bottom:4px;padding:8px;background:#0d1117;border-radius:4px;display:flex;align-items:center;gap:8px;border-left:3px solid " + (isEquipped ? "#ffa502" : (isUnlocked ? "#5a4080" : "#1a1a2a"));
+    div.innerHTML = '<span style="font-size:22px">' + (isUnlocked ? t.icon : '🔒') + '</span>' +
+      '<div style="flex:1"><b style="color:' + (isUnlocked ? '#ddccaa' : '#444') + '">' + t.name + '</b></div>';
+    if (isUnlocked && !isEquipped) {
+      var eqBtn = document.createElement("button");
+      eqBtn.className = "modal-btn"; eqBtn.style.cssText = "font-size:10px;padding:3px 8px;width:auto";
+      eqBtn.textContent = "装备";
+      eqBtn.onclick = function() { meta.equippedTitle = t.id; Game.saveMeta(); showAchievementPanel(); toast('👑 已装备称号：' + t.name); };
+      div.appendChild(eqBtn);
+    }
+    if (isEquipped) { var badge = document.createElement("span"); badge.style.cssText = "color:#ffa502;font-size:10px"; badge.textContent = "✅使用中"; div.appendChild(badge); }
+    content.appendChild(div);
+  });
+
+  // 成就列表
+  var achHdr = document.createElement("div");
+  achHdr.style.cssText = "color:#c8a8ff;font-weight:bold;margin:12px 0 6px;font-size:13px";
+  achHdr.textContent = "📋 成就进度（" + (meta.achievements||[]).length + "/" + (R.get('achievements')||[]).length + "）";
+  content.appendChild(achHdr);
+
+  var categories = { combat: "⚔️战斗", build: "🔗构筑", collect: "📦收集", challenge: "🏆挑战" };
+  var achList = R.get('achievements') || [];
+  Object.keys(categories).forEach(function(cat) {
+    var catAchs = achList.filter(function(a) { return a.category === cat; });
+    if (catAchs.length === 0) return;
+    var catDiv = document.createElement("div");
+    catDiv.style.cssText = "color:#8899bb;font-size:10px;margin:4px 0 2px";
+    catDiv.textContent = categories[cat];
+    content.appendChild(catDiv);
+    catAchs.forEach(function(a) {
+      var done = (meta.achievements||[]).includes(a.id);
+      var div = document.createElement("div");
+      div.style.cssText = "padding:3px 6px;font-size:10px;color:" + (done ? "#89e894" : "#444");
+      div.textContent = (done ? "✅" : "⬜") + " " + a.icon + " " + a.name + " — " + a.desc;
+      content.appendChild(div);
+    });
+  });
+
+  var closeBtn = document.createElement("button");
+  closeBtn.className = "restart-btn"; closeBtn.style.cssText = "margin-top:10px;width:100%";
+  closeBtn.textContent = "关闭"; closeBtn.onclick = function() { el.style.display = "none"; };
+  content.appendChild(closeBtn);
+  showModal("meta-panel");
+}
+
+// ===================== 成就卡片动画 =====================
+function showAchievementCard(ach) {
+  var card = document.getElementById("ach-card");
+  if (!card) {
+    card = document.createElement("div"); card.id = "ach-card";
+    card.style.cssText = "position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0);z-index:11000;background:linear-gradient(180deg,#2a1a0a,#1a0a00);border:3px solid #ffa502;border-radius:16px;padding:24px;text-align:center;pointer-events:none;transition:transform .4s cubic-bezier(.175,.885,.32,1.275);box-shadow:0 0 60px rgba(255,165,2,.5)";
+    document.body.appendChild(card);
+  }
+  card.innerHTML = '<div style="font-size:48px">🏆</div><div style="color:#ffa502;font-size:20px;font-weight:bold;margin:8px 0">成就解锁！</div><div style="color:#ffdd77;font-size:16px">' + ach.name + '</div><div style="color:#8899bb;font-size:11px;margin-top:4px">' + (ach.desc || '') + '</div>';
+  card.style.transform = "translate(-50%,-50%) scale(1)";
+  setTimeout(function() { card.style.transform = "translate(-50%,-50%) scale(0)"; }, 1800);
+}
+
 // ===================== 战斗记录保存 =====================
 function saveRunHistory(win) {
   var s = Game.state;
@@ -2275,7 +2438,7 @@ function showCityHub() {
     } else if (cityLv < 5) {
       guide.innerHTML = '🎯 <b>出城探险</b>赚取灵石升级主城（差' + (nextCost - spiritStones) + '灵石升Lv.' + (cityLv + 1) + '）';
     } else {
-      guide.innerHTML = '🎯 主城已满级！继续挑战更高难度吧';
+      guide.innerHTML = '👑 主城已满级 · 边境城池的传奇 · <b>出城挑战更高难度吧！</b>';
     }
   }
 
@@ -2284,12 +2447,12 @@ function showCityHub() {
   if (!npcList) return;
 
   var npcDefs = [
-    { id: 'altar', name: '女神祭司 · 艾琳娜', icon: '🧙‍♀️', quote: '"女神的光辉指引着每一位勇士……"', func: '🔮 天赋强化 · 魂晶兑换', unlockLv: 1 },
-    { id: 'class', name: '战斗大师 · 雷恩', icon: '🗡️', quote: '"想变强？选对路比拼命更重要。"', func: '🎭 职业解锁 · 觉醒转职', unlockLv: 1 },
-    { id: 'forge', name: '铁匠 · 锻炉', icon: '👨‍🏭', quote: '"好钢用在刀刃上……你有材料吗？"', func: '⚒️ 装备分解 · 锻造升级', unlockLv: 2 },
-    { id: 'compendium', name: '大学士 · 奥兰多', icon: '📖', quote: '"知识就是力量，记录即是对抗遗忘。"', func: '🔬 遗物研究 · 万象宝典', unlockLv: 3 },
-    { id: 'daily', name: '悬赏官 · 卡斯特', icon: '📋', quote: '"今天的猎物已经张贴出来了。"', func: '🎯 Boss猎杀令 · 每日悬赏', unlockLv: 4 },
-    { id: 'leaderboard', name: '史官 · 格里芬', icon: '📜', quote: '"每一位英雄的故事都应该被铭记。"', func: '📊 征战记录 · 统计摘要', unlockLv: 5 },
+    { id: 'altar', name: '女神祭司 · 艾琳娜', icon: '🧙‍♀️', quote: cityLv >= 5 ? '"你已成为边境城池的传说……"' : '"女神的光辉指引着每一位勇士……"', func: '🔮 天赋强化 · 魂晶兑换', unlockLv: 1 },
+    { id: 'class', name: '战斗大师 · 雷恩', icon: '🗡️', quote: cityLv >= 5 ? '"我已经没有什么可以教你了。"' : '"想变强？选对路比拼命更重要。"', func: '🎭 职业解锁 · 觉醒转职', unlockLv: 1 },
+    { id: 'forge', name: '铁匠 · 锻炉', icon: '👨‍🏭', quote: cityLv >= 5 ? '"这些灵石……足够打造神器了。"' : '"好钢用在刀刃上……你有材料吗？"', func: '⚒️ 装备分解 · 锻造升级', unlockLv: 2 },
+    { id: 'compendium', name: '大学士 · 奥兰多', icon: '📖', quote: cityLv >= 5 ? '"所有的知识，都已汇聚于此。"' : '"知识就是力量，记录即是对抗遗忘。"', func: '🔬 遗物研究 · 万象宝典', unlockLv: 3 },
+    { id: 'daily', name: '悬赏官 · 卡斯特', icon: '📋', quote: cityLv >= 5 ? '"已经没有猎物能难倒你了。"' : '"今天的猎物已经张贴出来了。"', func: '🎯 Boss猎杀令 · 每日悬赏', unlockLv: 4 },
+    { id: 'leaderboard', name: '史官 · 格里芬', icon: '📜', quote: cityLv >= 5 ? '"你的传奇，将永载史册。"' : '"每一位英雄的故事都应该被铭记。"', func: '📊 征战记录 · 历代最强', unlockLv: 5 },
   ];
 
   npcList.innerHTML = '';
@@ -2720,6 +2883,17 @@ function showGameOver(isWin, rewardText) {
     "</div>";
 
   // 按钮改大
+  // 分享按钮
+  var shareText = '【妖塔】' + clsName + ' · ' + (s.difficulty || 'standard') + ' · 第' + floor + '层 · 遗物' + (s.relics ? s.relics.length : 0) + '件 · 装备' + (s.equip ? s.equip.length : 0) + '件';
+  var shareBtn = document.createElement("button");
+  shareBtn.textContent = "📋 复制战绩";
+  shareBtn.style.cssText = "display:block;margin:8px auto;padding:10px 24px;background:#1a2a3a;border:1px solid #3a5a7a;color:#8899bb;border-radius:8px;cursor:pointer;font-size:13px;width:80%;max-width:300px";
+  shareBtn.onclick = function() {
+    if (navigator.clipboard) { navigator.clipboard.writeText(shareText).then(function() { toast("📋 战绩已复制！"); }); }
+    else { prompt("复制这段战绩：", shareText); }
+  };
+  score.appendChild(shareBtn);
+
   var restartBtn = document.getElementById("btn-hard-restart");
   restartBtn.textContent = "🔄 再来一局";
   restartBtn.style.cssText = "padding:18px 40px;font-size:20px;background:linear-gradient(180deg,#ffa502,#cc7700);color:#000;font-weight:bold;border:none;border-radius:12px;cursor:pointer;margin:8px;min-height:56px;width:80%;max-width:300px";

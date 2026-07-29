@@ -27,6 +27,7 @@
     <p class="city-lore">边境城池 · 魔塔前最后的庇护所</p>
     <!-- 种子输入 -->
     <div id="daily-fortune" style="color:#ffa502;font-size:11px;margin-bottom:4px"></div>
+    <div id="player-title" style="color:#ffa502;font-size:13px;font-weight:bold;margin-bottom:2px;cursor:pointer" title="点击查看成就与称号"></div>
     <span id="login-streak" style="color:#ff6644;font-size:10px"></span>
     <div class="seed-row">
       <input id="seed-input" placeholder="📜 输入种子（留空随机）" maxlength="20">
@@ -171,7 +172,8 @@
 
 <!-- 战斗主界面 -->
 <div id="main" class="hidden">
-  <div id="gold-bar">💰 <b id="gold-text">0</b> <span id="relic-count-bar" style="margin-left:8px;font-size:11px"></span></div>
+  <div id="gold-bar">💰 <b id="gold-text">0</b> <span id="relic-count-bar" style="margin-left:8px;font-size:11px"></span> <span id="bounty-tracker" style="margin-left:8px;font-size:10px;color:#ffa502"></span></div>
+  <div id="relic-bar" class="panel" style="padding:6px 8px;margin-bottom:6px;min-height:28px;font-size:12px;display:flex;flex-wrap:wrap;gap:4px;align-items:center"></div>
   <div id="floor">第 1 层</div>
   <div id="zone-name" style="text-align:center;color:#8899bb;font-size:12px;margin-bottom:4px">迷雾平原</div>
   <div id="turn-limit">回合: 0/15</div>
@@ -365,6 +367,17 @@
 <div id="room-preview">
   <div id="room-preview-icon"></div>
   <div id="room-preview-name"></div>
+</div>
+
+<!-- 结局动画 -->
+<div id="ending-screen">
+  <div id="ending-bg"></div>
+  <div id="ending-card">
+    <div id="ending-icon"></div>
+    <div id="ending-title"></div>
+    <div id="ending-text"></div>
+    <div id="ending-hint">点击任意位置继续</div>
+  </div>
 </div>
 
 <div id="toast"></div>

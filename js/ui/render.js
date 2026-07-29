@@ -9,6 +9,29 @@ import { getIntent } from '../systems/combat.js';
 import { startHeartbeat, stopHeartbeat } from '../core/audio.js';
 
 export function render(s) {
+  // 称号显示
+  var titleEl = document.getElementById("player-title");
+  if (titleEl && Game.meta) {
+    var equippedId = Game.meta.equippedTitle || "t_newbie";
+    var TITLES = [
+      { id: "t_newbie", name: "初入江湖", icon: "🌱" },
+      { id: "t_clear_casual", name: "守门人克星", icon: "🏰" },
+      { id: "t_clear_standard", name: "魔塔征服者", icon: "⚔️" },
+      { id: "t_clear_hell", name: "炼狱主宰", icon: "🔥" },
+      { id: "t_relic_10", name: "遗物猎人", icon: "📦" },
+      { id: "t_relic_20", name: "遗物大师", icon: "🔮" },
+      { id: "t_relic_all", name: "万象皆通", icon: "🌟" },
+      { id: "t_wins_5", name: "身经百战", icon: "💪" },
+      { id: "t_wins_20", name: "不败传说", icon: "👑" },
+      { id: "t_deaths_10", name: "不死小强", icon: "🪳" },
+      { id: "t_city_max", name: "城主大人", icon: "🏰" },
+      { id: "t_forge_myth", name: "神话锻造师", icon: "⚒️" }
+    ];
+    var t = TITLES.find(function(x) { return x.id === equippedId; }) || TITLES[0];
+    titleEl.textContent = t.icon + " " + t.name;
+    titleEl.onclick = function() { if (window._showAchPanel) window._showAchPanel(); };
+  }
+
   // 城池界面：有存档时显示"记忆之书"
   const cb = document.getElementById("continue-box");
   if (cb) cb.style.display = Game.hasSave() ? "block" : "none";
@@ -28,6 +51,13 @@ export function render(s) {
     var totalR = (R.get('relics') || []).length;
     rcBar.textContent = '🔮' + discovered + '/' + totalR;
     rcBar.style.color = discovered >= totalR ? '#ffa502' : '#667788';
+  }
+  // 猎杀令进度
+  var bountyEl = document.getElementById("bounty-tracker");
+  if (bountyEl) {
+    var bounty = Game.meta ? Game.meta.activeBounty : null;
+    if (bounty) { bountyEl.textContent = '🎯猎杀:' + bounty.boss + ' +' + bounty.reward + '魂晶'; bountyEl.style.display = ''; }
+    else { bountyEl.style.display = 'none'; }
   }
 
   if (s.player) {
@@ -105,6 +135,20 @@ export function render(s) {
   if (potList) {
     if (s.potions.length === 0) potList.innerHTML = '<span style="color:#445566">暂无</span>';
     else potList.innerHTML = s.potions.map((p, i) => `<span style="color:#70a1ff;cursor:pointer" onclick="window._usePotion(${i})">${p.icon}${p.name}</span>`).join(" ");
+  }
+
+  // 战斗遗物栏（左上角）
+  var relicBar = document.getElementById("relic-bar");
+  if (relicBar) {
+    if (s.relics && s.relics.length > 0) {
+      relicBar.innerHTML = s.relics.map(function(r) {
+        var stars = (r.stars && r.stars > 1) ? '<sup style="color:#ffa502;font-size:9px">' + '⭐'.repeat(r.stars - 1) + '</sup>' : '';
+        return '<span style="color:' + (RARITY_COLOR[r.rarity] || '#ccc') + '" title="' + r.desc + '">' + r.icon + stars + '</span>';
+      }).join('');
+      relicBar.style.display = '';
+    } else {
+      relicBar.style.display = 'none';
+    }
   }
 
   // Debuff栏

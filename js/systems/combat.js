@@ -103,6 +103,9 @@ export function startBattle(type) {
     if (diff2.doubleTag && s.rng.chance(0.5)) { addTag(s); addTag(s); }
     // 风险门：额外词条
     if (s._riskRoom) { addTag(s); s._riskReward = true; s._riskRoom = false; }
+    // 新Zone环境：魔塔下层扣血+攻 / 魔塔上层+暴击
+    if (s._zoneMod?.id === "tower_lower_drain" && s.player) { s.player.atk = Math.floor(s.player.atk * 1.2); }
+    if (s._zoneMod?.id === "tower_upper_seal" && s.player) { s.player.critRate += 0.25; }
     // 恢复意图系统
     s.enemies.forEach(function(em) { if (em.hp > 0) updateIntentFor(em, s); });
     Events.emit(E.BATTLE_START, { type: type, floor: s.totalFloor, zone: s.zone });
@@ -484,6 +487,14 @@ function enemyTurn() {
   if (s.defending) s.defending = false;
   if (s.skillCooldowns) {
     Object.keys(s.skillCooldowns).forEach(function(k) { if (s.skillCooldowns[k] > 0) s.skillCooldowns[k]--; });
+  }
+  // 新Zone环境
+  if (s._zoneMod?.id === "tower_lower_drain") { var drain = Math.max(1, Math.floor(s.player.maxHp * 0.02)); s.player.hp -= drain; }
+  if (s._zoneMod?.id === "swamp_poison") { s.player.hp -= 3; s.enemies.forEach(function(e) { if (e.hp > 0) e.hp -= 3; }); }
+  if (s._zoneMod?.id === "tower_upper_seal" && s.turnInFloor % 3 === 0 && s.activeSkills && s.activeSkills.length > 0) {
+    var rIdx = Math.floor(Math.random() * s.activeSkills.length);
+    var rSk = s.activeSkills[rIdx];
+    s.skillCooldowns[rSk.id] = Math.max((s.skillCooldowns[rSk.id] || 0), 1);
   }
   s.turn++; s.turnInFloor++;
   Events.emit(E.TURN_END, { turn: s.turn, turnInFloor: s.turnInFloor });

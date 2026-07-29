@@ -3,6 +3,14 @@ import { Game } from '../core/state.js';
 import { R } from '../core/registry.js';
 import { E, Events } from '../core/event-bus.js';
 
+// 根据难度获取路由choices
+function getChoices(entry, diff) {
+  if (!entry) return [];
+  if (diff === 'casual' || diff === 'simple') return entry.choices_simple || entry.choices || [];
+  if (diff === 'standard') return entry.choices_standard || entry.choices || [];
+  return entry.choices_hell || entry.choices || [];
+}
+
 // ---- 初始化关卡（按 Zone ID 路由）----
 export function initZone(zoneId) {
   const s = Game.state;
@@ -17,30 +25,28 @@ export function initZone(zoneId) {
   // 应用Zone环境效果
   s._zoneMod = s.zone.modifier || null;
   if (s._zoneMod) {
-    // 矿洞：防御-2
     if (s._zoneMod.id === "cave_gold" && s.player) s.player.def = Math.max(0, s.player.def - 2);
     if (s._zoneMod.id === "tower_regen" && s.player) s.player.regen = (s.player.regen || 0) + Math.floor(s.player.maxHp * 0.03);
     console.log("[妖塔] Zone环境效果:", s._zoneMod.desc);
   }
 
-  // 生成房间池：模板洗牌 + Boss 单独标记
+  // 生成房间池
   const templates = R.get('roomTemplates').simple;
   let template = s.rng.pick(templates).slice();
   if (s.extraElite) {
     const bi = template.findIndex(r => r === "battle");
     if (bi >= 0) template[bi] = "elite";
   }
-  // Fisher-Yates 洗牌（除了前3间保持战斗暖场）
-  const warmup = template.splice(0, 3);       // 前3间固定战斗
-  const rest = s.rng.shuffle(template);        // 其余打乱
-  s._roomPool = warmup.concat(rest);           // 暖场在前，其余洗乱
+  const warmup = template.splice(0, 3);
+  const rest = s.rng.shuffle(template);
+  s._roomPool = warmup.concat(rest);
   s._bossReady = false;
   s._roomForkUsed = false;
 
   Events.emit(E.ZONE_CHANGE, { zone: s.zone, zoneIndex: entry.depth });
 
-  // 返回：是否有分支选择
-  return entry.choices && entry.choices.length > 1 ? entry.choices : null;
+  var choices = getChoices(entry, s.difficulty);
+  return choices.length > 1 ? choices : null;
 }
 
 // ---- 从房间池顺序出牌（暖场在前，已洗牌在后）----
@@ -95,14 +101,16 @@ export function advanceFloor() {
 export function isFinalZone(zoneId) {
   const route = R.get('simpleRoute');
   const entry = route[zoneId];
-  return entry && (!entry.choices || entry.choices.length === 0);
+  if (!entry) return true;
+  var choices = getChoices(entry, Game.state.difficulty);
+  return choices.length === 0;
 }
 
 // ---- 获取 Zone 分支 ----
 export function getZoneChoices(zoneId) {
   const route = R.get('simpleRoute');
   const entry = route[zoneId];
-  return entry ? (entry.choices || []) : [];
+  return entry ? getChoices(entry, Game.state.difficulty) : [];
 }
 
 // ---- 进入房间前状态重置 ----
