@@ -101,10 +101,17 @@ export function genRelic() {
 
   // Zone 专属遗物池：50% 概率从当前区域池中抽取
   const allRelics = R.get('relics');
+  // 大学士研究加成：今天研究过的遗物出现率提升
+  var studiedId = Game.meta ? Game.meta.studiedRelic : '';
+  var todayStr = new Date().toDateString();
+  if (studiedId && Game.meta.studiedDate === todayStr && rng.next() < 0.12) {
+    var studiedRelic = allRelics.find(function(r) { return r.id === studiedId; });
+    if (studiedRelic) return { ...studiedRelic };
+  }
   let pool = allRelics;
   if (s.zone && s.zone.relicPool && rng.next() < 0.5) {
     pool = s.zone.relicPool.map(id => allRelics.find(r => r.id === id)).filter(Boolean);
-    if (pool.length === 0) pool = allRelics; // 兜底
+    if (pool.length === 0) pool = allRelics;
   }
 
   const list = pool.map(r => ({ r, w: weights[r.rarity] || 10 }));

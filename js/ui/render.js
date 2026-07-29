@@ -21,6 +21,14 @@ export function render(s) {
     relProgress.style.color = discovered >= total ? '#ffa502' : '#667788';
   }
   document.getElementById("gold-text").textContent = s.gold || 0;
+  // 遗物收集进度常驻
+  var rcBar = document.getElementById("relic-count-bar");
+  if (rcBar) {
+    var discovered = (Game.meta && Game.meta.discoveredRelics) ? Game.meta.discoveredRelics.length : 0;
+    var totalR = (R.get('relics') || []).length;
+    rcBar.textContent = '🔮' + discovered + '/' + totalR;
+    rcBar.style.color = discovered >= totalR ? '#ffa502' : '#667788';
+  }
 
   if (s.player) {
     const hpPct = s.player.maxHp > 0 ? Math.max(0, s.player.hp) / s.player.maxHp * 100 : 0;
@@ -64,7 +72,7 @@ export function render(s) {
     document.getElementById("mp-fill").style.width = (allReady ? 100 : Math.max(10, 100 - totalCD * 15)) + "%";
     // 自动战斗指示器
     var ai = document.getElementById("auto-indicator");
-    if (ai) ai.textContent = s.auto ? "⚡ 自动战斗中..." : "";
+    if (ai) ai.textContent = s._speedMode ? "⚡ 加速战斗中..." : (s.auto ? "🤖 自动战斗中..." : "");
   }
 
   // 装备列表（可点击丢弃）
@@ -90,7 +98,7 @@ export function render(s) {
   // 遗物列表
   const relList = document.getElementById("relic-list");
   if (s.relics.length === 0) relList.innerHTML = '<span style="color:#445566">暂无</span>';
-  else relList.innerHTML = s.relics.map(r => `<span style="color:${RARITY_COLOR[r.rarity]}" title="${r.desc}">${r.icon}${r.name}</span>`).join(" ");
+  else relList.innerHTML = s.relics.map(function(r) { var stars = r.stars > 1 ? '⭐'.repeat(r.stars - 1) : ''; return '<span style="color:' + (RARITY_COLOR[r.rarity] || '#ccc') + '" title="' + r.desc + '">' + r.icon + r.name + stars + '</span>'; }).join(" ");
 
   // 药水列表
   const potList = document.getElementById("potion-list");
@@ -170,10 +178,15 @@ export function render(s) {
     else btnSkill.innerHTML = "⚡ 技能";
   }
 
-  document.getElementById("btn-atk").disabled = !s.enemy || s.enemy.hp <= 0;
-  document.getElementById("btn-def").disabled = !s.enemy || s.enemy.hp <= 0;
+  var anyAlive = (s.enemies || []).some(function(e) { return e.hp > 0; });
+  document.getElementById("btn-atk").disabled = !anyAlive;
+  document.getElementById("btn-def").disabled = !anyAlive;
   const btnAuto = document.getElementById("btn-auto");
-  if (btnAuto) { btnAuto.style.background = s.auto ? "#8b0000" : "#2a3d66"; btnAuto.textContent = s.auto ? "⏹ 停止" : "▶️ 自动"; }
+  if (btnAuto) {
+    if (s._speedMode) { btnAuto.style.background = "#8b4500"; btnAuto.textContent = "⚡ 加速中"; }
+    else if (s.auto) { btnAuto.style.background = "#8b0000"; btnAuto.textContent = "🤖 自动中"; }
+    else { btnAuto.style.background = "#2a3d66"; btnAuto.textContent = "▶️ 手动"; }
+  }
 }
 
 // ---- 屏幕切换 ----

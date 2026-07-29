@@ -4,6 +4,7 @@ import { R } from '../core/registry.js';
 import { E, Events } from '../core/event-bus.js';
 import { genEquip, genRelic } from './loot.js';
 import { checkSynergies, recheckSynergies } from './synergy.js';
+import { log } from '../ui/effects.js';
 
 // ---- 获取可购商品列表 ----
 export function getShopItems() {
@@ -43,15 +44,30 @@ export function buyItem(item) {
 // ---- 获取遗物 ----
 export function acquireRelic(rel) {
   const s = Game.state;
+  // 遗物升星：已拥有同ID遗物→升星而非新增
+  var existingIdx = s.relics.findIndex(function(r) { return r.id === rel.id; });
+  if (existingIdx >= 0) {
+    var existing = s.relics[existingIdx];
+    if (!existing.stars) existing.stars = 1;
+    if (existing.stars < 3) {
+      existing.stars++;
+      if (existing.onStarUp) existing.onStarUp(s.player, existing.stars);
+      log('<span class="win">⭐ ' + existing.name + ' 升至' + existing.stars + '星！</span>');
+      Events.emit(E.RELIC_GAINED, { relic: existing });
+      Game.sync();
+      return;
+    }
+  }
+  // 满6件时移除最旧的
   if (s.relics.length >= 6) {
     const old = s.relics[0];
     if (old && old.onRemove) old.onRemove(s.player);
     Events.emit(E.RELIC_REMOVED, { relic: old });
     s.relics.shift();
   }
-  // 替换旧遗物时，先清理联动再重算
   if (rel.onAcquire && !rel.applied) { rel.onAcquire(s.player, s); rel.applied = true; }
   if (rel.passive && !rel.applied) { rel.passive(s.player); rel.applied = true; }
+  rel.stars = 1;
   s.relics.push(rel);
   // 遗物发现追踪
   if (!Game.meta.discoveredRelics) Game.meta.discoveredRelics = [];
@@ -60,7 +76,7 @@ export function acquireRelic(rel) {
     Game.saveMeta();
   }
   Events.emit(E.RELIC_GAINED, { relic: rel });
-  recheckSynergies(); // 旧遗物移除后，取消不再满足的联动
+  recheckSynergies();
   const activated = checkSynergies();
   activated.forEach(syn => Events.emit(E.BATTLE_START, { type: 'synergy', name: syn.name, desc: syn.desc }));
 }

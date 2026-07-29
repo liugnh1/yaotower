@@ -153,6 +153,10 @@ body{background:#080810;color:#c6d8e8;display:flex;justify-content:center;align-
 .fork-door[data-type="event"]{border-color:#3a5a3a}.fork-door[data-type="event"]:hover{border-color:#89e894;box-shadow:0 6px 24px rgba(137,232,148,0.25)}
 .fork-door[data-type="boss"]{border-color:#8b0000;background:rgba(20,0,0,0.9);animation:bossPulse 2s infinite}.fork-door[data-type="boss"]:hover{border-color:#ff4444;box-shadow:0 6px 32px rgba(255,0,0,0.5)}
 @keyframes bossPulse{0%,100%{box-shadow:0 0 8px rgba(255,0,0,0.2)}50%{box-shadow:0 0 20px rgba(255,0,0,0.45)}}
+/* 风险门 */
+.fork-door.fork-risk{border-color:#8b0000!important;background:rgba(20,0,0,.85)!important;animation:bossPulse 1.5s infinite}
+.fork-door.fork-risk:hover{border-color:#ff2222!important;box-shadow:0 6px 32px rgba(255,0,0,.6)!important}
+.fork-door.fork-risk .door-icon{filter:drop-shadow(0 0 8px rgba(255,0,0,.6))}
 
 /* ===================== 战斗主界面 ===================== */
 /* 战斗面板：半透明毛玻璃，透出地图背景 */

@@ -5,7 +5,7 @@ import { R } from '../core/registry.js';
 import { E, Events } from '../core/event-bus.js';
 import { playSound, startHeartbeat, stopHeartbeat } from '../core/audio.js';
 import { addBuff, tickBuffs, hasBuff, removeBuff } from './buff.js';
-import { animPlayerAttack, animEnemyAttack, showBossNarrative } from '../ui/effects.js';
+import { animPlayerAttack, animEnemyAttack, showBossNarrative, bigFloat, screenShake } from '../ui/effects.js';
 
 let _onWin = null, _onOver = null, _autoTimer = null;
 export function setCB(w, o) { _onWin = w; _onOver = o; }
@@ -15,7 +15,7 @@ export function clearAuto() { if (_autoTimer) { clearTimeout(_autoTimer); _autoT
 export function startBattle(type) {
   const s = Game.state;
   // Boss战强制手动，普通/精英自动战斗
-  s.auto = (type !== "boss");
+  s.auto = (type !== "boss"); s._speedMode = false;
   s.defending = false; s.nextBoost = 0; s.turnInFloor = 0;
   s.skillCooldowns = {};
   if (s.auto) setTimeout(function() { autoLoop(); }, 400);
@@ -101,6 +101,8 @@ export function startBattle(type) {
     if (s.floorInZone > 3 && s.rng.chance(0.55)) addTag(s);
     if (diff2.extraTag && s.rng.chance(0.35)) addTag(s);
     if (diff2.doubleTag && s.rng.chance(0.5)) { addTag(s); addTag(s); }
+    // 风险门：额外词条
+    if (s._riskRoom) { addTag(s); s._riskReward = true; s._riskRoom = false; }
     // 恢复意图系统
     s.enemies.forEach(function(em) { if (em.hp > 0) updateIntentFor(em, s); });
     Events.emit(E.BATTLE_START, { type: type, floor: s.totalFloor, zone: s.zone });
@@ -360,6 +362,7 @@ function applyDmg(dmg, skill, targetEnemy) {
     playSound("attack");
   }
   s.stats.totalDmg += dmg; e.hp -= dmg;
+  if (dmg > 25) playSound("heavyHit");
   if (!skill) applyEquipCombatEffects(s);
   if (p.lifeSteal > 0) {
     const h = Math.floor(dmg * p.lifeSteal);
@@ -459,6 +462,7 @@ function enemyTurn() {
     // 打断检查
     if (s._interrupted && (e.aiCharge || (e._intent && (e._intent.type === 'skill' || e._intent.type === 'heavy')))) {
       e._intent = null; e.chargeTurns = 0;
+      setTimeout(function() { bigFloat("🛡️ 打断！", "big-crit", 800); screenShake(1); }, 50);
     }
     var dmg = Math.max(1, e.atk - p.def);
     if (hasBuff(e, 'slow')) { dmg = Math.floor(dmg * 0.7); removeBuff(e, 'slow'); }
@@ -537,7 +541,7 @@ function win() {
         if (s.selectedTarget < 0) s.selectedTarget = 0;
         // 清除已死的小怪
         s.enemies = s.enemies.filter(function(e) { return e.hp > 0 || e === bossEnemy; });
-        s.auto = false; clearAuto();
+        s.auto = false; s._speedMode = false; clearAuto();
         Events.emit(E.BATTLE_START, { type: 'bossPhase2', name: p2.name });
         Game.sync();
       };
@@ -601,7 +605,7 @@ function win() {
   if (s.totalFloor >= 30 && s.endless) checkAchievement(s, "endless_30");
   // _furyActive 由 startBattle() 清除，此处不再清零（否则狂战士之魂永远不触发）
   s.stats.roomsCleared++;
-  s.auto = false; clearAuto();
+  s.auto = false; s._speedMode = false; clearAuto();
   Game.sync();
   if (_onWin) {
     setTimeout(function() { _onWin(fast); }, 300);
@@ -632,10 +636,14 @@ function gameOver() {
   if (_onOver) _onOver();
 }
 
-// ---- 自动战斗 ----
+// ---- 战斗模式（手动→加速→自动 三档循环）----
 export function toggleAuto() {
-  const s = Game.state; clearAuto(); s.auto = !s.auto; Game.sync();
-  if (s.auto) {
+  const s = Game.state; clearAuto();
+  if (!s.auto && !s._speedMode) { s._speedMode = true; s.auto = false; }
+  else if (s._speedMode) { s._speedMode = false; s.auto = true; }
+  else { s._speedMode = false; s.auto = false; }
+  Game.sync();
+  if (s.auto || s._speedMode) {
     var anyAlive = (s.enemies || []).some(function(e) { return e.hp > 0; });
     if (anyAlive) autoLoop();
   }
@@ -643,33 +651,23 @@ export function toggleAuto() {
 function autoLoop() {
   const s = Game.state;
   var anyAlive = (s.enemies || []).some(function(e) { return e.hp > 0; });
-  if (s.gameOver || !s.auto || !anyAlive) { clearAuto(); return; }
-  // 自动喝药：HP<25%且有药水
-  if (s.player.hp < s.player.maxHp * 0.25 && s.potions.length > 0) {
-    usePotion(0); // 喝第一瓶
-    _autoTimer = setTimeout(autoLoop, 350);
-    return;
-  }
-  // 防御当敌人攻击高且自己血低
-  var maxEnemyAtk = 0; (s.enemies || []).forEach(function(e) { if (e.hp > 0 && e.atk > maxEnemyAtk) maxEnemyAtk = e.atk; });
-  if (s.player.hp < s.player.maxHp * 0.2 && maxEnemyAtk > s.player.def + 5) {
-    doDefend();
-    _autoTimer = setTimeout(autoLoop, 400);
-    return;
-  }
-  // 找可用技能
-  var available = [];
-  var skills = s.activeSkills || [];
-  skills.forEach(function(sk, i) {
-    var cdKey = sk.id || ('skill_' + i);
-    if ((s.skillCooldowns[cdKey] || 0) === 0) available.push(i);
-  });
-  if (available.length > 0 && s.rng.chance(0.6)) {
-    doSkill(s.rng.pick(available));
+  if (s.gameOver || (!s.auto && !s._speedMode) || !anyAlive) { clearAuto(); return; }
+  var spd = s._speedMode ? 180 : 400;
+  if (s.auto) {
+    if (s.player.hp < s.player.maxHp * 0.25 && s.potions.length > 0) { usePotion(0); _autoTimer = setTimeout(autoLoop, spd); return; }
+    var maxEnemyAtk = 0; (s.enemies || []).forEach(function(e) { if (e.hp > 0 && e.atk > maxEnemyAtk) maxEnemyAtk = e.atk; });
+    if (s.player.hp < s.player.maxHp * 0.2 && maxEnemyAtk > s.player.def + 5) { doDefend(); _autoTimer = setTimeout(autoLoop, spd); return; }
+    var available = []; var skills = s.activeSkills || [];
+    skills.forEach(function(sk, i) { var cdKey = sk.id || ('skill_' + i); if ((s.skillCooldowns[cdKey] || 0) === 0) available.push(i); });
+    if (available.length > 0 && s.rng.chance(0.6)) { doSkill(s.rng.pick(available)); }
+    else { doAttack(); }
   } else {
-    doAttack();
+    var avail2 = []; var skills2 = s.activeSkills || [];
+    skills2.forEach(function(sk, i) { var cdKey = sk.id || ('skill_' + i); if ((s.skillCooldowns[cdKey] || 0) === 0) avail2.push(i); });
+    if (avail2.length > 0 && s.rng.chance(0.5)) { doSkill(s.rng.pick(avail2)); }
+    else { doAttack(); }
   }
-  _autoTimer = setTimeout(autoLoop, 450);
+  _autoTimer = setTimeout(autoLoop, spd);
 }
 
 // ---- 药水（含炼金宗师羁绊增强）----

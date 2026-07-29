@@ -26,6 +26,8 @@
     <h1>妖 塔 <span class="ver-tag">v0.33</span></h1>
     <p class="city-lore">边境城池 · 魔塔前最后的庇护所</p>
     <!-- 种子输入 -->
+    <div id="daily-fortune" style="color:#ffa502;font-size:11px;margin-bottom:4px"></div>
+    <span id="login-streak" style="color:#ff6644;font-size:10px"></span>
     <div class="seed-row">
       <input id="seed-input" placeholder="📜 输入种子（留空随机）" maxlength="20">
     </div>
@@ -102,62 +104,10 @@
     <button class="city-back-btn" id="btn-city-back">← 返回城门</button>
     <h2>🏰 边境主城</h2>
     <div id="city-resources" style="color:#ffa502;font-size:12px"></div>
+    <div id="city-guide" style="color:#89e894;font-size:11px;margin-top:4px"></div>
   </div>
   <div class="city-npc-list">
-    <!-- 女神祭司 -->
-    <div class="city-npc" data-bld="altar">
-      <div class="npc-portrait">🧙‍♀️</div>
-      <div class="npc-body">
-        <div class="npc-role">女神祭司 · 艾琳娜</div>
-        <div class="npc-quote">"女神的光辉指引着每一位勇士……"</div>
-        <div class="npc-func">🔮 天赋强化 · 魂晶兑换</div>
-      </div>
-    </div>
-    <!-- 职业导师 -->
-    <div class="city-npc" data-bld="class">
-      <div class="npc-portrait">🗡️</div>
-      <div class="npc-body">
-        <div class="npc-role">战斗大师 · 雷恩</div>
-        <div class="npc-quote">"想变强？选对路比拼命更重要。"</div>
-        <div class="npc-func">🎭 职业解锁 · 觉醒转职</div>
-      </div>
-    </div>
-    <!-- 铁匠 -->
-    <div class="city-npc" data-bld="forge">
-      <div class="npc-portrait">👨‍🏭</div>
-      <div class="npc-body">
-        <div class="npc-role">铁匠 · 锻炉</div>
-        <div class="npc-quote">"好钢用在刀刃上……你有材料吗？"</div>
-        <div class="npc-func">⚒️ 锻造工坊 · 装备合成</div>
-      </div>
-    </div>
-    <!-- 学者 -->
-    <div class="city-npc" data-bld="compendium">
-      <div class="npc-portrait">📖</div>
-      <div class="npc-body">
-        <div class="npc-role">大学士 · 奥兰多</div>
-        <div class="npc-quote">"知识就是力量，记录即是对抗遗忘。"</div>
-        <div class="npc-func">📚 万象宝典 · 遗物收藏</div>
-      </div>
-    </div>
-    <!-- 悬赏官 -->
-    <div class="city-npc" data-bld="daily">
-      <div class="npc-portrait">📋</div>
-      <div class="npc-body">
-        <div class="npc-role">悬赏官 · 卡斯特</div>
-        <div class="npc-quote">"今天的猎物已经张贴出来了。"</div>
-        <div class="npc-func">📅 每日挑战 · 悬赏任务</div>
-      </div>
-    </div>
-    <!-- 记录官 -->
-    <div class="city-npc" data-bld="leaderboard">
-      <div class="npc-portrait">📜</div>
-      <div class="npc-body">
-        <div class="npc-role">史官 · 格里芬</div>
-        <div class="npc-quote">"每一位英雄的故事都应该被铭记。"</div>
-        <div class="npc-func">🏆 功勋柱 · 排行榜</div>
-      </div>
-    </div>
+    <!-- 动态生成NPC -->
   </div>
 </div>
 
@@ -221,7 +171,7 @@
 
 <!-- 战斗主界面 -->
 <div id="main" class="hidden">
-  <div id="gold-bar">💰 <b id="gold-text">0</b></div>
+  <div id="gold-bar">💰 <b id="gold-text">0</b> <span id="relic-count-bar" style="margin-left:8px;font-size:11px"></span></div>
   <div id="floor">第 1 层</div>
   <div id="zone-name" style="text-align:center;color:#8899bb;font-size:12px;margin-bottom:4px">迷雾平原</div>
   <div id="turn-limit">回合: 0/15</div>

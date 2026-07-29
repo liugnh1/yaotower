@@ -365,6 +365,12 @@ function startNewGame() {
   buildDifficultySelect(diff => {
     pickedDiff = diff;
     s.difficulty = diff.id;
+    // 应用每日运势
+    var fortune = getDailyFortune();
+    fortune.apply(s);
+    s._fortuneName = fortune.name;
+    // 应用遗产
+    applyLegacy(s);
     Game.saveMeta();
     // 高亮已选难度
     document.querySelectorAll("#diff-grid .card").forEach(c => c.style.opacity = "0.5");
@@ -461,16 +467,18 @@ function enterRoom() {
   const directTypes = ["shop", "event", "shrine", "altar", "chest", "elite"];
   if (directTypes.includes(roomType)) { processRoom(roomType); return; }
 
-  // 战斗房间：暖场3间不出岔路，之后 ~30% 概率出现分岔
+  // 战斗房间：暖场3间不出岔路，之后 ~40% 概率出现分岔
   const isWarmup = s.floorInZone <= 3;
-  const forkChance = 0.30;
+  const forkChance = 0.40;
   if (!isWarmup && s.rng.chance(forkChance) && s._roomPool.length > 0) {
     const other = Room.tryDrawDifferent(roomType);
     if (other) {
-      console.log("[妖塔] 岔路:", roomType, "vs", other);
+      // 30%概率生成风险门(奖励翻倍但敌人多一词条)
+      var riskDoor = s.rng.chance(0.30);
+      console.log("[妖塔] 岔路:", roomType, "vs", other, riskDoor ? "(风险门!)" : "");
       const rs = document.getElementById('room-select');
       if (rs) { rs.style.backgroundImage = `url('img/bg-battle-${s.zone.id}.jpg?v=033')`; }
-      showRoomFork(roomType, other);
+      showRoomFork(roomType, other, riskDoor);
       return;
     }
   }
@@ -480,7 +488,7 @@ function enterRoom() {
 }
 
 // ---- 展示双门分岔路 ----
-function showRoomFork(typeA, typeB) {
+function showRoomFork(typeA, typeB, riskDoor) {
   const s = Game.state;
   const rtA = R.get('roomTypes', typeA) || R.get('roomTypes', 'battle');
   const rtB = R.get('roomTypes', typeB) || R.get('roomTypes', 'battle');
@@ -497,14 +505,20 @@ function showRoomFork(typeA, typeB) {
     left.querySelector(".door-icon").textContent = rtA.icon;
     left.querySelector(".door-name").textContent = rtA.name;
     left.querySelector(".door-hint").textContent = getRoomHint(typeA);
-    left.onclick = () => { const other = typeB; Room.returnRoom(other); processRoom(typeA); };
+    if (riskDoor) {
+      left.classList.add("fork-risk");
+      left.querySelector(".door-name").textContent = '🩸 ' + rtA.name;
+      left.querySelector(".door-hint").textContent = '⚠️ 敌人+1词条 · 奖励×2';
+    } else { left.classList.remove("fork-risk"); }
+    left.onclick = () => { s._riskRoom = riskDoor; const other = typeB; Room.returnRoom(other); processRoom(typeA); };
   }
   if (right) {
     right.style.display = ""; right.dataset.type = typeB;
     right.querySelector(".door-icon").textContent = rtB.icon;
     right.querySelector(".door-name").textContent = rtB.name;
     right.querySelector(".door-hint").textContent = getRoomHint(typeB);
-    right.onclick = () => { const other = typeA; Room.returnRoom(other); processRoom(typeB); };
+    right.classList.remove("fork-risk");
+    right.onclick = () => { s._riskRoom = false; const other = typeA; Room.returnRoom(other); processRoom(typeB); };
   }
   if (vs) vs.style.display = "";
   if (btn) btn.style.display = "none";
@@ -636,6 +650,18 @@ function onWin(isFast) {
         log(`<span class="win">🔥 稀有材料：${ex.name}！</span>`);
       }
     });
+    // 悬赏官猎杀令
+    var bounty = Game.meta.activeBounty;
+    if (bounty) {
+      var bossName = s.enemy ? s.enemy.name : '';
+      if (bossName.indexOf(bounty.boss) >= 0 || (s.zone && s.zone.name)) {
+        Game.meta.souls += bounty.reward;
+        log('<span class="win">🎯 猎杀令完成！+' + bounty.reward + '魂晶</span>');
+        toast('🎯 猎杀令完成！+' + bounty.reward + '魂晶');
+        Game.meta.activeBounty = null;
+        Game.saveMeta();
+      }
+    }
     // 技能升级（先于遗物选择）
     showSkillUpgrade(function() { showBossRelicPick(isFast); });
   } else if (roomType === "elite") {
@@ -645,8 +671,8 @@ function onWin(isFast) {
     // 矿洞环境：金币+50%
     const goldMul = s._zoneMod?.id === "cave_gold" ? 1.5 : 1;
     const baseGold = s.rng.range(8, 15);
-    s.gold += Math.floor(baseGold * goldMul);
-    showReward(isFast, eq => takeEquip(eq), attr => takeAttrReward(attr, isFast, false), false);
+    s.gold += Math.floor(baseGold * goldMul * (s._riskReward ? 2 : 1));
+    showReward(isFast, eq => takeEquip(eq), attr => takeAttrReward(attr, isFast, false), s._riskReward || false);
   }
   showModal("reward");
 }
@@ -654,6 +680,10 @@ function onWin(isFast) {
 function onGameOver() {
   const s = Game.state;
   Game.meta.totalDeaths++;
+  // 战斗记录
+  saveRunHistory(false);
+  var legacy = saveLegacy();
+  if (legacy) log('<span class="info">📦 遗产仓库：' + (legacy.data.name || '物品') + '已保存，下局可用</span>');
   const tp = Prog.calcTP(s.totalFloor, false);
   const souls = Math.floor(s.totalFloor / 5); // 死亡: 每5层1魂晶
   if (tp > 0) { Game.addTP(Math.floor(tp * Prog.getAdTPBonus())); }
@@ -668,6 +698,7 @@ function onGameOver() {
 function gameClear() {
   const s = Game.state;
   Game.meta.totalWins++;
+  saveRunHistory(true);
   // 难度币+灵石：通关奖励
   if (!Game.meta.difficultyCoins) Game.meta.difficultyCoins = 0;
   Game.meta.difficultyCoins++;
@@ -2015,29 +2046,277 @@ function openPotionModal() {
   }
 }
 
+// ===================== 战斗记录保存 =====================
+function saveRunHistory(win) {
+  var s = Game.state;
+  if (!Game.meta.runHistory) Game.meta.runHistory = [];
+  var d = new Date();
+  Game.meta.runHistory.push({
+    win: win,
+    char: s.playerClass ? s.playerClass.name : '--',
+    diff: s.difficulty || 'standard',
+    floor: s.totalFloor || 0,
+    relics: s.relics ? s.relics.length : 0,
+    equip: s.equip ? s.equip.length : 0,
+    maxDmg: s.stats ? s.stats.totalDmg : 0,
+    date: d.getFullYear() + '-' + (d.getMonth()+1) + '-' + d.getDate()
+  });
+  // 只保留最近20条
+  if (Game.meta.runHistory.length > 20) Game.meta.runHistory = Game.meta.runHistory.slice(-20);
+  Game.saveMeta();
+}
+
+// ===================== 大学士：遗物研究+宝典 =====================
+function showScholarPanel() {
+  var el = document.getElementById("meta-panel");
+  el.style.display = "block"; el.querySelector("h3").textContent = "📖 大学士 · 遗物研究";
+  var content = document.getElementById("meta-content"); content.innerHTML = "";
+  var spiritStones = Game.meta.stones || 0;
+
+  var info = document.createElement("div");
+  info.style.cssText = "color:#8899bb;font-size:12px;margin-bottom:10px;text-align:center";
+  info.innerHTML = '可用灵石:' + spiritStones + '<br><span style="color:#667788">研究遗物可提升下局该遗物出现率</span>';
+  content.appendChild(info);
+
+  // 遗物研究列表（显示稀有+史诗遗物，花灵石研究）
+  var relics = R.get('relics') || [];
+  var studyList = relics.filter(function(r) { return r.rarity === 'rare' || r.rarity === 'epic'; });
+  studyList = studyList.slice(0, 6); // 只显示6个
+  studyList.forEach(function(r) {
+    var cost = r.rarity === 'epic' ? 12 : 6;
+    var div = document.createElement("div");
+    div.style.cssText = "margin-bottom:6px;padding:8px;background:#0d1117;border-radius:4px;display:flex;align-items:center;gap:8px";
+    div.innerHTML = '<span style="font-size:20px">' + r.icon + '</span><div style="flex:1"><b style="color:#ddccaa">' + r.name + '</b><br><span style="color:#667788;font-size:10px">' + r.desc + '</span></div>';
+    var btn = document.createElement("button");
+    btn.className = "modal-btn"; btn.style.cssText = "font-size:10px;padding:4px 8px;white-space:nowrap";
+    btn.textContent = "研究(" + cost + "灵石)";
+    btn.disabled = spiritStones < cost;
+    btn.onclick = function() {
+      Game.meta.stones -= cost;
+      if (!Game.meta.studiedRelic) Game.meta.studiedRelic = '';
+      Game.meta.studiedRelic = r.id;
+      Game.meta.studiedDate = new Date().toDateString();
+      Game.saveMeta();
+      showScholarPanel();
+      toast('📖 正在研究 ' + r.name + '，下局出现率翻倍！');
+    };
+    div.appendChild(btn);
+    content.appendChild(div);
+  });
+
+  // 已研究状态
+  if (Game.meta.studiedRelic) {
+    var studied = relics.find(function(r) { return r.id === Game.meta.studiedRelic; });
+    if (studied && Game.meta.studiedDate === new Date().toDateString()) {
+      var sDiv = document.createElement("div");
+      sDiv.style.cssText = "margin-top:8px;padding:6px;background:#1a2a1a;border-radius:4px;text-align:center;color:#89e894;font-size:11px";
+      sDiv.textContent = '✅ 今日正在研究：' + studied.name + '（下局出现率翻倍）';
+      content.appendChild(sDiv);
+    }
+  }
+
+  // 快捷入口
+  var compBtn = document.createElement("button");
+  compBtn.className = "modal-btn"; compBtn.textContent = "📚 打开万象宝典";
+  compBtn.onclick = function() { el.style.display = "none"; showCompendium(); };
+  content.appendChild(compBtn);
+
+  var closeBtn = document.createElement("button");
+  closeBtn.className = "restart-btn"; closeBtn.style.cssText = "margin-top:10px;width:100%";
+  closeBtn.textContent = "关闭"; closeBtn.onclick = function() { el.style.display = "none"; };
+  content.appendChild(closeBtn);
+  showModal("meta-panel");
+}
+
+// ===================== 悬赏官：Boss猎杀令 =====================
+function showBountyHunterPanel() {
+  var el = document.getElementById("meta-panel");
+  el.style.display = "block"; el.querySelector("h3").textContent = "📋 悬赏官 · 猎杀令";
+  var content = document.getElementById("meta-content"); content.innerHTML = "";
+  var s = Game.state;
+
+  var info = document.createElement("div");
+  info.style.cssText = "color:#8899bb;font-size:12px;margin-bottom:10px;text-align:center";
+  info.innerHTML = '花费金币发布猎杀令，击败指定Boss拿魂晶奖励';
+  content.appendChild(info);
+
+  // 三个猎杀令选项
+  var bounties = [
+    { name: "裂地者猎杀令", boss: "平原领主", cost: 30, reward: 5, desc: "击败迷雾平原的裂地者" },
+    { name: "树精猎杀令", boss: "森林之王", cost: 40, reward: 8, desc: "击败幽暗森林的苍古树精" },
+    { name: "守门人猎杀令", boss: "魔塔守门人", cost: 60, reward: 15, desc: "击败魔塔门前的守门人" },
+  ];
+
+  var activeBounty = Game.meta.activeBounty;
+  bounties.forEach(function(b) {
+    var div = document.createElement("div");
+    div.style.cssText = "margin-bottom:6px;padding:8px;background:#0d1117;border-radius:4px";
+    var isActive = activeBounty && activeBounty.boss === b.boss;
+    div.innerHTML = '<b style="color:#ddccaa">🎯 ' + b.name + '</b><br>' +
+      '<span style="color:#667788;font-size:10px">' + b.desc + ' · 花费' + b.cost + 'G · 奖励' + b.reward + '魂晶</span>';
+    var btn = document.createElement("button");
+    btn.className = "modal-btn"; btn.style.cssText = "font-size:10px;padding:4px 8px;margin-top:4px";
+    if (isActive) {
+      btn.textContent = "进行中...";
+      btn.disabled = true;
+      btn.style.color = "#ffa502";
+    } else {
+      btn.textContent = "接取(" + b.cost + "G)";
+      btn.disabled = (s.gold || 0) < b.cost;
+      btn.onclick = function() {
+        s.gold -= b.cost;
+        Game.meta.activeBounty = { boss: b.boss, reward: b.reward };
+        Game.saveMeta();
+        showBountyHunterPanel();
+        toast('🎯 已接取' + b.name + '！');
+      };
+    }
+    div.appendChild(btn);
+    content.appendChild(div);
+  });
+
+  // 快捷入口
+  var dailyBtn = document.createElement("button");
+  dailyBtn.className = "modal-btn"; dailyBtn.textContent = "📅 查看每日悬赏";
+  dailyBtn.onclick = function() { el.style.display = "none"; showQuestBoard(); };
+  content.appendChild(dailyBtn);
+
+  var closeBtn = document.createElement("button");
+  closeBtn.className = "restart-btn"; closeBtn.style.cssText = "margin-top:10px;width:100%";
+  closeBtn.textContent = "关闭"; closeBtn.onclick = function() { el.style.display = "none"; };
+  content.appendChild(closeBtn);
+  showModal("meta-panel");
+}
+
+// ===================== 史官：战斗记录 =====================
+function showHistorianPanel() {
+  var el = document.getElementById("meta-panel");
+  el.style.display = "block"; el.querySelector("h3").textContent = "📜 史官 · 征战记录";
+  var content = document.getElementById("meta-content"); content.innerHTML = "";
+
+  var history = Game.meta.runHistory || [];
+  if (history.length === 0) {
+    content.innerHTML = '<div style="color:#667788;text-align:center;padding:20px">暂无战斗记录<br><span style="font-size:11px">完成一局游戏后自动记录</span></div>';
+  } else {
+    // 显示最近5局
+    var recent = history.slice(-5).reverse();
+    recent.forEach(function(h, i) {
+      var div = document.createElement("div");
+      div.style.cssText = "margin-bottom:8px;padding:10px;background:#0d1117;border-radius:6px;border-left:3px solid " + (h.win ? "#89e894" : "#ff7b7b");
+      div.innerHTML = '<b style="color:#ddccaa">#' + (history.length - i) + ' ' + (h.win ? '🏆通关' : '💀阵亡') + '</b> ' +
+        '<span style="color:#667788;font-size:10px">' + (h.date || '') + '</span><br>' +
+        '<span style="color:#8899bb;font-size:11px">' + (h.char || '--') + ' · ' + (h.diff || '') + ' · 第' + (h.floor || 0) + '层</span><br>' +
+        '<span style="color:#667788;font-size:10px">遗物' + (h.relics || 0) + '件 · 装备' + (h.equip || 0) + '件 · 最高伤害' + (h.maxDmg || 0) + '</span>';
+      content.appendChild(div);
+    });
+  }
+
+  // 统计摘要
+  if (history.length > 0) {
+    var totalRuns = history.length;
+    var wins = history.filter(function(h) { return h.win; }).length;
+    var bestFloor = 0; history.forEach(function(h) { if (h.floor > bestFloor) bestFloor = h.floor; });
+    var statsDiv = document.createElement("div");
+    statsDiv.style.cssText = "margin-top:10px;padding:8px;background:#1a1520;border-radius:4px;text-align:center;color:#c8a8ff;font-size:12px";
+    statsDiv.innerHTML = '共' + totalRuns + '局 · 通关' + wins + '次 · 最高' + bestFloor + '层 · 胜率' + Math.floor(wins / totalRuns * 100) + '%';
+    content.appendChild(statsDiv);
+  }
+
+  // 排行榜入口
+  var lbBtn = document.createElement("button");
+  lbBtn.className = "modal-btn"; lbBtn.textContent = "🏆 查看排行榜";
+  lbBtn.onclick = function() { el.style.display = "none"; if (!TapLeaderboard.showPanel('total')) showLeaderboard(); };
+  content.appendChild(lbBtn);
+
+  var closeBtn = document.createElement("button");
+  closeBtn.className = "restart-btn"; closeBtn.style.cssText = "margin-top:10px;width:100%";
+  closeBtn.textContent = "关闭"; closeBtn.onclick = function() { el.style.display = "none"; };
+  content.appendChild(closeBtn);
+  showModal("meta-panel");
+}
+
 // ===================== 主城建造界面 =====================
 function showCityHub() {
   switchScreen("city-hub");
-  // 资源显示
-  var res = document.getElementById("city-resources");
   var meta = Game.meta;
+  if (!meta.cityLevel) meta.cityLevel = 1;
+  var cityLv = meta.cityLevel;
   var spiritStones = meta.stones || 0;
   var coins = meta.difficultyCoins || 0;
-  res.innerHTML = '💎灵石:' + spiritStones + ' · 🪙难度币:' + coins + ' · ⭐TP:' + (meta.tp || 0);
 
-  // NPC点击
-  document.querySelectorAll('.city-npc').forEach(function(bld) {
-    bld.onclick = function() {
-      var id = bld.dataset.bld;
-      switch (id) {
-        case 'altar': showMetaPanel(); break;
-        case 'class': showClassShrine(); break;
-        case 'forge': showForgePanel(); break;
-        case 'compendium': showCompendium(); break;
-        case 'leaderboard': if (!TapLeaderboard.showPanel('total')) showLeaderboard(); break;
-        case 'daily': showQuestBoard(); break;
+  // 资源+等级
+  var res = document.getElementById("city-resources");
+  var levelCosts = [0, 0, 15, 30, 50, 80];
+  var nextCost = cityLv < 5 ? levelCosts[cityLv + 1] : 0;
+  res.innerHTML = '🏰 主城 Lv.' + cityLv + '/5 · 💎灵石:' + spiritStones + ' · 🪙难度币:' + coins;
+  if (nextCost > 0) {
+    res.innerHTML += ' <button id=\"btn-upgrade-city\" style=\"font-size:10px;padding:2px 8px;background:#2a1a0a;border:1px solid #8a6030;color:#ffcc88;border-radius:4px;cursor:pointer\">⬆升级(' + nextCost + '灵石)</button>';
+  }
+
+  // 升级按钮
+  setTimeout(function() {
+    var upBtn = document.getElementById("btn-upgrade-city");
+    if (upBtn) upBtn.onclick = function() {
+      if (spiritStones >= nextCost && cityLv < 5) {
+        meta.stones -= nextCost;
+        meta.cityLevel = cityLv + 1;
+        Game.saveMeta();
+        showCityHub();
+        toast('🏰 主城升至Lv.' + (cityLv + 1) + '！');
       }
     };
+  }, 100);
+
+  // 成长指南
+  var guide = document.getElementById("city-guide");
+  if (guide) {
+    if (cityLv < 5 && spiritStones >= nextCost) {
+      guide.innerHTML = '🎯 可<b>升级主城</b>至Lv.' + (cityLv + 1) + '（' + nextCost + '灵石），解锁新功能！';
+    } else if (cityLv < 5) {
+      guide.innerHTML = '🎯 <b>出城探险</b>赚取灵石升级主城（差' + (nextCost - spiritStones) + '灵石升Lv.' + (cityLv + 1) + '）';
+    } else {
+      guide.innerHTML = '🎯 主城已满级！继续挑战更高难度吧';
+    }
+  }
+
+  // NPC列表：根据等级显示/锁定
+  var npcList = document.querySelector('.city-npc-list');
+  if (!npcList) return;
+
+  var npcDefs = [
+    { id: 'altar', name: '女神祭司 · 艾琳娜', icon: '🧙‍♀️', quote: '"女神的光辉指引着每一位勇士……"', func: '🔮 天赋强化 · 魂晶兑换', unlockLv: 1 },
+    { id: 'class', name: '战斗大师 · 雷恩', icon: '🗡️', quote: '"想变强？选对路比拼命更重要。"', func: '🎭 职业解锁 · 觉醒转职', unlockLv: 1 },
+    { id: 'forge', name: '铁匠 · 锻炉', icon: '👨‍🏭', quote: '"好钢用在刀刃上……你有材料吗？"', func: '⚒️ 装备分解 · 锻造升级', unlockLv: 2 },
+    { id: 'compendium', name: '大学士 · 奥兰多', icon: '📖', quote: '"知识就是力量，记录即是对抗遗忘。"', func: '🔬 遗物研究 · 万象宝典', unlockLv: 3 },
+    { id: 'daily', name: '悬赏官 · 卡斯特', icon: '📋', quote: '"今天的猎物已经张贴出来了。"', func: '🎯 Boss猎杀令 · 每日悬赏', unlockLv: 4 },
+    { id: 'leaderboard', name: '史官 · 格里芬', icon: '📜', quote: '"每一位英雄的故事都应该被铭记。"', func: '📊 征战记录 · 统计摘要', unlockLv: 5 },
+  ];
+
+  npcList.innerHTML = '';
+  npcDefs.forEach(function(npc) {
+    var locked = cityLv < npc.unlockLv;
+    var div = document.createElement('div');
+    div.className = 'city-npc';
+    if (locked) { div.style.opacity = '0.4'; div.style.borderColor = '#1a1a2a'; }
+    div.innerHTML = '<div class="npc-portrait">' + (locked ? '🔒' : npc.icon) + '</div>' +
+      '<div class="npc-body">' +
+        '<div class="npc-role">' + npc.name + '</div>' +
+        '<div class="npc-quote">' + (locked ? '（主城Lv.' + npc.unlockLv + '解锁）' : npc.quote) + '</div>' +
+        '<div class="npc-func">' + npc.func + '</div>' +
+      '</div>';
+    if (!locked) {
+      div.onclick = function() {
+        switch (npc.id) {
+          case 'altar': showMetaPanel(); break;
+          case 'class': showClassShrine(); break;
+          case 'forge': showForgePanel(); break;
+          case 'compendium': showScholarPanel(); break;
+          case 'leaderboard': showHistorianPanel(); break;
+          case 'daily': showBountyHunterPanel(); break;
+        }
+      };
+    }
+    npcList.appendChild(div);
   });
 }
 
@@ -2109,6 +2388,7 @@ function showForgePanel() {
   el.querySelector("h3").textContent = "⚒️ 锻造工坊";
   var content = document.getElementById("meta-content");
   content.innerHTML = "";
+  var s = Game.state;
 
   var spiritStones = Game.meta.stones || 0;
   var levels = Game.meta.buildingLevels || {};
@@ -2136,6 +2416,39 @@ function showForgePanel() {
     }
   };
   content.appendChild(upBtn);
+
+  // 装备分解
+  var salvageDiv = document.createElement("div");
+  salvageDiv.style.cssText = "margin-top:10px;padding:8px;background:#1a1010;border-radius:4px";
+  salvageDiv.innerHTML = '<b style="color:#ffaa88">♻️ 装备分解</b><br><span style="color:#8899bb;font-size:11px">分解不需要的装备换取灵石（品质越高越多）</span>';
+
+  var s = Game.state;
+  if (s.equip && s.equip.length > 0) {
+    s.equip.forEach(function(eq, i) {
+      var salvageValue = 1;
+      if (eq.qualityName === '精良') salvageValue = 2;
+      else if (eq.qualityName === '稀有') salvageValue = 3;
+      else if (eq.qualityName === '史诗') salvageValue = 5;
+      else if (eq.qualityName === '传说') salvageValue = 8;
+      else if (eq.qualityName === '神话') salvageValue = 15;
+      var btn = document.createElement("button");
+      btn.className = "modal-btn"; btn.style.cssText = "font-size:10px;padding:3px 8px;margin:2px;display:inline-block;width:auto";
+      btn.textContent = eq.fullName + ' → ' + salvageValue + '灵石';
+      btn.onclick = function() {
+        removeEquipStats(s.player, eq);
+        s.equip.splice(i, 1);
+        Game.meta.stones = (Game.meta.stones || 0) + salvageValue;
+        Game.saveMeta();
+        Game.sync();
+        showForgePanel();
+        toast('♻️ 分解获得' + salvageValue + '灵石');
+      };
+      salvageDiv.appendChild(btn);
+    });
+  } else {
+    salvageDiv.innerHTML += '<br><span style="color:#667788;font-size:10px">当前无装备可分解</span>';
+  }
+  content.appendChild(salvageDiv);
 
   // 合成配方说明
   var forgeDiv = document.createElement("div");
@@ -2418,12 +2731,85 @@ function showGameOver(isWin, rewardText) {
   switchScreen("gameover");
 }
 
+// ===================== 每日运势 =====================
+function getDailyFortune() {
+  var today = new Date(); var seed = today.getFullYear() * 10000 + (today.getMonth()+1) * 100 + today.getDate();
+  var fortunes = [
+    { icon: "💰", name: "财运亨通", desc: "今日金币获取+30%", apply: function(s) { s.player.goldMul = (s.player.goldMul || 1) * 1.3; } },
+    { icon: "⚡", name: "灵力涌动", desc: "今日长CD技能-1回合(CD≥3的)", apply: function(s) { (s.activeSkills || []).forEach(function(sk) { if (sk.cooldown >= 3) sk.cooldown--; }); } },
+    { icon: "🛡️", name: "坚如磐石", desc: "今日开局防御+5", apply: function(s) { s.player.def += 5; } },
+    { icon: "💪", name: "战神附体", desc: "今日开局攻击+5", apply: function(s) { s.player.atk += 5; } },
+    { icon: "🔮", name: "遗物亲和", desc: "今日遗物掉率提升", apply: function(s) { s._fortuneRelic = true; } },
+    { icon: "❤️", name: "生命恩赐", desc: "今日开局生命+30", apply: function(s) { s.player.maxHp += 30; s.player.hp += 30; } },
+    { icon: "🔥", name: "烈焰之日", desc: "今日所有敌人自带燃烧", apply: function(s) { s._fortuneBurn = true; } },
+    { icon: "💀", name: "诅咒之日", desc: "今日商店半价但开局带1诅咒", apply: function(s) { s._fortuneCurse = true; } },
+  ];
+  var idx = seed % fortunes.length;
+  return fortunes[idx];
+}
+
+// ===================== 连续登录 =====================
+function checkLoginStreak() {
+  var today = new Date(); var todayStr = today.getFullYear() + '-' + (today.getMonth()+1) + '-' + today.getDate();
+  var meta = Game.meta;
+  if (!meta.loginStreak) meta.loginStreak = 0;
+  if (!meta.lastLogin) meta.lastLogin = '';
+
+  var yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+  var yesterdayStr = yesterday.getFullYear() + '-' + (yesterday.getMonth()+1) + '-' + yesterday.getDate();
+
+  if (meta.lastLogin === todayStr) return; // 今天已登录
+  if (meta.lastLogin === yesterdayStr) { meta.loginStreak++; } // 连续
+  else if (meta.lastLogin === '') { meta.loginStreak = 1; } // 首次
+  else { meta.loginStreak = Math.max(1, meta.loginStreak - 1); } // 断签扣1天
+
+  meta.lastLogin = todayStr;
+  Game.saveMeta();
+}
+
+// ===================== 遗产仓库 =====================
+function saveLegacy() {
+  var s = Game.state;
+  if (!s) return;
+  var items = [];
+  if (s.equip && s.equip.length > 0) items.push({ type: 'equip', data: s.equip[s.equip.length - 1] });
+  if (s.relics && s.relics.length > 0) items.push({ type: 'relic', data: s.relics[s.relics.length - 1] });
+  if (items.length > 0) {
+    var pick = items[Math.floor(Math.random() * items.length)];
+    Game.meta.legacyItem = pick;
+    Game.saveMeta();
+    return pick;
+  }
+  return null;
+}
+function applyLegacy(s) {
+  var item = Game.meta.legacyItem;
+  if (!item) return;
+  if (item.type === 'equip' && item.data) {
+    s.equip.push(item.data);
+    applyEquipStats(s.player, item.data);
+  } else if (item.type === 'relic' && item.data) {
+    var r = item.data;
+    if (r.passive && !r.applied) { r.passive(s.player); r.applied = true; }
+    s.relics.push(r);
+  }
+  Game.meta.legacyItem = null;
+  Game.saveMeta();
+  log('<span class="win">📦 遗产仓库：继承了上局的' + (item.data.name || '物品') + '！</span>');
+}
+
 // 初始渲染
 try {
+  checkLoginStreak();
+  var fortune = getDailyFortune();
+  var fortuneEl = document.getElementById("daily-fortune");
+  if (fortuneEl) fortuneEl.innerHTML = fortune.icon + ' 今日运势：<b>' + fortune.name + '</b> — ' + fortune.desc;
+  var streakEl = document.getElementById("login-streak");
+  if (streakEl) streakEl.textContent = '🔥连续' + (Game.meta.loginStreak || 1) + '天';
   console.log("[妖塔] 开始初始渲染, state:", Game.state ? 'OK' : 'NULL');
   render(Game.state);
   console.log("[妖塔] 初始渲染完成");
 } catch(e) {
   console.error("[妖塔] 初始渲染失败:", e.message, e.stack);
 }
-console.log("妖塔 v0.32 | Registry + EventBus + DLC架构 | 6项地基升级完成");
+console.log("妖塔 v0.40 | 全周期留存优化");
