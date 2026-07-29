@@ -13,7 +13,10 @@ class Registry {
       equipPrefixes: [], potions: [], difficulties: {},
       dailyGlobalMods: [], dailyPlayerMods: [], dailyEnemyMods: [],
       metaLimits: {}, roomTypes: {}, roomTemplates: { simple: [], normal: [] },
-      simpleRoute: {}, synergies: [], achievements: []
+      simpleRoute: {}, synergies: [], achievements: [],
+      dailyQuests: [], weeklyQuests: [],
+      forgeRecipes: [], bossMaterials: {}, extraMaterials: [],
+      skillRecipes: []
     };
   }
 

@@ -62,17 +62,17 @@ function deserializePlayer(bp) {
     _greedCurse: !!bp._greedCurse,
     _blindCurse: !!bp._blindCurse, _blindCritGain: bp._blindCritGain,
     _shadowBorn: !!bp._shadowBorn,
-    _luckyCharm: !!bp._luckyCharm, _alchemyStone: !!bp._alchemyStone,
-    _demonPact: !!bp._demonPact, _shadowStep: !!bp._shadowStep,
-    _glassHeart: !!bp._glassHeart, _doubleSoul: !!bp._doubleSoul,
-    _voidStone: !!bp._voidStone, _rageTotem: !!bp._rageTotem,
-    // 联动/Boss标记（防止读档丢失）
-    _synVampBlood: !!bp._synVampBlood, _synCritDice: !!bp._synCritDice,
-    _synOrbRing: !!bp._synOrbRing, _stoneGaze: !!bp._stoneGaze,
-    _synCurseMaster: !!bp._synCurseMaster, _synGoldTycoon: !!bp._synGoldTycoon,
-    _synFuryBorn: !!bp._synFuryBorn, _synShadowDance: !!bp._synShadowDance,
-    _synAlchemyGrand: !!bp._synAlchemyGrand, _synGlassDemon: !!bp._synGlassDemon,
-    _synExecutioner: !!bp._synExecutioner,
+    _luckyCharm: !!bp._luckyCharm, _shadowCloak: !!bp._shadowCloak,
+    _lightningRod: !!bp._lightningRod, _echoStone: !!bp._echoStone,
+    _bloodShield: !!bp._bloodShield, _greedBag: !!bp._greedBag,
+    _chaosBlade: !!bp._chaosBlade, _deathMark: !!bp._deathMark,
+    _infMana: !!bp._infMana, _godHand: !!bp._godHand,
+    _glassCannon: !!bp._glassCannon, _vampLord: !!bp._vampLord,
+    // 联动标记
+    _synVampLord: !!bp._synVampLord, _synThunderGod: !!bp._synThunderGod,
+    _synFrostKing: !!bp._synFrostKing, _synReaper: !!bp._synReaper,
+    _synTimeMaster: !!bp._synTimeMaster, _synGlassGod: !!bp._synGlassGod,
+    _stoneGaze: !!bp._stoneGaze,
     // 保留未来版本新增的字段
     ...extra
   };
@@ -84,16 +84,17 @@ function defState() {
     seed: "", rng: null, mode: "simple", difficulty: "standard",
     zone: null, zoneIndex: 0, floorInZone: 1, totalFloor: 1,
     _roomPool: [], _bossReady: false, _currentRoomType: null,
-    player: null, enemy: null, gold: 0,
+    player: null, enemy: null, enemies: [], selectedTarget: 0, gold: 0,
     equip: [], relics: [], potions: [],
-    talent: null, playerClass: null, activeSkill: null, curses: [],
+    talent: null, playerClass: null, activeSkill: null, activeSkills: [],
+    skillLevels: {}, skillCooldowns: {}, curses: [],
     codex: {}, highest: 1, auto: false, turn: 0, turnInFloor: 0,
     defending: false, nextBoost: 0, gameOver: false,
     stats: { totalDmg: 0, critCount: 0, roomsCleared: 0 },
     dailyMods: { globalId: null, playerId: null, enemyId: null },
     potionAtk: 0, potionDef: 0,
     adDiscount: false, adRefreshCount: 0,
-    endless: false, _activeSynergies: []
+    endless: false, _activeSynergies: [], forgeMats: {}
   };
 }
 

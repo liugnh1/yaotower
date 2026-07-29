@@ -7,7 +7,8 @@ R.registerAll('equipQualities', [
   { name: "精良", color: "#89e894", mul: 1.6, weight: 20 },
   { name: "稀有", color: "#70a1ff", mul: 2.2, weight: 15 },
   { name: "史诗", color: "#c8a8ff", mul: 3.0, weight: 8  },
-  { name: "传说", color: "#ffa502", mul: 4.0, weight: 2  }
+  { name: "传说", color: "#ffa502", mul: 4.0, weight: 2  },
+  { name: "神话", color: "#ff6644", mul: 5.5, weight: 0.5 }
 ]);
 
 R.registerAll('equipTypes', [

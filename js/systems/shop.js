@@ -49,6 +49,7 @@ export function acquireRelic(rel) {
     s.relics.shift();
   }
   // 替换旧遗物时，先清理联动再重算
+  if (rel.onAcquire && !rel.applied) { rel.onAcquire(s.player, s); rel.applied = true; }
   if (rel.passive && !rel.applied) { rel.passive(s.player); rel.applied = true; }
   s.relics.push(rel);
   Events.emit(E.RELIC_GAINED, { relic: rel });

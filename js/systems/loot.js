@@ -13,32 +13,75 @@ function weightedPick(arr, rng) {
   return arr[arr.length - 1];
 }
 
-// ---- 装备生成 ----
-export function genEquip() {
+// ---- 装备生成（v0.35：区域套装+深度缩放）----
+export function genEquip(zoneId) {
   const s = Game.state;
   const rng = (s && s.rng) ? s.rng : { next: () => Math.random() };
   const qualities = R.get('equipQualities');
   const types = R.get('equipTypes');
   const prefixes = R.get('equipPrefixes');
-  // 空池守卫
   if (!qualities.length || !types.length) {
     console.warn("[妖塔] 装备注册表为空，返回保底装备");
     return { icon: "🗡️", name: "破剑", prefix: "", fullName: "破剑", stat: "atk", val: 3, color: "#8899bb", qualityName: "普通", type: "weapon" };
   }
-  const q = weightedPick(qualities, rng);
-  const t = types[Math.floor(rng.next() * types.length)];
+
+  // 深度缩放：随总层数提高品质权重
+  const depth = s ? (s.totalFloor || 1) : 1;
+  const depthMul = Math.min(3, 1 + depth * 0.03); // 1.0 ~ 3.0
+  const scaledQualities = qualities.map(q => {
+    let w = q.weight;
+    if (q.mul >= 4.0) w = Math.floor(w * depthMul);        // 传说/神话在高层的权重提高
+    else if (q.mul <= 0.5) w = Math.max(2, w - depth);      // 破旧在高层的权重降低
+    return { ...q, weight: Math.max(0.5, w) };
+  });
+
+  // 区域偏向：30%概率从区域对应装备类型中选，使用区域独有名字
+  const zone = zoneId ? R.get('zones', zoneId) : (s?.zone || null);
+  let typePick = types[Math.floor(rng.next() * types.length)];
+  let equipName = null;
+  if (zone && zone.equipSet && rng.next() < 0.30) {
+    // 区域装备偏向该Zone主题属性
+    const zoneBias = zone.equipBonus ? Object.keys(zone.equipBonus) : [];
+    if (zoneBias.length > 0) {
+      const biasStat = zoneBias[Math.floor(rng.next() * zoneBias.length)];
+      const matched = types.filter(t => {
+        const s = t.stat;
+        if (s === biasStat) return true;
+        if (biasStat === 'atk' && s === 'atk') return true;
+        if (biasStat === 'def' && s === 'def') return true;
+        if (biasStat === 'maxHp' && s === 'maxHp') return true;
+        if (biasStat === 'maxMp' && s === 'maxMp') return true;
+        if (biasStat === 'critRate' && s === 'critRate') return true;
+        if (biasStat === 'lifeSteal' && s === 'atk') return true;
+        if (biasStat === 'dmgReduce' && s === 'def') return true;
+        if (biasStat === 'pen' && s === 'atk') return true;
+        if (biasStat === 'critMul' && s === 'critRate') return true;
+        return false;
+      });
+      if (matched.length > 0) typePick = rng.pick(matched);
+    }
+    // 使用Zone独有装备名
+    if (zone.equipNames && zone.equipNames[typePick.type]) {
+      equipName = zone.equipNames[typePick.type];
+    }
+  }
+
+  const q = weightedPick(scaledQualities, rng);
+  const t = typePick;
   const p = prefixes.length ? prefixes[Math.floor(rng.next() * prefixes.length)] : { name: '', statBonus: {} };
   let val = Math.floor(t.base * q.mul);
   if (p.statBonus && p.statBonus[t.stat]) {
     val += p.statBonus[t.stat];
   }
-  if (val <= 0) val = 1; // 防止暗影前缀导致 val=0 的废装备
-  const fullName = p.name ? `${p.name}的${t.name}` : t.name;
+  if (val <= 0) val = 1;
+  // 命名：区域独有名 > 前缀+通用名
+  const displayName = equipName || t.name;
+  const fullName = (p.name ? p.name + '·' : '') + displayName;
   const combatEffect = p.combatEffect ? { ...p.combatEffect } : null;
   return {
-    icon: t.icon, name: t.name, prefix: p.name || '', fullName,
+    icon: t.icon, name: displayName, prefix: p.name || '', fullName,
     stat: t.stat, val: val, color: q.color, qualityName: q.name, type: t.type,
-    _combatEffect: combatEffect
+    _combatEffect: combatEffect, _zoneSet: zone?.equipSet || null
   };
 }
 
@@ -67,7 +110,7 @@ export function genRelic() {
   const list = pool.map(r => ({ r, w: weights[r.rarity] || 10 }));
   if (list.length === 0) {
     console.warn("[妖塔] 遗物池为空，返回保底遗物");
-    return { id: "power_brace", name: "力量护腕", icon: "💪", rarity: "common", desc: "攻击力+5", passive: (p) => { p.atk += 5; }, onRemove: (p) => { p.atk = Math.max(1, p.atk - 5); } };
+    return { id: "vamp_fang", name: "吸血獠牙", icon: "🦷", rarity: "common", desc: "攻击恢复12%伤害的生命", onAttack: (p, dmg) => { p.hp = Math.min(p.maxHp, p.hp + Math.floor(dmg * 0.12)); } };
   }
   const total = list.reduce((sum, x) => sum + x.w, 0);
   let roll = rng.next() * total;

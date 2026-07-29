@@ -10,66 +10,82 @@
 <body>
 <div id="game">
 
+<!-- 序幕：打字机剧情 -->
+<div id="prologue">
+  <div id="prologue-bg"></div>
+  <div id="prologue-text"></div>
+  <div id="prologue-skip">点击任意位置跳过</div>
+</div>
+
 <!-- 边境城池 · 主界面 -->
 <div id="start">
-  <div class="city-sky">
-    <h1>妖塔 <span class="ver-tag">v0.32</span></h1>
-    <p class="city-lore">边境城池 · 魔塔前最后的庇护所<br><span class="lore-sub">整装待发，踏入迷雾……</span></p>
-  </div>
+  <!-- 书卷装饰顶部 -->
+  <div class="tome-top"></div>
 
-  <div class="city-map">
+  <div class="city-sky">
+    <h1>妖 塔 <span class="ver-tag">v0.33</span></h1>
+    <p class="city-lore">边境城池 · 魔塔前最后的庇护所</p>
     <!-- 种子输入 -->
     <div class="seed-row">
-      <input id="seed-input" placeholder="输入种子（留空随机）" maxlength="20">
+      <input id="seed-input" placeholder="📜 输入种子（留空随机）" maxlength="20">
     </div>
+  </div>
 
-    <!-- NPC 网格 -->
-    <div class="npc-grid">
-      <div class="npc-card npc-gate" id="btn-newgame">
-        <div class="npc-icon">🏰</div>
-        <div class="npc-name">城门</div>
-        <div class="npc-hint">出城探险</div>
-      </div>
-
-      <div class="npc-card npc-altar" id="btn-meta">
-        <div class="npc-icon">🔮</div>
-        <div class="npc-name">女神祭坛</div>
-        <div class="npc-hint">局外成长</div>
-      </div>
-
-      <div class="npc-card npc-guild" id="btn-codex">
-        <div class="npc-icon">📖</div>
-        <div class="npc-name">学者公会</div>
-        <div class="npc-hint">妖兽图鉴</div>
-      </div>
-
-      <div class="npc-card npc-board" id="btn-daily">
-        <div class="npc-icon">📅</div>
-        <div class="npc-name">悬赏板</div>
-        <div class="npc-hint">每日挑战</div>
-      </div>
-
-      <div id="continue-box" style="display:none">
-        <div class="npc-card npc-save" id="btn-continue">
-          <div class="npc-icon">📂</div>
-          <div class="npc-name">记忆之书</div>
-          <div class="npc-hint">继续冒险</div>
+  <!-- 书卷式左右分栏 -->
+  <div class="tome-spread">
+    <!-- 左页：征战 -->
+    <div class="tome-page tome-left">
+      <div class="page-ornament">◆ ◇ ◆</div>
+      <div class="page-title">征 战</div>
+      <div class="page-buttons">
+        <div class="tome-btn tome-btn-gate" id="btn-newgame">
+          <div class="tome-btn-icon">🏰</div>
+          <div class="tome-btn-name">出城探险</div>
+          <div class="tome-btn-hint">踏上新的征程</div>
+        </div>
+        <div id="continue-box" style="display:none">
+          <div class="tome-btn tome-btn-save" id="btn-continue">
+            <div class="tome-btn-icon">📂</div>
+            <div class="tome-btn-name">继续冒险</div>
+            <div class="tome-btn-hint">从存档处继续</div>
+          </div>
         </div>
       </div>
+    </div>
 
-      <div class="npc-card npc-fountain" id="btn-delete">
-        <div class="npc-icon">🌊</div>
-        <div class="npc-name">遗忘之泉</div>
-        <div class="npc-hint">重置旅程</div>
-      </div>
+    <!-- 书脊装饰 -->
+    <div class="tome-spine"></div>
 
-      <div class="npc-card npc-lb" id="btn-show-lb-start">
-        <div class="npc-icon">📊</div>
-        <div class="npc-name">功勋柱</div>
-        <div class="npc-hint">排行榜</div>
+    <!-- 右页：备战 -->
+    <div class="tome-page tome-right">
+      <div class="page-ornament">◆ ◇ ◆</div>
+      <div class="page-title">备 战</div>
+      <div class="page-buttons">
+        <div class="tome-btn tome-btn-altar" id="btn-meta">
+          <div class="tome-btn-icon">🔮</div>
+          <div class="tome-btn-name">女神祭坛</div>
+          <div class="tome-btn-hint">局外成长 · 天赋强化</div>
+        </div>
+        <div class="tome-btn tome-btn-compendium" id="btn-compendium">
+          <div class="tome-btn-icon">📚</div>
+          <div class="tome-btn-name">万象宝典</div>
+          <div class="tome-btn-hint">角色 · 妖兽 · 装备 · 遗物</div>
+        </div>
       </div>
     </div>
   </div>
+
+  <!-- 底部功能栏 -->
+  <div class="tome-footer">
+    <div class="footer-btn" id="btn-daily">📅 每日悬赏</div>
+    <div class="footer-divider">│</div>
+    <div class="footer-btn" id="btn-show-lb-start">📊 功勋柱</div>
+    <div class="footer-divider">│</div>
+    <div class="footer-btn footer-btn-danger" id="btn-delete">🌊 重置旅程</div>
+  </div>
+
+  <!-- 书卷装饰底部 -->
+  <div class="tome-bottom"></div>
 
   <div class="city-footer">「魔塔的阴影正在蔓延……勇士，请做好准备。」</div>
 </div>
@@ -139,12 +155,21 @@
   <div id="zone-name" style="text-align:center;color:#8899bb;font-size:12px;margin-bottom:4px">迷雾平原</div>
   <div id="turn-limit">回合: 0/15</div>
 
-  <div id="enemy-box" class="panel">
-    <div id="enemy-name">--</div>
-    <div id="enemy-tag"></div>
-    <div id="enemy-intent" style="text-align:center;font-size:13px;color:#ffcc00;min-height:20px;margin:4px 0"></div>
-    <div id="enemy-hp-bar"><div id="enemy-hp-fill"></div></div>
-    <div id="enemy-hp-text">HP: --/--</div>
+  <!-- 战斗竞技场：角色 vs 敌人 -->
+  <div id="battle-arena">
+    <div id="arena-player" class="arena-unit">
+      <div id="arena-player-sprite" class="arena-sprite">⚔️</div>
+      <div id="arena-player-label">勇者</div>
+    </div>
+    <div id="arena-vs">⚡</div>
+    <div id="arena-enemy" class="arena-unit">
+      <div id="arena-enemy-sprite" class="arena-sprite">👹</div>
+      <div id="arena-enemy-label">妖兽</div>
+    </div>
+  </div>
+
+  <div id="enemy-area">
+    <!-- 动态填充敌人卡片 -->
   </div>
 
   <div id="player-box" class="panel">
@@ -174,12 +199,11 @@
   <div id="log"></div>
   <div id="float-container"></div>
 
+  <div id="auto-indicator"></div>
   <div id="actions">
-    <button id="btn-atk" class="act-btn">⚔️ 普攻</button>
-    <button id="btn-skill" class="act-btn">⚡ 技能</button>
-    <button id="btn-def" class="act-btn">🛡️ 防御</button>
-    <button id="btn-potion" class="act-btn">🧪 药水</button>
-    <button id="btn-auto" class="act-btn">▶️ 自动</button>
+    <button id="btn-atk" class="act-btn big-btn">⚔️ 攻击</button>
+    <button id="btn-skill" class="act-btn big-btn">⚡ 技能</button>
+    <button id="btn-def" class="act-btn big-btn">🛡️ 闪避</button>
   </div>
 </div>
 
@@ -231,13 +255,6 @@
   <button class="restart-btn" style="margin-top:10px;width:100%" id="btn-close-daily">关闭</button>
 </div>
 
-<!-- 图鉴 -->
-<div id="codex-panel" class="modal">
-  <h3>📖 妖兽图鉴</h3>
-  <div id="codex-content"></div>
-  <button class="restart-btn" style="margin-top:12px;width:100%" id="btn-close-codex">关闭</button>
-</div>
-
 <!-- 装备替换选择 -->
 <div id="equip-replace" class="modal">
   <h3>🎒 装备栏已满</h3>
@@ -263,11 +280,71 @@
   <button class="restart-btn" style="margin-top:10px;width:100%" id="btn-close-meta">关闭</button>
 </div>
 
+<!-- 万象宝典 -->
+<div id="compendium" class="modal">
+  <h3>📚 万象宝典</h3>
+  <!-- 首页：四格选类别 -->
+  <div id="comp-home">
+    <div class="comp-spread">
+      <div class="comp-col">
+        <div class="comp-card-main" data-cat="classes">
+          <div class="comp-card-icon">⚔️</div>
+          <div class="comp-card-title">角 色</div>
+          <div class="comp-card-sub">三大道途 · 各具神通</div>
+        </div>
+        <div class="comp-card-main" data-cat="equip">
+          <div class="comp-card-icon">🎒</div>
+          <div class="comp-card-title">装 备</div>
+          <div class="comp-card-sub">神兵利器 · 品质前缀</div>
+        </div>
+      </div>
+      <div class="comp-spine-v"></div>
+      <div class="comp-col">
+        <div class="comp-card-main" data-cat="monsters">
+          <div class="comp-card-icon">👹</div>
+          <div class="comp-card-title">妖 兽</div>
+          <div class="comp-card-sub">图鉴记录 · 知己知彼</div>
+        </div>
+        <div class="comp-card-main" data-cat="relics">
+          <div class="comp-card-icon">🔮</div>
+          <div class="comp-card-title">遗 物</div>
+          <div class="comp-card-sub">远古秘宝 · 羁绊联动</div>
+        </div>
+        <div class="comp-card-main" data-cat="trophies">
+          <div class="comp-card-icon">🏆</div>
+          <div class="comp-card-title">藏品展架</div>
+          <div class="comp-card-sub">传说锻造 · 荣耀收藏</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- 详情页 -->
+  <div id="comp-detail" style="display:none">
+    <button class="comp-back-btn" id="btn-comp-back">← 返回宝典</button>
+    <div id="comp-detail-title" style="color:#ffa502;font-size:16px;font-weight:bold;margin-bottom:10px"></div>
+    <div id="comp-detail-content" style="text-align:left;font-size:13px;max-height:45vh;overflow-y:auto"></div>
+  </div>
+  <button class="restart-btn" style="margin-top:10px;width:100%" id="btn-close-compendium">关闭宝典</button>
+</div>
+
 <!-- 排行榜 -->
 <div id="leaderboard" class="modal">
   <h3>📊 本地排行榜</h3>
   <div id="lb-content" style="text-align:left;font-size:13px;max-height:50vh;overflow-y:auto"></div>
   <button class="restart-btn" style="margin-top:10px;width:100%" id="btn-close-lb">关闭</button>
+</div>
+
+<!-- Boss叙事覆盖层 -->
+<div id="boss-narrative">
+  <div id="boss-narrative-bg"></div>
+  <div id="boss-narrative-text"></div>
+  <div id="boss-narrative-skip">点击任意位置跳过</div>
+</div>
+
+<!-- 房间预告卡 -->
+<div id="room-preview">
+  <div id="room-preview-icon"></div>
+  <div id="room-preview-name"></div>
 </div>
 
 <div id="toast"></div>

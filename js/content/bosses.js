@@ -4,6 +4,8 @@ import { R } from '../core/registry.js';
 R.registerAll('bosses', {
   plains: {
     name: "平原领主·裂地者", hp: 150, atk: 18, def: 5, exp: "大地颤抖", icon: "🦏",
+    intro: ["迷雾散开，大地开始震动……","一头如山丘般大小的巨兽，","从裂开的地面中缓缓爬出。","—— 平原领主 · 裂地者"],
+    phase2Intro: ["裂地者的眼中燃起怒火！","大地在它脚下崩裂，岩浆喷涌……","它已不再只是野兽——","—— 平原领主 · 崩山者"],
     skill: { name: "地震", desc: "对玩家造成2倍攻击力伤害", fn: (e, p) => { const d = Math.max(1, e.atk * 2 - p.def); p.hp -= d; return { dmg: d, msg: '🌍 裂地者释放地震！' }; } },
     phase2: {
       name: "平原领主·崩山者", atkMul: 1.3, defBonus: 3,
@@ -12,6 +14,8 @@ R.registerAll('bosses', {
   },
   forest: {
     name: "森林之王·苍古树精", hp: 220, atk: 22, def: 7, exp: "万木臣服", icon: "🌲",
+    intro: ["幽暗的森林深处，万木忽然静默……","一棵参天古树睁开了眼睛。","千百年的根须即是它的手足，","整片森林，都是它的领域。","—— 森林之王 · 苍古树精"],
+    phase2Intro: ["树精发出震耳欲聋的咆哮！","无数藤蔓从地底破土而出，","每一根都带着千年的怨念……","—— 森林之王 · 万木之怒"],
     skill: { name: "缠绕", desc: "造成1.5倍伤害并降低玩家攻击2回合", fn: (e, p) => { const d = Math.max(1, Math.floor(e.atk * 1.5) - p.def); p.hp -= d; p.debuffAtk = { turns: 3, value: 3 }; return { dmg: d, msg: '🌿 苍古树精释放缠绕！攻击力降低' }; } },
     phase2: {
       name: "森林之王·万木之怒", atkMul: 1.2, defBonus: 4,
@@ -20,6 +24,8 @@ R.registerAll('bosses', {
   },
   cave: {
     name: "矿洞主宰·晶石巨像", hp: 300, atk: 26, def: 10, exp: "坚不可摧", icon: "💎",
+    intro: ["矿洞深处传来水晶碰撞的脆响……","无数晶石自行聚合，拼成一尊巨像。","它没有生命，却散发着远古的意志。","—— 矿洞主宰 · 晶石巨像"],
+    phase2Intro: ["巨像体内的晶核开始狂暴地跳动！","晶刺如暴雨般从四面八方射来，","这尊古老的守卫，已不再克制自己。","—— 矿洞主宰 · 晶核暴走"],
     skill: { name: "晶化", desc: "本回合防御翻倍并反弹伤害", fn: (e, p) => { if (!e._crystalDoubled) { e._crystalDoubled = true; e.def *= 2; } e._thorns = true; return { msg: '💎 晶石巨像晶化了！防御翻倍', crystal: true }; } },
     phase2: {
       name: "矿洞主宰·晶核暴走", atkMul: 1.5, defBonus: -3,
@@ -28,6 +34,8 @@ R.registerAll('bosses', {
   },
   ruins: {
     name: "废墟守护者·石像鬼", hp: 350, atk: 28, def: 8, exp: "千年沉睡", icon: "🗿",
+    intro: ["断壁残垣之间，一座石像缓缓转头……","它的目光穿透了千年的时光，","锁定在你的身上。","—— 废墟守护者 · 石像鬼"],
+    phase2Intro: ["石像鬼的身体开始崩裂——","但裂痕中透出的不是碎石，","而是古老的咒文与不灭的怨念。","—— 废墟守护者 · 觉醒"],
     skill: { name: "石化凝视", desc: "造成伤害并有概率跳过玩家下回合", fn: (e, p) => { const d = Math.max(1, e.atk - p.def + 8); p.hp -= d; if (Math.random() < 0.4) p._stoneGaze = true; return { dmg: d, msg: '🗿 石像鬼释放石化凝视！' }; } },
     phase2: {
       name: "废墟守护者·觉醒", atkMul: 1.4, defBonus: 5,
@@ -36,6 +44,8 @@ R.registerAll('bosses', {
   },
   frozen: {
     name: "冰原之主·霜翼巨鹰", hp: 380, atk: 30, def: 9, exp: "极寒风暴", icon: "🦅",
+    intro: ["刺骨的寒风中，一道巨大的阴影掠过……","那是一双遮天蔽日的冰霜之翼。","它的每一次呼吸，都带来暴风雪。","—— 冰原之主 · 霜翼巨鹰"],
+    phase2Intro: ["霜翼巨鹰发出刺耳的尖啸！","温度骤降至绝对零度。","连空气都开始凝结成冰……","—— 冰原之主 · 永冻之翼"],
     skill: { name: "暴风雪", desc: "AOE伤害并降低玩家攻击1回合", fn: (e, p) => { const d = 15; p.hp -= d; p.debuffAtk = { turns: 2, value: 2 }; return { dmg: d, msg: '🦅 霜翼巨鹰召唤暴风雪！攻击力降低' }; } },
     phase2: {
       name: "冰原之主·永冻之翼", atkMul: 1.3, defBonus: 3,
@@ -44,6 +54,8 @@ R.registerAll('bosses', {
   },
   voidgate: {
     name: "虚空守门人", hp: 450, atk: 34, def: 12, exp: "魔塔在前", icon: "🌀",
+    intro: ["现实在此处撕裂……","一道裂隙中，站着一个没有面孔的身影。","它身后，魔塔的轮廓已隐约可见。","—— 虚空守门人"],
+    phase2Intro: ["守门人的身影开始扭曲、膨胀——","虚空中伸出无数触手般的裂缝，","贪婪地吞噬着周围的一切。","—— 虚空守门人 · 终焉"],
     skill: { name: "虚空裂隙", desc: "造成伤害并回复自身10%最大生命", fn: (e, p) => { const d = Math.max(1, e.atk - p.def + 5); p.hp -= d; const heal = Math.floor(e.maxHp * 0.1); e.hp = Math.min(e.maxHp, e.hp + heal); return { dmg: d, heal: heal, msg: '🌀 虚空守门人撕裂空间！回复了生命' }; } },
     phase2: {
       name: "虚空守门人·终焉", atkMul: 1.5, defBonus: 5,
@@ -52,6 +64,8 @@ R.registerAll('bosses', {
   },
   tower: {
     name: "魔塔守门人", hp: 550, atk: 38, def: 15, exp: "简单模式·终极之战", icon: "🛡️",
+    intro: ["魔塔的大门在你面前缓缓开启……","黑暗之中，一副铠甲凭空而立。","它没有主人——它自己就是主人。","—— 魔塔守门人"],
+    phase2Intro: ["守门人的铠甲开始燃烧——","不，那不是火焰，","那是魔塔积蓄了千年的妖力。","—— 魔塔守门人 · 灭世"],
     skill: { name: "魔塔之怒", desc: "全屏AOE，无视防御造成30点伤害", fn: (e, p) => { p.hp -= 30; return { dmg: 30, msg: '🏰 魔塔守门人释放魔塔之怒！无视防御造成伤害' }; } },
     phase2: {
       name: "魔塔守门人·灭世", atkMul: 1.6, defBonus: 8,

@@ -2,10 +2,11 @@
 import { Game } from '../core/state.js';
 import { R } from '../core/registry.js';
 import { E, Events } from '../core/event-bus.js';
-import { log, toast, float } from './effects.js';
+import { log, toast, float, updateArena } from './effects.js';
 import { switchScreen, showModal, hideModal, hideAllModals } from './screens.js';
 import { RARITY_COLOR } from '../content/relics.js';
 import { getIntent } from '../systems/combat.js';
+import { startHeartbeat, stopHeartbeat } from '../core/audio.js';
 
 export function render(s) {
   // 城池界面：有存档时显示"记忆之书"
@@ -28,8 +29,34 @@ export function render(s) {
     let db = s.equip.reduce((sum, e) => sum + (e.stat === "def" ? e.val : 0), 0);
     document.getElementById("pl-atk").textContent = ab ? `${ba + ab}(+${ab})` : ba;
     document.getElementById("pl-def").textContent = db ? `${bd + db}(+${db})` : bd;
-    const sk = s.activeSkill;
-    document.getElementById("pl-skill-name").textContent = sk ? `${sk.icon} ${sk.name}` : "无技能";
+    // 技能按钮状态
+    var skills = s.activeSkills || [];
+    var skillBtn = document.getElementById("btn-skill");
+    var allReady = true, totalCD = 0;
+    if (s.skillCooldowns) {
+      Object.values(s.skillCooldowns).forEach(function(v) { totalCD += v; if (v > 0) allReady = false; });
+    }
+    if (skillBtn) {
+      if (skills.length === 0) {
+        skillBtn.textContent = "⚡ 技能";
+        skillBtn.classList.remove("on-cd");
+        skillBtn.disabled = true;
+      } else if (allReady && totalCD === 0) {
+        skillBtn.textContent = "⚡ 技能(" + skills.length + ")";
+        skillBtn.classList.remove("on-cd");
+        skillBtn.disabled = false;
+      } else {
+        skillBtn.textContent = "⚡ CD:" + totalCD;
+        skillBtn.classList.add("on-cd");
+        skillBtn.disabled = false; // 仍可点击查看CD状态
+      }
+    }
+    document.getElementById("pl-skill-name").textContent = skills.length > 0 ? skills.map(function(sk) { return sk.icon + sk.name; }).join(" ") : "无技能";
+    document.getElementById("pl-mp").textContent = skills.length + "技能";
+    document.getElementById("mp-fill").style.width = (allReady ? 100 : Math.max(10, 100 - totalCD * 15)) + "%";
+    // 自动战斗指示器
+    var ai = document.getElementById("auto-indicator");
+    if (ai) ai.textContent = s.auto ? "⚡ 自动战斗中..." : "";
   }
 
   // 装备列表（可点击丢弃）
@@ -71,40 +98,52 @@ export function render(s) {
   if (s.potionAtk) db += `<span style="color:#89e894;font-size:12px;margin-left:6px">💪药剂+${Math.floor(s.potionAtk * 100)}%攻</span>`;
   dbEl.innerHTML = db || "";
 
-  // 敌人信息
-  if (s.enemy) {
-    const ehp = s.enemy.maxHp > 0 ? Math.max(0, s.enemy.hp) / s.enemy.maxHp * 100 : 0;
-    const fill = document.getElementById("enemy-hp-fill");
-    fill.style.width = ehp + "%";
-    if (ehp > 60) fill.style.background = "linear-gradient(90deg,#8b0000,#ff4444)";
-    else if (ehp > 30) fill.style.background = "linear-gradient(90deg,#8b4500,#ffaa00)";
-    else fill.style.background = "linear-gradient(90deg,#550000,#ff0000)";
-    const isBoss = s._currentRoomType === "boss";
-    const ne = document.getElementById("enemy-name");
-    ne.style.color = isBoss ? "#ffa502" : "#ff7b7b"; ne.textContent = s.enemy.name;
-    document.getElementById("enemy-tag").textContent = s.enemy.tags.map(t => t.name).join(" ");
-    // 敌人意图显示（失明诅咒时隐藏）
-    const intentEl = document.getElementById("enemy-intent");
-    if (intentEl) {
-      if (s.player?._blindCurse) {
-        intentEl.textContent = "???";
-      } else {
-        const intent = getIntent();
-        intentEl.textContent = intent ? `${intent.icon} 下回合：${intent.name}` : "";
-      }
+  // 敌人区域（多敌人卡片）
+  var enemyArea = document.getElementById("enemy-area");
+  if (enemyArea) {
+    var enemies = s.enemies || [];
+    if (enemies.length === 0) {
+      enemyArea.innerHTML = '<div style="color:#667788;text-align:center;padding:10px">--</div>';
+    } else {
+      enemyArea.innerHTML = '';
+      enemies.forEach(function(e, i) {
+        if (!e) return;
+        var ehp = e.maxHp > 0 ? Math.max(0, e.hp) / e.maxHp * 100 : 0;
+        var isBoss = s._currentRoomType === "boss";
+        var selected = (s.selectedTarget === i);
+        var card = document.createElement("div");
+        card.className = "enemy-card";
+        card.style.borderColor = selected ? "#ffdd77" : (isBoss ? "#ffa502" : "#5a3a3a");
+        card.style.boxShadow = selected ? "0 0 12px rgba(255,200,100,.5)" : "none";
+        var intentText = '';
+        if (e._intent) { intentText = '<div style="font-size:9px;color:#ffcc00;margin-top:2px">' + e._intent.icon + e._intent.name + '</div>'; }
+        var tagText = (e.tags && e.tags.length > 0) ? '<div style="font-size:8px;color:#ff8844">' + e.tags.map(function(t){return t.name;}).join(' ') + '</div>' : '';
+        card.innerHTML = '<div class="enemy-card-icon">' + (e.icon || '👹') + '</div>' +
+          '<div class="enemy-card-name" style="color:' + (isBoss ? '#ffa502' : '#ff7b7b') + '">' + e.name + '</div>' +
+          tagText +
+          '<div class="enemy-card-hp-bar"><div class="enemy-card-hp-fill" style="width:' + ehp + '%;background:' + (ehp > 60 ? '#c04040' : ehp > 30 ? '#c08030' : '#c02020') + '"></div></div>' +
+          '<div class="enemy-card-hp-text">' + Math.max(0, e.hp) + '/' + e.maxHp + ' ATK:' + (e.atk || 0) + '</div>' +
+          intentText;
+        card.onclick = function() { s.selectedTarget = i; render(s); };
+        enemyArea.appendChild(card);
+      });
     }
-    // 失明时隐藏HP信息
-    const blind = s.player?._blindCurse;
-    document.getElementById("enemy-hp-text").textContent = blind ? "HP: ???/???" : `HP: ${Math.max(0, s.enemy.hp)}/${s.enemy.maxHp}`;
-    if (blind) { const fill = document.getElementById("enemy-hp-fill"); fill.style.width = "100%"; fill.style.background = "linear-gradient(90deg,#333,#555)"; }
+  }
+
+  // 更新战斗竞技场角色形象
+  if (s.enemy && s.player) {
+    const pIcon = s.playerClass?.icon || "⚔️";
+    const pLabel = s.playerClass?.name || "勇者";
+    const eIcon = s.enemy.icon || (s._currentRoomType === "boss" ? "💀" : "👹");
+    const eLabel = s.enemy.name || "妖兽";
+    updateArena(pIcon, pLabel, eIcon, eLabel);
+  }
+
+  // 低血量心跳音效
+  if (s.player && s.enemy && s.player.hp > 0 && s.player.hp < s.player.maxHp * 0.25) {
+    startHeartbeat();
   } else {
-    document.getElementById("enemy-name").textContent = "--";
-    document.getElementById("enemy-name").style.color = "#ff7b7b";
-    document.getElementById("enemy-tag").textContent = "";
-    const intentEl2 = document.getElementById("enemy-intent");
-    if (intentEl2) intentEl2.textContent = "";
-    document.getElementById("enemy-hp-fill").style.width = "0%";
-    document.getElementById("enemy-hp-text").textContent = "HP: --/--";
+    stopHeartbeat();
   }
 
   // 回合与楼层
