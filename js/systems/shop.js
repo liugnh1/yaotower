@@ -18,7 +18,7 @@ export function getShopItems() {
     fn: () => { s.player.hp = s.player.maxHp; s.player.mp = s.player.maxMp; Events.emit(E.PLAYER_HEALED, { amount: s.player.maxHp, hp: s.player.hp, maxHp: s.player.maxHp }); } });
   const eq = genEquip(); eq.cost = 25 + Math.floor(eq.val * 3);
   items.push({ name: eq.fullName || eq.name, cost: eq.cost, icon: eq.icon, type: 'equip', data: eq,
-    fn: () => { window._addEquip(eq); Events.emit(E.EQUIP_GAINED, { equip: eq }); } });
+    fn: () => { if (typeof window._addEquip === 'function') { window._addEquip(eq); } else { Game.state.equip.push(eq); } Events.emit(E.EQUIP_GAINED, { equip: eq }); } });
   var relicChance = (s.blessingType === '🔮') ? 0.8 : 0.5;
   if (s.rng.chance(relicChance)) {
     const rel = genRelic();
@@ -31,7 +31,8 @@ export function getShopItems() {
 // ---- 购买 ----
 export function buyItem(item) {
   const s = Game.state;
-  let mul = s.adDiscount ? 0.5 : 1;
+  var diffCfg = R.get('difficulties', s.difficulty) || {};
+  let mul = (s.adDiscount ? 0.5 : 1) * (diffCfg.shopMul || 1);
   if (s.player?._greedCurse) mul *= 2; // 贪婪诅咒：商店价格翻倍
   const cost = Math.floor(item.cost * mul);
   if ((s.gold || 0) < cost) return false;
@@ -57,6 +58,11 @@ export function acquireRelic(rel) {
       Game.sync();
       return;
     }
+    // 已满3星：转为金币奖励
+    s.gold += 30;
+    log('<span class="gold">💰 ' + existing.name + '已满星，转为30金币！</span>');
+    Game.sync();
+    return;
   }
   // 满6件时移除最旧的
   if (s.relics.length >= 6) {

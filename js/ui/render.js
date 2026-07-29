@@ -75,29 +75,38 @@ export function render(s) {
     let db = s.equip.reduce((sum, e) => sum + (e.stat === "def" ? e.val : 0), 0);
     document.getElementById("pl-atk").textContent = ab ? `${ba + ab}(+${ab})` : ba;
     document.getElementById("pl-def").textContent = db ? `${bd + db}(+${db})` : bd;
-    // 技能按钮状态
+    // 技能按钮状态（CD系统）
     var skills = s.activeSkills || [];
     var skillBtn = document.getElementById("btn-skill");
-    var allReady = true, totalCD = 0;
+    var allReady = true, totalCD = 0, maxCD = 0;
     if (s.skillCooldowns) {
-      Object.values(s.skillCooldowns).forEach(function(v) { totalCD += v; if (v > 0) allReady = false; });
+      Object.values(s.skillCooldowns).forEach(function(v) { totalCD += v; if (v > 0) allReady = false; if (v > maxCD) maxCD = v; });
     }
     if (skillBtn) {
       if (skills.length === 0) {
-        skillBtn.textContent = "⚡ 技能";
+        skillBtn.textContent = "⚡ 无技能";
         skillBtn.classList.remove("on-cd");
         skillBtn.disabled = true;
-      } else if (allReady && totalCD === 0) {
-        skillBtn.textContent = "⚡ 技能(" + skills.length + ")";
+      } else if (allReady) {
+        // 显示各技能名
+        var skillNames = skills.map(function(sk) { return sk.icon + sk.name; }).join(" ");
+        skillBtn.textContent = "⚡ " + skillNames;
         skillBtn.classList.remove("on-cd");
         skillBtn.disabled = false;
       } else {
-        skillBtn.textContent = "⚡ CD:" + totalCD;
+        // 显示每个技能的CD
+        var cdTexts = skills.map(function(sk, i) {
+          var cdKey = sk.id || ('skill_' + i);
+          var cd = s.skillCooldowns[cdKey] || 0;
+          return cd > 0 ? sk.icon + "CD" + cd : sk.icon + "就绪";
+        });
+        skillBtn.textContent = "⚡ " + cdTexts.join(" ");
         skillBtn.classList.add("on-cd");
-        skillBtn.disabled = false; // 仍可点击查看CD状态
+        skillBtn.disabled = false;
       }
     }
-    document.getElementById("pl-skill-name").textContent = skills.length > 0 ? skills.map(function(sk) { return sk.icon + sk.name; }).join(" ") : "无技能";
+    document.getElementById("pl-skill-name").textContent = skills.length > 0 ? skills.map(function(sk) { return sk.icon + sk.name + "(CD" + (sk.cooldown || 1) + ")"; }).join(" ") : "无技能";
+    // MP/灵力显示改为CD状态条
     document.getElementById("pl-mp").textContent = skills.length + "技能";
     document.getElementById("mp-fill").style.width = (allReady ? 100 : Math.max(10, 100 - totalCD * 15)) + "%";
     // 自动战斗指示器
@@ -233,12 +242,15 @@ export function render(s) {
   document.getElementById("floor").textContent = `第 ${s.totalFloor} 层`;
   const zn = document.getElementById("zone-name"); if (zn && s.zone) zn.textContent = s.zone.name;
 
-  // 技能按钮
+  // 技能按钮（CD系统：所有技能CD中则禁用）
   const btnSkill = document.getElementById("btn-skill");
   if (btnSkill) {
-    btnSkill.disabled = s.player ? s.player.mp < s.player.mpCost : true;
-    if (s.activeSkill) btnSkill.innerHTML = `${s.activeSkill.icon} ${s.activeSkill.name}`;
-    else btnSkill.innerHTML = "⚡ 技能";
+    var skillsAll = s.activeSkills || [];
+    var allOnCD = skillsAll.length > 0 && skillsAll.every(function(sk, i) {
+      var cdKey = sk.id || ('skill_' + i);
+      return (s.skillCooldowns && s.skillCooldowns[cdKey]) ? s.skillCooldowns[cdKey] > 0 : false;
+    });
+    btnSkill.disabled = skillsAll.length === 0 || allOnCD;
   }
 
   var anyAlive = (s.enemies || []).some(function(e) { return e.hp > 0; });

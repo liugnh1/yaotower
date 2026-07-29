@@ -16,7 +16,7 @@ function weightedPick(arr, rng) {
 // ---- 装备生成（v0.35：区域套装+深度缩放）----
 export function genEquip(zoneId) {
   const s = Game.state;
-  const rng = (s && s.rng) ? s.rng : { next: () => Math.random() };
+  const rng = (s && s.rng) ? s.rng : { next: () => Math.random(), pick: (arr) => arr[Math.floor(Math.random() * arr.length)], chance: (p) => Math.random() < p, range: (min, max) => min + Math.floor(Math.random() * (max - min + 1)), shuffle: (arr) => { var a = arr.slice(); for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; } };
   const qualities = R.get('equipQualities');
   const types = R.get('equipTypes');
   const prefixes = R.get('equipPrefixes');
@@ -88,11 +88,11 @@ export function genEquip(zoneId) {
 // ---- 遗物生成（使用难度 legendRate + Zone 专属池）----
 export function genRelic() {
   const s = Game.state;
-  const rng = (s && s.rng) ? s.rng : { next: () => Math.random() };
+  const rng = (s && s.rng) ? s.rng : { next: () => Math.random(), pick: (arr) => arr[Math.floor(Math.random() * arr.length)], chance: (p) => Math.random() < p, range: (min, max) => min + Math.floor(Math.random() * (max - min + 1)), shuffle: (arr) => { var a = arr.slice(); for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; } };
   const diff = R.get('difficulties', s?.difficulty) || R.get('difficulties', 'standard');
   const legendRate = diff.legendRate || 0.02;
   // 诅咒"恐惧"/"贫困"：遗物掉率翻倍（提高稀有度分布）
-  const luckyMul = (s?.player?._fearLucky || s?.player?._poorLucky) ? 1.8 : 1;
+  const luckyMul = (s?.player?._fearLucky || s?.player?._poorLucky || s?.player?._luckyCharm) ? 1.8 : 1;
   const weights = {
     common: Math.floor(40 / luckyMul), rare: Math.floor(30 * luckyMul),
     epic: Math.floor(20 * luckyMul),

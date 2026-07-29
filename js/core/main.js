@@ -421,7 +421,7 @@ function pickClass(cls) {
   applySoulUpgrades(s);
 
   // 应用运势和遗产（player已创建）
-  if (s._pendingFortune) { s._pendingFortune.apply(s); s._fortuneName = s._pendingFortune.name; s._pendingFortune = null; }
+  if (s._pendingFortune) { s._pendingFortune.apply(s); s._fortuneName = s._pendingFortune.name; if (s._pendingFortune.mutation) { s._pendingFortune.mutation.apply(s); s._mutationName = s._pendingFortune.mutation.name; } s._pendingFortune = null; }
   applyLegacy(s);
 
   // 开局选1个本命技能
@@ -661,8 +661,21 @@ function onWin(isFast) {
   }
   if (roomType === "boss") {
     s.gold += 50 + s.totalFloor;
+    // Boss专属遗物（首次击败掉落）
+    var zoneId = s.zone ? s.zone.id : null;
+    if (zoneId && !Game.meta.bossRelicsFound) Game.meta.bossRelicsFound = [];
+    var bossRelicId = 'boss_' + zoneId;
+    if (zoneId && !Game.meta.bossRelicsFound.includes(bossRelicId)) {
+      Game.meta.bossRelicsFound.push(bossRelicId);
+      Game.saveMeta();
+      var bossRelic = getBossRelic(zoneId);
+      if (bossRelic) {
+        Shop.acquireRelic(bossRelic);
+        log('<span class="win">👑 首次击败！获得Boss专属遗物：' + bossRelic.name + '！</span>');
+        toast('👑 Boss专属遗物：' + bossRelic.name);
+      }
+    }
     // Boss材料掉落（局内）
-    const zoneId = s.zone ? s.zone.id : null;
     const bossMat = zoneId ? (R.get('bossMaterials') || {})[zoneId] : null;
     if (!s.forgeMats) s.forgeMats = {};
     if (bossMat && s.rng.chance(bossMat.dropRate)) {
@@ -681,7 +694,7 @@ function onWin(isFast) {
     var bounty = Game.meta.activeBounty;
     if (bounty) {
       var bossName = s.enemy ? s.enemy.name : '';
-      if (bossName.indexOf(bounty.boss) >= 0 || (s.zone && s.zone.name)) {
+      if (bossName.indexOf(bounty.boss) >= 0) {
         Game.meta.souls += bounty.reward;
         log('<span class="win">🎯 猎杀令完成！+' + bounty.reward + '魂晶</span>');
         toast('🎯 猎杀令完成！+' + bounty.reward + '魂晶');
@@ -698,7 +711,8 @@ function onWin(isFast) {
     // 矿洞环境：金币+50%
     const goldMul = s._zoneMod?.id === "cave_gold" ? 1.5 : 1;
     const baseGold = s.rng.range(8, 15);
-    s.gold += Math.floor(baseGold * goldMul * (s._riskReward ? 2 : 1));
+    var extraGold = s.player && s.player._luckyCharm ? 15 : 0;
+    s.gold += Math.floor(baseGold * goldMul * (s._riskReward ? 2 : 1)) + extraGold;
     showReward(isFast, eq => takeEquip(eq), attr => takeAttrReward(attr, isFast, false), s._riskReward || false);
   }
   showModal("reward");
@@ -2148,16 +2162,18 @@ function showReward(isFast, onEquip, onAttr, isElite) {
   // 2个装备大卡片
   for (var i = 0; i < 2; i++) {
     var eq = Loot.genEquip(s.zone ? s.zone.id : null);
-    var card = document.createElement("div");
-    card.style.cssText = "background:#111827;border:2px solid " + eq.color + ";border-radius:12px;padding:16px 10px;text-align:center;cursor:pointer;transition:all .15s;box-shadow:0 0 " + (eq.qualityName === "传说" ? "16px" : "0") + " " + eq.color;
-    card.innerHTML = "<div style=\"font-size:40px;margin-bottom:8px\">" + eq.icon + "</div>" +
-      "<div style=\"color:" + eq.color + ";font-weight:bold;font-size:14px;margin-bottom:4px\">" + (eq.fullName||eq.name) + "</div>" +
-      "<div style=\"color:#8899bb;font-size:11px\">" + eq.stat.toUpperCase() + "+" + eq.val + " · " + (eq.qualityName||"") + "</div>" +
-      (eq._zoneSet ? "<div style=\"color:#ffa502;font-size:10px;margin-top:2px\">🏷️ " + eq._zoneSet + "套装</div>" : "");
-    card.onmouseenter = function() { this.style.transform = "scale(1.04)"; this.style.borderColor = "#fff"; };
-    card.onmouseleave = function() { this.style.transform = "scale(1)"; this.style.borderColor = eq.color; };
-    card.onclick = function() { onEquip(eq); };
-    list.appendChild(card);
+    (function(equip) {
+      var card = document.createElement("div");
+      card.style.cssText = "background:#111827;border:2px solid " + equip.color + ";border-radius:12px;padding:16px 10px;text-align:center;cursor:pointer;transition:all .15s;box-shadow:0 0 " + (equip.qualityName === "传说" ? "16px" : "0") + " " + equip.color;
+      card.innerHTML = "<div style=\"font-size:40px;margin-bottom:8px\">" + equip.icon + "</div>" +
+        "<div style=\"color:" + equip.color + ";font-weight:bold;font-size:14px;margin-bottom:4px\">" + (equip.fullName||equip.name) + "</div>" +
+        "<div style=\"color:#8899bb;font-size:11px\">" + equip.stat.toUpperCase() + "+" + equip.val + " · " + (equip.qualityName||"") + "</div>" +
+        (equip._zoneSet ? "<div style=\"color:#ffa502;font-size:10px;margin-top:2px\">🏷️ " + equip._zoneSet + "套装</div>" : "");
+      card.onmouseenter = function() { this.style.transform = "scale(1.04)"; this.style.borderColor = "#fff"; };
+      card.onmouseleave = function() { this.style.transform = "scale(1)"; this.style.borderColor = equip.color; };
+      card.onclick = function() { onEquip(equip); };
+      list.appendChild(card);
+    })(eq);
   }
 
   var attrs = [
@@ -3065,7 +3081,7 @@ function showGameOver(isWin, rewardText) {
   switchScreen("gameover");
 }
 
-// ===================== 每日运势 =====================
+// ===================== 每日运势 + 开局突变 =====================
 function getDailyFortune() {
   var today = new Date(); var seed = today.getFullYear() * 10000 + (today.getMonth()+1) * 100 + today.getDate();
   var fortunes = [
@@ -3078,8 +3094,22 @@ function getDailyFortune() {
     { icon: "🔥", name: "烈焰之日", desc: "今日所有敌人自带燃烧", apply: function(s) { s._fortuneBurn = true; } },
     { icon: "💀", name: "诅咒之日", desc: "今日商店半价但开局带1诅咒", apply: function(s) { s._fortuneCurse = true; } },
   ];
-  var idx = seed % fortunes.length;
-  return fortunes[idx];
+  // 开局突变：规则级全局改变（与运势独立）
+  var mutations = [
+    { icon: "☠️", name: "亡灵天灾", desc: "所有敌人被击杀后3回合复活一次(半血)", apply: function(s) { s._mutationUndead = true; } },
+    { icon: "🌀", name: "魔力紊乱", desc: "技能CD随机±1回合(每次释放后)", apply: function(s) { s._mutationChaos = true; } },
+    { icon: "⚖️", name: "元素失衡", desc: "火焰/冰霜伤害翻倍·物理伤害减半", apply: function(s) { s._mutationElement = true; } },
+    { icon: "😈", name: "诅咒狂欢", desc: "开局3诅咒·每诅咒+25%全属性", apply: function(s) { var curses = R.get('curses')||[]; for(var i=0;i<3;i++){var c=s.rng.pick(curses);if(c){s.curses.push(c);c.apply(s.player);s.player.atk=Math.floor(s.player.atk*1.25);s.player.def=Math.floor(s.player.def*1.25);}} } },
+    { icon: "⏰", name: "时间加速", desc: "每回合自动过2回合(敌人双动·CD双降)", apply: function(s) { s._mutationTime = true; } },
+    { icon: "🩸", name: "血月降临", desc: "治疗减半·攻击附带30%吸血", apply: function(s) { s.player.lifeSteal=(s.player.lifeSteal||0)+0.3; s._mutationBlood = true; } },
+    { icon: "💎", name: "富矿层", desc: "所有掉落翻倍·但精英敌人+1", apply: function(s) { s.player.goldMul=(s.player.goldMul||1)*2; s._mutationRich = true; } },
+    { icon: "👻", name: "幽灵模式", desc: "闪避率+30%·但被击中时受伤翻倍", apply: function(s) { s.player.dodge=(s.player.dodge||0)+0.3; s._mutationGhost = true; } },
+  ];
+  var fortuneIdx = seed % fortunes.length;
+  var mutIdx = Math.floor(seed / 9) % mutations.length;
+  var result = fortunes[fortuneIdx];
+  result.mutation = mutations[mutIdx];
+  return result;
 }
 
 // ===================== 连续登录 =====================
@@ -3099,6 +3129,22 @@ function checkLoginStreak() {
 
   meta.lastLogin = todayStr;
   Game.saveMeta();
+}
+
+// ===================== Boss专属遗物 =====================
+function getBossRelic(zoneId) {
+  var relics = {
+    plains: { id:'boss_plains', name:'大地之力', icon:'🦏', rarity:'epic', desc:'技能释放时相邻敌人受50%溅射伤害', passive:function(p){p._bossPlains=true;}, onRemove:function(p){p._bossPlains=false;} },
+    forest: { id:'boss_forest', name:'自然之愈', icon:'🌲', rarity:'epic', desc:'每回合末若未攻击则回复15%HP', passive:function(p){p._bossForest=true;}, onRemove:function(p){p._bossForest=false;} },
+    cave:   { id:'boss_cave',   name:'晶岩护体', icon:'💎', rarity:'epic', desc:'受击时获得1层晶化(防御+2可叠3层)', passive:function(p){p._bossCave=true;}, onRemove:function(p){p._bossCave=false;} },
+    ruins:  { id:'boss_ruins',  name:'远古咒印', icon:'📜', rarity:'epic', desc:'攻击时附加1个随机debuff(燃烧/迟缓/中毒)', passive:function(p){p._bossRuins=true;}, onRemove:function(p){p._bossRuins=false;} },
+    frozen: { id:'boss_frozen', name:'永冻之触', icon:'❄️', rarity:'epic', desc:'技能命中必定迟缓，已迟缓的敌人冻结1回合', passive:function(p){p._bossFrozen=true;}, onRemove:function(p){p._bossFrozen=false;} },
+    voidgate:{id:'boss_void',   name:'虚空裂隙', icon:'🌀', rarity:'epic', desc:'击杀敌人时生成虚空裂隙(2回合后爆炸伤害全场)', passive:function(p){p._bossVoid=true;}, onRemove:function(p){p._bossVoid=false;} },
+    tower:  { id:'boss_tower',  name:'破塔之誓', icon:'🛕', rarity:'legendary', desc:'对Boss伤害+40%，Boss战中每回合回复5%HP', passive:function(p){p._bossTower=true;}, onRemove:function(p){p._bossTower=false;} },
+    desert: { id:'boss_desert', name:'流沙之舞', icon:'🏜️', rarity:'epic', desc:'闪避成功后下次攻击必暴击且+50%伤害', passive:function(p){p._bossDesert=true;}, onRemove:function(p){p._bossDesert=false;} },
+    swamp:  { id:'boss_swamp',  name:'腐沼之种', icon:'🌿', rarity:'epic', desc:'中毒的敌人死亡时治疗你10%最大HP', passive:function(p){p._bossSwamp=true;}, onRemove:function(p){p._bossSwamp=false;} },
+  };
+  return relics[zoneId] || null;
 }
 
 // ===================== 遗产仓库 =====================
@@ -3137,7 +3183,8 @@ try {
   checkLoginStreak();
   var fortune = getDailyFortune();
   var fortuneEl = document.getElementById("daily-fortune");
-  if (fortuneEl) fortuneEl.innerHTML = fortune.icon + ' 今日运势：<b>' + fortune.name + '</b> — ' + fortune.desc;
+  if (fortuneEl) fortuneEl.innerHTML = fortune.icon + ' 运势：<b>' + fortune.name + '</b> — ' + fortune.desc +
+    (fortune.mutation ? '<br>' + fortune.mutation.icon + ' 突变：<b style="color:#ff6644">' + fortune.mutation.name + '</b> — ' + fortune.mutation.desc : '');
   var streakEl = document.getElementById("login-streak");
   if (streakEl) streakEl.textContent = '🔥连续' + (Game.meta.loginStreak || 1) + '天';
   console.log("[妖塔] 开始初始渲染, state:", Game.state ? 'OK' : 'NULL');
