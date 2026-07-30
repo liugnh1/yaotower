@@ -450,6 +450,8 @@ function pickClass(cls) {
         buildTalentSelect(function(tal) {
           s.talent = tal;
           tal.apply(s.player);
+          // 元素亲和/迅捷赐福：现有技能CD-1
+          if (tal.id === 'mage' || s.player._blessingSwift) { s.activeSkills.forEach(function(sk) { if (sk.cooldown > 1) sk.cooldown--; }); }
           // 追猎目标选择（在天赋之后，进入区域之前）
           buildHuntSelect(function() {
             initZone("plains");
@@ -796,16 +798,18 @@ function showEnding(onDone) {
   var el = document.getElementById("ending-screen");
   el.className = ending.cls;
   el.style.display = "flex";
-  document.getElementById("ending-icon").textContent = ending.icon;
-  document.getElementById("ending-title").textContent = ending.title;
+  var eIcon = document.getElementById("ending-icon"); if (eIcon) eIcon.textContent = ending.icon;
+  var eTitle = document.getElementById("ending-title"); if (eTitle) eTitle.textContent = ending.title;
   var txt = document.getElementById("ending-text");
+  if (!txt) return;
   txt.innerHTML = "";
   // 打字机：逐行显示（全部在同一卡片内）
   var li = 0, ci = 0;
   function typeLine() {
     if (li >= ending.lines.length) return;
-    if (ci === 0) { var d = document.createElement("div"); d.id = "end-line-" + li; txt.appendChild(d); }
+    if (ci === 0) { var d = document.createElement("div"); d.id = "end-line-" + li; if (txt) txt.appendChild(d); }
     var lineEl = document.getElementById("end-line-" + li);
+    if (!lineEl) return;
     if (ci < ending.lines[li].length) {
       lineEl.textContent = ending.lines[li].substring(0, ci + 1);
       ci++;
@@ -1016,12 +1020,24 @@ function doGameClear() {
 
 // ===================== 装备属性管理 =====================
 function applyEquipStats(p, eq) {
-  if (eq.stat === "maxHp") { p.maxHp += eq.val; p.hp = Math.min(p.hp + eq.val, p.maxHp); }
-  else if (eq.stat === "maxMp") { p.maxMp += eq.val; p.mp = Math.min(p.mp + eq.val, p.maxMp); }
+  switch (eq.stat) {
+    case "maxHp": p.maxHp += eq.val; p.hp = Math.min(p.hp + eq.val, p.maxHp); break;
+    case "atk": p.atk += eq.val; break;
+    case "def": p.def += eq.val; break;
+    case "critRate": p.critRate += eq.val / 100; break;
+    case "dodge": p.dodge = (p.dodge||0) + eq.val; break;
+    default: break;
+  }
 }
 function removeEquipStats(p, eq) {
-  if (eq.stat === "maxHp") { p.maxHp = Math.max(1, p.maxHp - eq.val); p.hp = Math.min(p.hp, p.maxHp); }
-  else if (eq.stat === "maxMp") { p.maxMp = Math.max(1, p.maxMp - eq.val); p.mp = Math.min(p.mp, p.maxMp); }
+  switch (eq.stat) {
+    case "maxHp": p.maxHp = Math.max(1, p.maxHp - eq.val); p.hp = Math.min(p.hp, p.maxHp); break;
+    case "atk": p.atk = Math.max(1, p.atk - eq.val); break;
+    case "def": p.def = Math.max(0, p.def - eq.val); break;
+    case "critRate": p.critRate = Math.max(0, p.critRate - eq.val / 100); break;
+    case "dodge": p.dodge = Math.max(0, (p.dodge||0) - eq.val); break;
+    default: break;
+  }
 }
 
 // 全局：添加装备（满时弹出替换选择）
@@ -1060,7 +1076,7 @@ function showEquipReplace(newEq, onDone, onCancel) {
   const el = document.getElementById("equip-replace");
   const list = document.getElementById("equip-replace-list");
   el.style.display = "block"; list.innerHTML = "";
-  const STAT_LABEL = { atk: '⚔️攻击', def: '🛡️防御', maxHp: '❤️生命', critRate: '💥暴击', maxMp: '🔮灵力' };
+  const STAT_LABEL = { atk: '⚔️攻击', def: '🛡️防御', maxHp: '❤️生命', critRate: '💥暴击', maxEnergy: '⚡能量' };
 
   // 显示新装备（点击取消）
   const newBtn = document.createElement("button"); newBtn.className = "modal-btn";
@@ -1081,6 +1097,7 @@ function showEquipReplace(newEq, onDone, onCancel) {
       s.equip.splice(i, 1);
       s.equip.push(newEq);
       applyEquipStats(s.player, newEq);
+      Combat.recalcEquipSetBonus();
       log(`<span class='warn'>替换装备：${eq.fullName||eq.name} → ${newEq.fullName||newEq.name}</span>`);
       el.style.display = "none";
       if (onDone) onDone();
@@ -1116,7 +1133,7 @@ function takeAttrReward(type, isFast, isBoss) {
   switch (type) {
     case "atk": { const v = isBoss ? (isFast ? 15 : 8) : (isFast ? 10 : 5); p.atk += v; log("攻击 +" + v, "win"); Game.sync(); break; }
     case "hp":  { const v = isBoss ? (isFast ? 80 : 40) : (isFast ? 50 : 25); p.maxHp += v; p.hp += v; log("生命上限 +" + v, "heal"); Game.sync(); break; }
-    case "mp":  { const v = isBoss ? (isFast ? 30 : 15) : (isFast ? 20 : 10); p.maxMp += v; p.mp += v; log("灵力上限 +" + v, "info"); Game.sync(); break; }
+    case "mp":  { const v = 1; p.maxEnergy = (p.maxEnergy||3) + v; p.energy = Math.min(p.energy+v, p.maxEnergy); log("最大能量 +" + v, "info"); Game.sync(); break; }
     case "heal": p.hp = p.maxHp; log("生命全满", "heal"); playSound("heal"); Game.sync(); break;
   }
   hideModal("reward"); nextRoom();
@@ -1145,7 +1162,7 @@ function openShop() {
   const items = Shop.getShopItems();
   var diffCfg = R.get('difficulties', s.difficulty) || {};
   const mul = (s.adDiscount ? 0.5 : 1) * (diffCfg.shopMul || 1);
-  const STAT_LABEL = { atk: '⚔️攻击', def: '🛡️防御', maxHp: '❤️生命', critRate: '💥暴击', maxMp: '🔮灵力' };
+  const STAT_LABEL = { atk: '⚔️攻击', def: '🛡️防御', maxHp: '❤️生命', critRate: '💥暴击', maxEnergy: '⚡能量' };
   items.forEach(it => {
     const finalCost = Math.floor(it.cost * mul);
     const btn = document.createElement("button"); btn.className = "modal-btn";
@@ -1156,7 +1173,7 @@ function openShop() {
     } else if (it.type === 'relic' && it.data) {
       detail = `<br><span style="font-size:10px;color:#c8a8ff">${it.data.desc||''}</span>`;
     } else if (it.type === 'potion') {
-      detail = `<br><span style="font-size:10px;color:#70a1ff">${it.name.includes('生命')?'回复50生命':it.name.includes('灵力')?'回复30灵力':'回满生命灵力'}</span>`;
+      detail = `<br><span style="font-size:10px;color:#70a1ff">${it.name.includes('生命')?'回复50生命':it.name.includes('能量')?'回复3能量':'回满生命'}</span>`;
     }
     btn.innerHTML = `${it.icon} ${it.name} — <span style="color:#ffdd77">${finalCost}G</span>${s.adDiscount ? ' <span style="color:#89e894">[5折]</span>' : ''}${detail}`;
     btn.disabled = (s.gold || 0) < finalCost;
@@ -1657,6 +1674,7 @@ function openForgeStone(onClose) {
     newEq.fullName = (newEq.prefix ? newEq.prefix + '·' : '') + oldEq.name;
     s.equip[idx] = newEq;
     applyEquipStats(s.player, newEq);
+    Combat.recalcEquipSetBonus();
     log("<span class='win'>🔮 重铸完成：" + newEq.fullName + "</span>");
     toast("🔮 重铸完成");
     trackQuest('forge', 1); playSound("equip");
@@ -1692,7 +1710,7 @@ function openForgeStone(onClose) {
           if (k === 'atk') s.player.atk += recipe.bonus[k];
           else if (k === 'def') s.player.def += recipe.bonus[k];
           else if (k === 'maxHp') { s.player.maxHp += recipe.bonus[k]; s.player.hp += recipe.bonus[k]; }
-          else if (k === 'maxMp') { s.player.maxMp += recipe.bonus[k]; s.player.mp += recipe.bonus[k]; }
+          else if (k === 'dodge') { s.player.dodge = (s.player.dodge||0) + recipe.bonus[k]; }
           else if (k === 'critRate') s.player.critRate += recipe.bonus[k];
           else if (k === 'pen') s.player.pen = (s.player.pen || 0) + recipe.bonus[k];
           else if (k === 'regen') s.player.regen = (s.player.regen || 0) + recipe.bonus[k];
@@ -1813,6 +1831,9 @@ function showSkillUpgrade(onDone) {
       Object.keys(up).forEach(function(k) {
         if (k !== 'name' && k !== 'desc' && k !== 'mul' && k !== 'cd' && k !== 'effect') sk[k] = up[k];
       });
+      // 重新应用CD减免
+      if (s.player._blessingSwift && sk.cooldown > 1) sk.cooldown--;
+      if (s.player._talentMage && sk.cooldown > 1) sk.cooldown--;
       s.skillLevels[sk.id] = lv + 1;
       log("<span class='win'>⬆ " + sk.icon + " " + sk.name + " Lv" + (lv + 1) + "！</span>");
       toast(sk.icon + " " + sk.name + " Lv" + (lv + 1));
@@ -1844,6 +1865,8 @@ function showSkillUpgrade(onDone) {
           "<span style=\"color:#8899bb;font-size:11px\">" + nsk.desc + " CD:" + (nsk.cooldown || 2) + "回合 ⚡" + (nsk.energyCost || 1) + "</span>";
         b.onclick = function() {
           var newSk = { ...nsk };
+          if (s.player._blessingSwift && newSk.cooldown > 1) newSk.cooldown--;
+          if (s.player._talentMage && newSk.cooldown > 1) newSk.cooldown--;
           skills.push(newSk);
           s.skillLevels[newSk.id] = 1;
           // 不覆盖 activeSkill，保留玩家最初选择的技能引用
@@ -2246,12 +2269,14 @@ function buildStartBonus(onDone) {
       if (rares.length > 0) { var r = { ...s.rng.pick(rares) }; if (r.passive) { r.passive(s.player); r.applied = true; } s.relics.push(r); log("<span class='win'>🎁 " + r.name + "</span>"); }
     }},
     { icon: "💰", name: "财宝赐福", desc: "开局额外获得80金币", apply: function(s) { s.gold += 80; } },
-    { icon: "⚡", name: "迅捷赐福", desc: "本局所有技能CD-1回合", apply: function(s) {
+    { icon: "⚡", name: "迅捷赐福", desc: "本局所有技能CD-1回合（含后续学的新技能）", apply: function(s) {
+      s.player._blessingSwift = true;
       s.activeSkills.forEach(function(sk) { if (sk.cooldown > 1) sk.cooldown--; });
     }},
     { icon: "❤️", name: "生命赐福", desc: "生命上限+25", apply: function(s) { s.player.maxHp += 25; s.player.hp += 25; } },
     { icon: "📦", name: "装备赐福", desc: "开局随机获得2件装备", apply: function(s) {
       for (var i = 0; i < 2; i++) { var eq = Loot.genEquip(s.zone ? s.zone.id : null); s.equip.push(eq); applyEquipStats(s.player, eq); }
+      Combat.recalcEquipSetBonus();
     }},
   ];
   var picks = Game.state.rng ? Game.state.rng.pickMulti(bonuses, 3) : bonuses.slice(0, 3);
@@ -3085,8 +3110,8 @@ function renderCompClasses(content) {
       <div class="comp-item-icon">${c.icon}</div>
       <div class="comp-item-body">
         <div class="comp-item-name">${c.name} ${isUnlocked ? '' : '🔒'}</div>
-        <div class="comp-item-stat">❤️${c.maxHp} ⚔️${c.atk} 🛡️${c.def} 💥${Math.floor(c.critRate*100)}% 🔮${c.maxMp}</div>
-        <div class="comp-item-stat">暴伤${c.critMul}x · 消耗${c.mpCost}MP · 穿透${Math.floor((c.pen||0)*100)}%${c.dodge ? ' · 🍃'+Math.floor(c.dodge*100)+'%' : ''}</div>
+        <div class="comp-item-stat">❤️${c.maxHp} ⚔️${c.atk} 🛡️${c.def} 💥${Math.floor(c.critRate*100)}% ⚡${c.maxEnergy||3}</div>
+        <div class="comp-item-stat">暴伤${c.critMul}x · 穿透${Math.floor((c.pen||0)*100)}%${c.dodge ? ' · 🍃'+Math.floor(c.dodge*100)+'%' : ''}</div>
         <div class="comp-item-desc">${c.desc}</div>
         <div class="comp-item-desc">技能：${(c.skills||[]).map(s=>s.icon+s.name).join(' · ')}</div>
       </div>
@@ -3302,7 +3327,7 @@ function getDailyFortune() {
   var today = new Date(); var seed = today.getFullYear() * 10000 + (today.getMonth()+1) * 100 + today.getDate();
   var fortunes = [
     { icon: "💰", name: "财运亨通", desc: "今日金币获取+30%", apply: function(s) { s.player.goldMul = (s.player.goldMul || 1) * 1.3; } },
-    { icon: "⚡", name: "灵力涌动", desc: "今日长CD技能-1回合(CD≥3的)", apply: function(s) { (s.activeSkills || []).forEach(function(sk) { if (sk.cooldown >= 3) sk.cooldown--; }); } },
+    { icon: "⚡", name: "能量涌动", desc: "开局额外+1最大能量", apply: function(s) { s.player.maxEnergy = (s.player.maxEnergy||3)+1; s.player.energy = s.player.maxEnergy; } },
     { icon: "🛡️", name: "坚如磐石", desc: "今日开局防御+5", apply: function(s) { s.player.def += 5; } },
     { icon: "💪", name: "战神附体", desc: "今日开局攻击+5", apply: function(s) { s.player.atk += 5; } },
     { icon: "🔮", name: "遗物亲和", desc: "今日遗物掉率提升", apply: function(s) { s._fortuneRelic = true; } },
@@ -3409,4 +3434,4 @@ try {
 } catch(e) {
   console.error("[妖塔] 初始渲染失败:", e.message, e.stack);
 }
-console.log("妖塔 v0.40 | 全周期留存优化");
+console.log("妖塔 v0.47 | 能量时代");

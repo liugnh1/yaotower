@@ -50,7 +50,7 @@ export function genEquip(zoneId) {
         if (biasStat === 'atk' && s === 'atk') return true;
         if (biasStat === 'def' && s === 'def') return true;
         if (biasStat === 'maxHp' && s === 'maxHp') return true;
-        if (biasStat === 'maxMp' && s === 'maxMp') return true;
+        if (biasStat === 'dodge' && t.stat === 'dodge') return true;
         if (biasStat === 'critRate' && s === 'critRate') return true;
         if (biasStat === 'lifeSteal' && s === 'atk') return true;
         if (biasStat === 'dmgReduce' && s === 'def') return true;

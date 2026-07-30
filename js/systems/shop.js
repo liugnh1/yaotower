@@ -19,10 +19,10 @@ export function getShopItems() {
   const items = [];
   items.push({ name: "生命药水", cost: 20, icon: "🧪", type: 'potion',
     fn: () => { s.player.hp = Math.min(s.player.maxHp, s.player.hp + 50); Events.emit(E.PLAYER_HEALED, { amount: 50, hp: s.player.hp, maxHp: s.player.maxHp }); } });
-  items.push({ name: "灵力药水", cost: 15, icon: "🔮", type: 'potion',
-    fn: () => { s.player.mp = Math.min(s.player.maxMp, s.player.mp + 30); } });
+  items.push({ name: "能量药剂", cost: 15, icon: "⚡", type: 'potion',
+    fn: () => { s.player.energy = Math.min((s.player.maxEnergy||3)+2, (s.player.energy||0)+3); } });
   items.push({ name: "强力药水", cost: 35, icon: "🧴", type: 'potion',
-    fn: () => { s.player.hp = s.player.maxHp; s.player.mp = s.player.maxMp; Events.emit(E.PLAYER_HEALED, { amount: s.player.maxHp, hp: s.player.hp, maxHp: s.player.maxHp }); } });
+    fn: () => { s.player.hp = s.player.maxHp; Events.emit(E.PLAYER_HEALED, { amount: s.player.maxHp, hp: s.player.hp, maxHp: s.player.maxHp }); } });
   const eq = genEquip(); eq.cost = 25 + Math.floor(eq.val * 3);
   items.push({ name: eq.fullName || eq.name, cost: eq.cost, icon: eq.icon, type: 'equip', data: eq,
     fn: () => { if (typeof window._addEquip === 'function') { window._addEquip(eq); } else { Game.state.equip.push(eq); } Events.emit(E.EQUIP_GAINED, { equip: eq }); } });

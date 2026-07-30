@@ -93,7 +93,7 @@ R.registerAll('enemies', {
     { name: "魔导师徒",hp: 80, atk: 24, def: 3, exp: "双人合击", icon: "👥" },
     { name: "封印石像",hp: 140,atk: 14, def: 8, exp: "远古封印", icon: "🗿" },
     { name: "暗影刺客",hp: 70, atk: 28, def: 1, exp: "一击必杀", icon: "🗡️" },
-    { name: "魔力漩涡",hp: 90, atk: 20, def: 2, exp: "吞噬灵力", icon: "🌀" },
+    { name: "魔力漩涡",hp: 90, atk: 20, def: 2, exp: "吞噬能量", icon: "🌀" },
     { name: "下层典狱官",hp:130,atk: 18, def: 6, exp: "牢不可破", icon: "🔗" }
   ],
 

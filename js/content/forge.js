@@ -34,8 +34,8 @@ R.registerAll('forgeRecipes', [
     combatEffect: { type: "burn", value: 6 }
   },
   {
-    id: "forge_verdant_heart", name: "苍翠之心", icon: "💚", rarity: "mythic", stat: "maxMp", val: 45,
-    desc: "森林本源凝聚的护符 · 灵力+45 · 每回合恢复8灵力+5%生命",
+    id: "forge_verdant_heart", name: "苍翠之心", icon: "💚", rarity: "mythic", stat: "dodge", val: 0.12,
+    desc: "森林本源凝聚的护符 · 闪避+12% · 每回合恢复5%生命",
     cost: 120,
     materials: ["mat_forest_heart", "mat_earth_core"],
     bonus: { regen: 5 },

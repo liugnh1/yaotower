@@ -48,7 +48,7 @@ R.registerAll('bosses', {
     phase2Intro: ["守门人的身影开始扭曲、膨胀——","虚空中伸出无数触手般的裂缝，","贪婪地吞噬着周围的一切。","—— 虚空守门人 · 终焉"],
     skill: { name: "虚空裂隙", desc: "造成伤害并回复自身10%最大生命", fn: (e, p) => { const d = Math.max(1, e.atk - p.def + 5); p.hp -= d; const heal = Math.floor(e.maxHp * 0.1); e.hp = Math.min(e.maxHp, e.hp + heal); return { dmg: d, heal: heal, msg: '🌀 虚空守门人撕裂空间！回复了生命' }; } },
     phase2: { name: "虚空守门人·终焉", atkMul: 1.5, defBonus: 5,
-      skill: { name: "虚空吞噬", desc: "造成1.5倍伤害+回复20%最大生命+减玩家灵力5", fn: (e, p) => { const d = Math.max(1, Math.floor(e.atk * 1.5) - p.def); p.hp -= d; const heal = Math.floor(e.maxHp * 0.2); e.hp = Math.min(e.maxHp, e.hp + heal); p.mp = Math.max(0, p.mp - 5); return { dmg: d, heal: heal, msg: '🌀💢 虚空吞噬！生命力被吸走，灵力流失' }; } } }
+      skill: { name: "虚空吞噬", desc: "造成1.5倍伤害+回复20%最大生命+减玩家2能量", fn: (e, p) => { const d = Math.max(1, Math.floor(e.atk * 1.5) - p.def); p.hp -= d; const heal = Math.floor(e.maxHp * 0.2); e.hp = Math.min(e.maxHp, e.hp + heal); p.energy = Math.max(0, (p.energy||0) - 2); return { dmg: d, heal: heal, msg: '🌀💢 虚空吞噬！生命力被吸走，能量流失' }; } } }
   },
   tower: {
     name: "魔塔守门人", hp: 550, atk: 38, def: 15, exp: "简单模式·终极之战", icon: "🛡️",
@@ -166,7 +166,7 @@ R.registerAll('bosses_hell', {
     phase2Intro: ["虚空主宰开始吞噬空间本身——","现实在它周围崩塌。","—— 虚空主宰 · 虚空之神"],
     skill: { name: "维度撕裂", desc: "造成伤害+回复20%生命", fn: (e, p) => { const d = Math.max(1, e.atk - p.def + 12); p.hp -= d; const h = Math.floor(e.maxHp*0.2); e.hp = Math.min(e.maxHp, e.hp + h); return { dmg: d, msg: '🌀 维度撕裂！虚空主宰吸取了空间能量' }; } },
     phase2: { name: "虚空主宰·虚空之神", atkMul: 1.7, defBonus: 6,
-      skill: { name: "虚空湮灭", desc: "造成50点固定伤害+减灵力", fn: (e, p) => { p.hp -= 50; p.mp = Math.max(0, p.mp - 15); return { dmg: 50, msg: '🌀💢 虚空湮灭！灵力被吞噬' }; } } }
+      skill: { name: "虚空湮灭", desc: "造成50点固定伤害+减3能量", fn: (e, p) => { p.hp -= 50; p.energy = Math.max(0, (p.energy||0) - 3); return { dmg: 50, msg: '🌀💢 虚空湮灭！能量被吞噬' }; } } }
   },
   tower: {
     name: "魔塔双卫·混沌双子", hp: 700, atk: 48, def: 20, exp: "魔王双子", icon: "👥",

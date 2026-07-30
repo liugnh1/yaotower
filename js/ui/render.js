@@ -76,11 +76,8 @@ export function render(s) {
     if (mainEl) { if (hpPct < 25 && s.enemy) mainEl.classList.add("low-hp"); else mainEl.classList.remove("low-hp"); }
     document.getElementById("pl-hp").textContent = `${Math.max(0, s.player.hp)}/${s.player.maxHp}`;
     document.getElementById("hp-fill").style.width = hpPct + "%";
-    let ba = s.player.atk, bd = s.player.def;
-    let ab = s.equip.reduce((sum, e) => sum + (e.stat === "atk" ? e.val : 0), 0);
-    let db = s.equip.reduce((sum, e) => sum + (e.stat === "def" ? e.val : 0), 0);
-    document.getElementById("pl-atk").textContent = ab ? `${ba + ab}(+${ab})` : ba;
-    document.getElementById("pl-def").textContent = db ? `${bd + db}(+${db})` : bd;
+    document.getElementById("pl-atk").textContent = s.player.atk;
+    document.getElementById("pl-def").textContent = s.player.def;
     // 技能按钮状态（CD系统 + 能量消耗显示）
     var skills = s.activeSkills || [];
     var skillBtn = document.getElementById("btn-skill");
@@ -124,7 +121,7 @@ export function render(s) {
 
   // 装备列表（可点击丢弃）+ 套装进度
   const eqList = document.getElementById("equip-list");
-  const STAT_LABEL = { atk: '⚔️攻击', def: '🛡️防御', maxHp: '❤️生命', critRate: '💥暴击', maxMp: '🔮灵力' };
+  const STAT_LABEL = { atk: '⚔️攻击', def: '🛡️防御', maxHp: '❤️生命', critRate: '💥暴击', maxEnergy: '⚡能量' };
   if (s.equip.length === 0) eqList.innerHTML = '<span style="color:#445566">暂无</span>';
   else {
     eqList.innerHTML = '';
@@ -191,8 +188,7 @@ export function render(s) {
   const dbEl = document.getElementById("debuff-bar"); let db = "";
   if (s.player?.debuffAtk?.turns > 0) db += `<span style="color:#ff4444;font-size:12px">⚔️攻击-${s.player.debuffAtk.value}(${s.player.debuffAtk.turns}回合)</span>`;
   if (s.player?.bleed) db += `<span style="color:#ff4444;font-size:12px;margin-left:6px">☠️流血-${s.player.bleed}/回合</span>`;
-  let cr = s.player?.critRate || 0; s.equip.forEach(e => { if (e.stat === "critRate") cr += e.val / 100; });
-  if (cr > 0) db += `<span style="color:#ffa502;font-size:12px;margin-left:6px">💥暴击${Math.floor(cr * 100)}%</span>`;
+  if ((s.player?.critRate||0) > 0) db += `<span style="color:#ffa502;font-size:12px;margin-left:6px">💥暴击${Math.floor((s.player.critRate||0) * 100)}%</span>`;
   if (s.potionAtk) db += `<span style="color:#89e894;font-size:12px;margin-left:6px">💪药剂+${Math.floor(s.potionAtk * 100)}%攻</span>`;
   dbEl.innerHTML = db || "";
 

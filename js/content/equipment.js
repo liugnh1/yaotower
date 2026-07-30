@@ -16,7 +16,7 @@ R.registerAll('equipTypes', [
   { type: "armor",  name: "铠甲", stat: "def",      icon: "🛡️", base: 2 },
   { type: "helm",   name: "头盔", stat: "maxHp",    icon: "⛑️", base: 15 },
   { type: "ring",   name: "戒指", stat: "critRate", icon: "💍", base: 5 },
-  { type: "amulet", name: "护符", stat: "maxMp",    icon: "📿", base: 10 }
+  { type: "amulet", name: "护符", stat: "dodge",   icon: "📿", base: 0.05 }
 ]);
 
 // 前缀现在支持 combatEffect: { type, value } 用于战斗中的特效触发
@@ -25,13 +25,13 @@ R.registerAll('equipPrefixes', [
   { name: "锋利",   statBonus: { atk: 2 }, combatEffect: null, desc: "攻击+2" },
   { name: "坚固",   statBonus: { def: 2 }, combatEffect: null, desc: "防御+2" },
   { name: "生命",   statBonus: { maxHp: 10 }, combatEffect: null, desc: "生命+10" },
-  { name: "魔力",   statBonus: { maxMp: 8 }, combatEffect: null, desc: "灵力+8" },
+  { name: "魔力",   statBonus: { atk: 3 }, combatEffect: null, desc: "攻击+3" },
   { name: "精准",   statBonus: { critRate: 3 }, combatEffect: null, desc: "暴击+3%" },
   { name: "烈焰",   statBonus: { atk: 4 }, combatEffect: { type: "burn", value: 4 }, desc: "攻击+4 · 普攻附带灼烧" },
   { name: "冰霜",   statBonus: { def: 3, maxHp: 5 }, combatEffect: { type: "slow", value: 1 }, desc: "防+3命+5 · 普攻附带迟缓" },
   { name: "雷霆",   statBonus: { atk: 3, critRate: 2 }, combatEffect: { type: "stun", value: 0.3 }, desc: "攻+3暴+2% · 普攻概率眩晕" },
   { name: "暗影",   statBonus: { atk: 5, def: -1 }, combatEffect: { type: "lifesteal", value: 0.08 }, desc: "攻+5防-1 · 普攻吸血8%" },
   { name: "混沌",   statBonus: { atk: 6, critRate: 5, maxHp: 10 }, combatEffect: { type: "chaos", value: 0.3 }, desc: "全属性 · 30%概率伤害+50%" },
-  { name: "神圣",   statBonus: { def: 4, maxHp: 20, maxMp: 10 }, combatEffect: { type: "heal_on_kill", value: 0.1 }, desc: "防+4命+20灵+10 · 击杀回血10%" },
+  { name: "神圣",   statBonus: { def: 4, maxHp: 20, dodge: 0.03 }, combatEffect: { type: "heal_on_kill", value: 0.1 }, desc: "防+4命+20闪+3% · 击杀回血10%" },
   { name: "毁灭",   statBonus: { atk: 8, critRate: 8 }, combatEffect: { type: "executioner", value: 0.25 }, desc: "攻+8暴+8% · 对低血敌人+25%伤害" }
 ]);

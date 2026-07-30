@@ -4,7 +4,7 @@ import { R } from '../core/registry.js';
 R.registerAll('dailyGlobalMods', [
   { id: "g1", name: "全员强化", desc: "所有人属性+10%", apply: s => { s.player.atk = Math.floor(s.player.atk * 1.1); s.player.maxHp = Math.floor(s.player.maxHp * 1.1); s.player.hp = s.player.maxHp; } },
   { id: "g2", name: "贫瘠之地", desc: "金币获取-50%",   apply: s => { s.player.goldMul = (s.player.goldMul || 1) * 0.5; } },
-  { id: "g3", name: "灵气充沛", desc: "灵力上限+50%",   apply: s => { s.player.maxMp = Math.floor(s.player.maxMp * 1.5); s.player.mp = s.player.maxMp; } },
+  { id: "g3", name: "能量充沛", desc: "最大能量+1",   apply: s => { s.player.maxEnergy = (s.player.maxEnergy||3)+1; s.player.energy = s.player.maxEnergy; } },
   { id: "g4", name: "血战到底", desc: "生命上限-30%，攻击+30%", apply: s => { s.player.maxHp = Math.floor(s.player.maxHp * 0.7); s.player.hp = Math.min(s.player.hp, s.player.maxHp); s.player.atk = Math.floor(s.player.atk * 1.3); } },
   { id: "g5", name: "富可敌国", desc: "开局金币+100",   apply: s => { s.gold += 100; } },
   { id: "g6", name: "诅咒缠身", desc: "开局自带1层诅咒", apply: s => { const curse = s.rng.pick(R.get('curses')); s.curses.push(curse); curse.apply(s.player); } },
@@ -15,7 +15,7 @@ R.registerAll('dailyGlobalMods', [
 
 R.registerAll('dailyPlayerMods', [
   { id: "p1", name: "战士之血", desc: "攻击+10%", apply: s => { s.player.atk = Math.floor(s.player.atk * 1.1); } },
-  { id: "p2", name: "法师之智", desc: "灵力+20%", apply: s => { s.player.maxMp = Math.floor(s.player.maxMp * 1.2); s.player.mp = s.player.maxMp; } },
+  { id: "p2", name: "能量涌动", desc: "每回合额外+1能量", apply: s => { s.player.maxEnergy = (s.player.maxEnergy||3)+1; s.player.energy = s.player.maxEnergy; } },
   { id: "p3", name: "铁壁",     desc: "防御+5",   apply: s => { s.player.def += 5; } },
   { id: "p4", name: "暴击狂",   desc: "暴击率+15%", apply: s => { s.player.critRate += 0.15; } },
   { id: "p5", name: "吸血本能", desc: "吸血+10%", apply: s => { s.player.lifeSteal = (s.player.lifeSteal || 0) + 0.1; } },
