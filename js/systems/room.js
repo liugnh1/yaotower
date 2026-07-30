@@ -23,7 +23,23 @@ export function initZone(zoneId) {
   s.zoneIndex = entry.depth;
   s.floorInZone = 1;
 
-  // 应用Zone环境效果
+  // 清除旧Zone环境效果
+  if (s._zoneMod && s.player) {
+    switch (s._zoneMod.id) {
+      case "cave_gold": s.player.def += 2; break; // 还原DEF
+      case "tower_regen": s.player.regen = Math.max(0, (s.player.regen || 0) - Math.floor(s.player.maxHp * 0.03)); break;
+      case "tower_lower_drain": s.player.atk = Math.floor(s.player.atk / 1.2); break; // 还原+20%ATK
+      case "frozen_mp": /* MP系统已移除，无实际效果 */ break;
+      case "void_crit": /* 每场战斗重新计算，无需还原 */ break;
+      case "desert_storm": /* 每场战斗重新计算 */ break;
+      case "swamp_poison": /* 每回合计算 */ break;
+      case "forest_poison": /* 每回合计算 */ break;
+      case "tower_upper_seal": /* 每场战斗重新计算 */ break;
+      case "ruins_ancient": /* 怪物词条，不持久 */ break;
+    }
+  }
+  s._zoneMod = null;
+  // 应用新Zone环境效果
   s._zoneMod = s.zone.modifier || null;
   if (s._zoneMod) {
     if (s._zoneMod.id === "cave_gold" && s.player) s.player.def = Math.max(0, s.player.def - 2);

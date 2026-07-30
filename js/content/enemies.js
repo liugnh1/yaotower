@@ -7,6 +7,7 @@ R.registerAll('enemies', {
     { name: "野兔精",  hp: 25, atk: 6,  def: 0, exp: "不堪一击", icon: "🐰" },
     { name: "山魈",    hp: 40, atk: 8,  def: 1, exp: "略有身手", icon: "👹" },
     { name: "野狼",    hp: 55, atk: 10, def: 1, exp: "凶性毕露", icon: "🐺" },
+    { name: "钢盾卫士",hp: 35, atk: 9,  def: 4, exp: "举盾防御60%减伤，被技能击中后破盾3回合", icon: "🛡️", aiCharge: true, _shield: true },
     { name: "石魔像",  hp: 65, atk: 7,  def: 4, exp: "坚如磐石", icon: "🗿" },
     { name: "流浪剑客",hp: 50, atk: 14, def: 1, exp: "剑术精湛", icon: "⚔️" },
     { name: "毒寡妇",  hp: 38, atk: 11, def: 0, exp: "剧毒蛰刺", icon: "🕷️" }
@@ -79,7 +80,7 @@ R.registerAll('enemies', {
   // ===== 幽暗沼泽（Tier 1 · 新增）=====
   swamp: [
     { name: "沼泽巨鳄",hp: 75, atk: 13, def: 3, exp: "死亡翻滚", icon: "🐊" },
-    { name: "毒雾花",  hp: 40, atk: 12, def: 1, exp: "瘴气弥漫", icon: "🌺" },
+    { name: "毒雾花",  hp: 40, atk: 12, def: 1, exp: "每回合为全体敌人回复15%生命（优先击杀！）", icon: "🌺", _healAllies: 0.15 },
     { name: "泥沼怪",  hp: 65, atk: 11, def: 4, exp: "深陷泥潭", icon: "🫧" },
     { name: "暗夜猎手",hp: 55, atk: 18, def: 1, exp: "暗影突袭", icon: "🦇" },
     { name: "腐化树精",hp: 90, atk: 14, def: 5, exp: "万藤缠绕", icon: "🌳" },

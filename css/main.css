@@ -287,6 +287,8 @@ body{background:#080810;color:#c6d8e8;display:flex;justify-content:center;align-
 .bar-bg{background:#0d1220;border-radius:3px;height:8px;overflow:hidden}
 #hp-fill{background:#ff7b7b;height:100%;transition:width .3s}
 #mp-fill{background:#70a1ff;height:100%;transition:width .3s}
+.energy-bar{background:#0d1220;border-radius:3px;height:10px;overflow:hidden;margin-top:2px;border:1px solid #3a3050}
+#energy-fill{background:linear-gradient(90deg,#c8a050,#ffcc44,#ffdd77);height:100%;transition:width .25s}
 
 #inv-bar{font-size:12px;margin-bottom:8px}
 #inv-bar .sec{color:#6b7fa3;margin-bottom:4px;font-size:13px}
@@ -308,12 +310,14 @@ body{background:#080810;color:#c6d8e8;display:flex;justify-content:center;align-
 #kill-flash.fire{opacity:.7;transition:opacity 0s}
 
 /* 行动按钮 */
-#actions{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:8px;position:sticky;bottom:0;background:linear-gradient(180deg,transparent,#0a0a14 20%);padding:8px 0;z-index:100}
-.big-btn{padding:22px 0;font-size:18px;border:none;border-radius:12px;color:#fff;cursor:pointer;font-weight:bold;transition:all .1s;min-height:64px;letter-spacing:2px;background:url('../img/btn_bg.jpg') center/cover}
+#actions{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:8px;position:sticky;bottom:0;background:linear-gradient(180deg,transparent,#0a0a14 20%);padding:8px 0;z-index:100}
+.big-btn{padding:18px 4px;font-size:14px;border:none;border-radius:12px;color:#fff;cursor:pointer;font-weight:bold;transition:all .1s;min-height:56px;letter-spacing:0;background:url('../img/btn_bg.jpg') center/cover;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .big-btn:active{transform:scale(.92)}
 #btn-atk{background:linear-gradient(180deg,rgba(200,32,32,.8),rgba(139,0,0,.9)),url('../img/btn_bg.jpg') center/cover;box-shadow:0 4px 16px rgba(200,32,32,.35)}
 #btn-skill{background:linear-gradient(180deg,rgba(106,59,200,.8),rgba(58,26,106,.9)),url('../img/btn_bg.jpg') center/cover;box-shadow:0 4px 16px rgba(106,59,200,.35)}
 #btn-def{background:linear-gradient(180deg,rgba(42,139,75,.8),rgba(26,90,43,.9)),url('../img/btn_bg.jpg') center/cover;box-shadow:0 4px 16px rgba(42,139,75,.35)}
+#btn-endturn{background:linear-gradient(180deg,rgba(200,150,30,.7),rgba(120,80,10,.9)),url('../img/btn_bg.jpg') center/cover;box-shadow:0 4px 16px rgba(200,150,30,.3);color:#ffdd88}
+#btn-endturn:disabled{background:#2a2a35!important;color:#555!important;box-shadow:none!important}
 .big-btn:disabled{background:#2a2a35!important;color:#555!important;box-shadow:none!important}
 
 /* 自动战斗指示器 */

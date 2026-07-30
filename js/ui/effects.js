@@ -37,6 +37,8 @@ export function toast(m) {
 export function float(txt, cls) {
   const fc = document.getElementById("float-container");
   if (!fc) return;
+  // DOM数量限制：超过30个飘字时移除最旧的
+  if (fc.children.length > 30) fc.removeChild(fc.firstChild);
   const el = document.createElement("div");
   el.className = "float-text " + cls;
   el.textContent = txt;
@@ -46,10 +48,12 @@ export function float(txt, cls) {
   setTimeout(() => el.remove(), 1000);
 }
 
-// 大号中央浮动标签（暴击、击杀等）
+var _bigFloatCount = 0;
 export function bigFloat(txt, cls, dur = 1200) {
   const fc = document.getElementById("float-container");
   if (!fc) return;
+  // DOM数量限制
+  if (fc.children.length > 20) fc.removeChild(fc.firstChild);
   const el = document.createElement("div");
   el.className = "big-float " + cls;
   el.textContent = txt;
@@ -191,6 +195,7 @@ export function updateArena(playerIcon, playerLabel, enemyIcon, enemyLabel) {
 // ===== Boss 打字机叙事 =====
 let _narrativeDone = false;
 let _narrativeCallback = null;
+let _narrativeTimer = null;
 
 /**
  * 显示Boss叙事覆盖层
@@ -213,6 +218,7 @@ export function showBossNarrative(lines, onComplete) {
   // 停止之前的叙事
   _narrativeDone = true;
   _narrativeCallback = null;
+  if (_narrativeTimer) { clearTimeout(_narrativeTimer); _narrativeTimer = null; }
 
   el.style.display = "flex";
   el.classList.remove("fade-out");
@@ -234,13 +240,12 @@ export function showBossNarrative(lines, onComplete) {
       charIdx++;
       // Boss叙事稍慢，更有压迫感
       const delay = lines[lineIdx].startsWith('——') ? 100 : 55 + Math.random() * 35;
-      setTimeout(typeNext, delay);
+      _narrativeTimer = setTimeout(typeNext, delay);
     } else {
       txt.innerHTML = lines[lineIdx] + '<span class="cursor"></span>';
       charIdx = 0; lineIdx++;
-      // 行间停顿
       const pause = lines[lineIdx - 1] && lines[lineIdx - 1].startsWith('——') ? 600 : 350 + Math.random() * 200;
-      setTimeout(typeNext, pause);
+      _narrativeTimer = setTimeout(typeNext, pause);
     }
   }
 

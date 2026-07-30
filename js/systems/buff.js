@@ -29,7 +29,7 @@ export function tickBuffs(target, isEnemy) {
   for (const b of target._buffs) {
     if (b.onTick) {
       const result = b.onTick(target, b);
-      if (result === 'dead') return 'dead';
+      if (result === 'dead') { target.hp = 0; target._buffs = []; return 'dead'; }
       if (result === 'stunned') stunned = true;
     }
     b.turns--;

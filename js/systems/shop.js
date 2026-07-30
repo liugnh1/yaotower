@@ -6,6 +6,13 @@ import { genEquip, genRelic } from './loot.js';
 import { checkSynergies, recheckSynergies } from './synergy.js';
 import { log } from '../ui/effects.js';
 
+function checkAchievement2(s, id) {
+  if (Game.meta && Game.meta.achievements && !Game.meta.achievements.includes(id)) {
+    Game.meta.achievements.push(id); Game.saveMeta();
+    Events.emit(E.BATTLE_START, { type: 'achievement', id });
+  }
+}
+
 // ---- 获取可购商品列表 ----
 export function getShopItems() {
   const s = Game.state;
@@ -50,8 +57,9 @@ export function acquireRelic(rel) {
   if (existingIdx >= 0) {
     var existing = s.relics[existingIdx];
     if (!existing.stars) existing.stars = 1;
+    existing.stars = Math.min(existing.stars, 3); // 防御损坏数据
     if (existing.stars < 3) {
-      existing.stars++;
+      existing.stars = Math.min(existing.stars + 1, 3);
       if (existing.onStarUp) existing.onStarUp(s.player, existing.stars);
       log('<span class="win">⭐ ' + existing.name + ' 升至' + existing.stars + '星！</span>');
       Events.emit(E.RELIC_GAINED, { relic: existing });
@@ -82,8 +90,15 @@ export function acquireRelic(rel) {
     Game.saveMeta();
   }
   Events.emit(E.RELIC_GAINED, { relic: rel });
+  // 追踪遗物和羁绊
+  var s2 = Game.state;
+  if (!s2._runRelics.includes(rel.id)) { s2._runRelics.push(rel.id); }
+  // relic_10: 累计发现10种（使用跨局discoveredRelics）
+  var discovered = Game.meta.discoveredRelics || [];
+  if (discovered.length >= 10) checkAchievement2(s2, "relic_10");
   recheckSynergies();
   const activated = checkSynergies();
+  activated.forEach(syn => { if (!s2._runSynergies.includes(syn.id)) s2._runSynergies.push(syn.id); if (s2._runSynergies.length >= 4) checkAchievement2(s2, "full_synergy"); });
   activated.forEach(syn => Events.emit(E.BATTLE_START, { type: 'synergy', name: syn.name, desc: syn.desc }));
 }
 

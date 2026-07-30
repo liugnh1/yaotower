@@ -114,7 +114,13 @@ export function genRelic() {
     if (pool.length === 0) pool = allRelics;
   }
 
-  const list = pool.map(r => ({ r, w: weights[r.rarity] || 10 }));
+  // 追猎目标加成：选中的遗物出现率×5
+  var huntTargets = s && s.huntTargets ? s.huntTargets : [];
+  const list = pool.map(r => {
+    var w = weights[r.rarity] || 10;
+    if (huntTargets.indexOf(r.id) >= 0) w = Math.floor(w * 5); // 追猎加成5倍
+    return { r, w };
+  });
   if (list.length === 0) {
     console.warn("[妖塔] 遗物池为空，返回保底遗物");
     return { id: "vamp_fang", name: "吸血獠牙", icon: "🦷", rarity: "common", desc: "攻击恢复12%伤害的生命", onAttack: (p, dmg) => { p.hp = Math.min(p.maxHp, p.hp + Math.floor(dmg * 0.12)); } };
@@ -123,7 +129,9 @@ export function genRelic() {
   let roll = rng.next() * total;
   for (const item of list) {
     roll -= item.w;
-    if (roll <= 0) return { ...item.r };
+    if (roll <= 0) {
+      return { ...item.r };
+    }
   }
   return { ...list[0].r };
 }

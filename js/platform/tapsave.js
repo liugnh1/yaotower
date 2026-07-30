@@ -103,12 +103,21 @@ export const TapSave = {
     });
   },
 
-  /** 删除云存档 */
+  /** 删除指定槽位云存档 */
   async deleteCloud(slotName) {
     if (!this._cloud) return;
     const slots = await this.getArchiveList();
     const slot = slots.find(s => s.name === slotName);
     if (!slot) return;
     this._cloud.deleteArchive({ archiveUUID: slot.uuid });
+  },
+
+  /** 清空所有云存档 */
+  async clearCloud() {
+    if (!this._cloud) return;
+    try {
+      const slots = await this.getArchiveList();
+      for (const s of slots) { await this.deleteCloud(s.name); }
+    } catch(e) {}
   }
 };

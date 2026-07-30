@@ -14,6 +14,27 @@ export function onRender(fn) { _render = fn; }
 
 function fix(v, d) { return (typeof v === "number" && !isNaN(v)) ? v : d; }
 
+// 深度合并meta对象：defaults为基础，parsed覆盖，但缺失字段保留默认值
+function deepMergeMeta(defaults, parsed) {
+  var out = {};
+  Object.keys(defaults).forEach(function(k) {
+    if (parsed.hasOwnProperty(k)) {
+      var pv = parsed[k], dv = defaults[k];
+      // 对象类型递归合并（如upgrades, soulUpgrades, buildingLevels等）
+      if (dv && typeof dv === 'object' && !Array.isArray(dv) && pv && typeof pv === 'object' && !Array.isArray(pv)) {
+        out[k] = deepMergeMeta(dv, pv);
+      } else if (pv === undefined || pv === null || (typeof dv === 'number' && (typeof pv !== 'number' || isNaN(pv)))) {
+        out[k] = dv; // 无效值回退默认
+      } else {
+        out[k] = pv;
+      }
+    } else {
+      out[k] = defaults[k]; // 缺失字段用默认
+    }
+  });
+  return out;
+}
+
 // ---- 玩家属性序列化：自动保存所有自有属性 ----
 function serializePlayer(p) {
   if (!p) return null;
@@ -31,7 +52,9 @@ function deserializePlayer(bp) {
   // 已知字段白名单（用于识别非临时属性）
   const KNOWN = new Set(['hp','maxHp','mp','maxMp','atk','def','critRate','critMul',
     'skillMul','mpCost','pen','lifeSteal','thorn','goldMul','dodge','bleed','rage',
-    'doubleFirst','debuffAtk','dmgReduce','berserk','rebirth','regen']);
+    'doubleFirst','debuffAtk','dmgReduce','berserk','rebirth','regen',
+    'energy','maxEnergy','buildDirection',
+    '_deathGamble','_coreFlame','_coreIce','_coreShadow','_coreCurse']);
   // 收集 bp 中的未知字段（新版本新增的字段），保留不丢
   // 注意：_syn* 标记由羁绊系统重新计算，不复原；其他 _ 字段（如链标记、突变标记）需保留
   const extra = {};
@@ -49,6 +72,11 @@ function deserializePlayer(bp) {
     doubleFirst: !!bp.doubleFirst, debuffAtk: bp.debuffAtk || null,
     dmgReduce: bp.dmgReduce || 0, berserk: !!bp.berserk,
     rebirth: !!bp.rebirth, regen: bp.regen || 0,
+    energy: fix(bp.energy, 3), maxEnergy: fix(bp.maxEnergy, 3),
+    buildDirection: bp.buildDirection || '',
+    _deathGamble: !!bp._deathGamble,
+    _coreFlame: !!bp._coreFlame, _coreIce: !!bp._coreIce,
+    _coreShadow: !!bp._coreShadow, _coreCurse: !!bp._coreCurse,
     // 诅咒/遗物临时字段
     _weakHpLoss: bp._weakHpLoss, _weakAtkGain: bp._weakAtkGain,
     _slowDefLoss: bp._slowDefLoss, _slowHpGain: bp._slowHpGain,
@@ -96,7 +124,11 @@ function defState() {
     potionAtk: 0, potionDef: 0,
     adDiscount: false, adRefreshCount: 0,
     endless: false, _activeSynergies: [], forgeMats: {},
-    blessingType: '', difficultyCoins: 0
+    blessingType: '', difficultyCoins: 0,
+    huntTargets: [], buildDirection: '',
+    _runCrits: 0, _runDodges: 0, _runKills: 0, _runSynergies: [], _runRelics: [],
+    _appliedMutations: [], _recentEvents: [],
+    _fortuneName: '', _mutationName: ''
   };
 }
 
@@ -107,7 +139,8 @@ function defMeta() {
     upgrades: {}, soulUpgrades: {}, highestSimple: 0, highestNormal: 0,
     adWatched: 0, adDate: "", totalRuns: 0, totalWins: 0, totalDeaths: 0,
     stones: 0, buildingLevels: {}, awakenedClasses: {},
-    dailyBest: 0, dailyDate: "", achievements: []
+    dailyBest: 0, dailyDate: "", achievements: [],
+    totalKills: 0, clearedClasses: []
   };
 }
 
@@ -138,13 +171,18 @@ export const Game = {
       talent: s.talent ? s.talent.id : null,
       playerClass: s.playerClass ? s.playerClass.id : null,
       activeSkill: s.activeSkill ? s.activeSkill.id : null,
+      skillCooldowns: s.skillCooldowns || {}, skillLevels: s.skillLevels || {},
       endless: s.endless, turn: s.turn, stats: s.stats,
       dailyMods: s.dailyMods,
       basePlayer: serializePlayer(s.player),
       enemy: s.enemy ? serializeEnemy(s.enemy) : null,
       potionAtk: s.potionAtk || 0, potionDef: s.potionDef || 0,
       adDiscount: s.adDiscount || false, adRefreshCount: s.adRefreshCount || 0,
-      turnInFloor: s.turnInFloor || 0
+      turnInFloor: s.turnInFloor || 0,
+      huntTargets: s.huntTargets || [], buildDirection: s.buildDirection || '',
+      runCrits: s._runCrits || 0, runDodges: s._runDodges || 0,
+      runKills: s._runKills || 0, runSynergies: s._runSynergies || [], runRelics: s._runRelics || [],
+      fortuneName: s._fortuneName || '', mutationName: s._mutationName || ''
     };
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch (e) { console.error("妖塔3.0: 存档保存失败", e); }
     this._persistCodex();
@@ -182,8 +220,14 @@ export const Game = {
       s.enemy = d.enemy ? deserializeEnemy(d.enemy) : null;
       s.potionAtk = d.potionAtk || 0; s.potionDef = d.potionDef || 0;
       s.adDiscount = d.adDiscount || false; s.adRefreshCount = d.adRefreshCount || 0;
+      s.skillCooldowns = d.skillCooldowns || {};
+      s.skillLevels = d.skillLevels || {};
       s.auto = false; s.defending = false; s.nextBoost = 0;
       s.turnInFloor = d.turnInFloor || 0; s.gameOver = false;
+      s.huntTargets = d.huntTargets || []; s.buildDirection = d.buildDirection || '';
+      s._runCrits = d.runCrits || 0; s._runDodges = d.runDodges || 0;
+      s._runKills = d.runKills || 0; s._runSynergies = d.runSynergies || []; s._runRelics = d.runRelics || [];
+      s._fortuneName = d.fortuneName || ''; s._mutationName = d.mutationName || '';
       this._loadCodex();
       return true;
     } catch (e) { console.error("load fail", e); return false; }
@@ -196,32 +240,30 @@ export const Game = {
   _loadMeta() {
     try {
       const raw = localStorage.getItem(META_KEY);
-      if (raw) { this.meta = { ...defMeta(), ...JSON.parse(raw) }; }
-      else { this.meta = defMeta(); }
-    } catch (e) { console.warn("[妖塔] 元数据损坏，已重置"); this.meta = defMeta(); }
+      if (raw) {
+        var defaults = defMeta();
+        var parsed = JSON.parse(raw);
+        // 深度合并：缺失字段补默认，防御旧版本升级缺失新字段
+        this.meta = deepMergeMeta(defaults, parsed);
+      } else { this.meta = defMeta(); }
+    } catch (e) { console.warn("[妖塔] 元数据损坏，已重置", e); this.meta = defMeta(); }
     this._checkAdReset();
   },
   saveMeta() { try { localStorage.setItem(META_KEY, JSON.stringify(this.meta)); } catch (e) { console.error("妖塔3.0: 元数据保存失败", e); } },
 
   _checkAdReset() {
     if (!this.meta) return;
-    // 防御：确保 adWatched 是合法数字
     if (typeof this.meta.adWatched !== 'number' || isNaN(this.meta.adWatched) || this.meta.adWatched < 0 || this.meta.adWatched > 50) {
-      console.warn("[妖塔] adWatched 异常值，已重置:", this.meta.adWatched);
       this.meta.adWatched = 0;
     }
-    // 一次性修复：旧版本bug可能导致adWatched异常累积到上限，自动清零一次
-    const FIX_FLAG = "yaotower_v3.2_ad_fix_done";
-    if (!localStorage.getItem(FIX_FLAG)) {
-      console.warn("[妖塔] 执行广告计数一次性修复：adWatched", this.meta.adWatched, "→ 0");
+    // 版本迁移：meta.version 不存在 → 旧版本升级，重置广告计数
+    if (!this.meta._version || this.meta._version < 2) {
       this.meta.adWatched = 0;
-      this.meta.adDate = "";
-      localStorage.setItem(FIX_FLAG, "1");
+      this.meta._version = 2;
       this.saveMeta();
     }
     const d = new Date(); const today = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     if (this.meta.adDate !== today) {
-      console.log("[妖塔] 新的一天，重置广告计数:", this.meta.adDate, "→", today);
       this.meta.adDate = today; this.meta.adWatched = 0; this.saveMeta();
     }
   },
@@ -252,21 +294,29 @@ export const Game = {
   // ---- 局外成长（修复隐形陷阱）----
   applyMetaBonus(p) {
     const up = this.meta.upgrades;
-    // 成就加成只在新游戏时应用一次
+    // 成就加成只应用一次（_achApplied 随存档持久化）
     if (!p._achApplied) {
       var achList = R.get('achievements') || [];
       var unlocked = this.meta.achievements || [];
+      // 先计算总加成比例（累加，非累乘，防止数值爆炸）
+      var totalAtkBonus = 0, totalHpBonus = 0, totalDefBonus = 0, totalAllBonus = 0;
       unlocked.forEach(function(id) {
         var ach = achList.find(function(a) { return a.id === id; });
         if (ach && ach.bonus) {
-          if (ach.bonus.atkBonus) p.atk = Math.floor(p.atk * (1 + ach.bonus.atkBonus));
-          if (ach.bonus.hpBonus) { p.maxHp = Math.floor(p.maxHp * (1 + ach.bonus.hpBonus)); p.hp = Math.floor(p.hp * (1 + ach.bonus.hpBonus)); }
-          if (ach.bonus.defBonus) p.def = Math.floor(p.def * (1 + ach.bonus.defBonus));
+          if (ach.bonus.atkBonus) totalAtkBonus += ach.bonus.atkBonus;
+          if (ach.bonus.hpBonus) totalHpBonus += ach.bonus.hpBonus;
+          if (ach.bonus.defBonus) totalDefBonus += ach.bonus.defBonus;
           if (ach.bonus.critBonus) p.critRate += ach.bonus.critBonus;
           if (ach.bonus.goldBonus) p.goldMul = (p.goldMul || 1) * (1 + ach.bonus.goldBonus);
-          if (ach.bonus.allBonus) { p.atk = Math.floor(p.atk*(1+ach.bonus.allBonus)); p.def = Math.floor(p.def*(1+ach.bonus.allBonus)); }
+          if (ach.bonus.allBonus) totalAllBonus += ach.bonus.allBonus;
         }
       });
+      var atkMul = 1 + totalAtkBonus + totalAllBonus;
+      var hpMul = 1 + totalHpBonus + totalAllBonus;
+      var defMul = 1 + totalDefBonus + totalAllBonus;
+      p.atk = Math.floor(p.atk * atkMul);
+      p.maxHp = Math.floor(p.maxHp * hpMul); p.hp = Math.floor(p.hp * hpMul);
+      p.def = Math.floor(p.def * defMul);
       p._achApplied = true;
     }
     if (up.atkBonus)  p.atk  = Math.floor(p.atk  * (1 + up.atkBonus));
@@ -278,11 +328,14 @@ export const Game = {
 
   // 获取开局药水数量（修复 startPotion 陷阱）
   getStartPotions() {
-    const count = this.meta.upgrades?.startPotion || 0;
+    const count = Math.min(this.meta.upgrades?.startPotion || 0, 2); // 上限2瓶
     if (count <= 0) return [];
     const potionPool = R.get('potions').filter(p => p.id !== 'cleanse');
     const result = [];
-    for (let i = 0; i < count; i++) result.push({ ...potionPool[i % potionPool.length] });
+    for (let i = 0; i < count; i++) {
+      var src = potionPool[i % potionPool.length];
+      result.push({ ...src, fn: src.fn }); // 保留函数引用
+    }
     return result;
   },
 
@@ -344,10 +397,21 @@ export const Game = {
     }
   },
 
-  hardReset() {
+  hardReset(full) {
     const c = this.state.codex, h = this.state.highest;
-    this.state = defState(); this.state.codex = c; this.state.highest = h;
+    this.state = defState();
+    if (!full) { this.state.codex = c; this.state.highest = h; }
     this.deleteSave();
+    if (full) {
+      this.meta = defMeta();
+      this.saveMeta();
+      localStorage.removeItem(CODEX_KEY);
+      localStorage.removeItem(LB_KEY);
+      this.state.codex = {}; // 同步清空内存图鉴
+      try { import('../platform/tapsave.js').then(function(m) { m.TapSave.clearCloud(); }); } catch(e) {}
+    }
+    this.state._appliedMutations = [];
+    this.state.huntTargets = [];
   }
 };
 
@@ -383,6 +447,8 @@ function restoreBuffs(saved) {
     switch (b.id) {
       case 'burn':
         return { ...b, onTick: (e, bf) => { e.hp -= bf.data.dmg; if (e.hp <= 0) return 'dead'; }, onRemove: () => {} };
+      case 'poison':
+        return { ...b, onTick: (e, bf) => { e.hp -= bf.data.dmg; if (e.hp <= 0) return 'dead'; }, onRemove: () => {} };
       case 'slow':
         return { ...b, onRemove: () => {} };
       case 'stun':
@@ -390,8 +456,8 @@ function restoreBuffs(saved) {
       case 'crystal':
         return { ...b, onRemove: (enemy) => { enemy.def = Math.floor(enemy.def / 2); } };
       default:
-        console.warn("[妖塔] 未知buff类型，跳过:", b.id);
-        return { ...b, onRemove: () => {} };
+        console.warn("[妖塔] 未知buff类型，使用默认:", b.id);
+        return { ...b, onTick: b.data ? (e, bf) => { e.hp -= bf.data.dmg; if (e.hp <= 0) return 'dead'; } : undefined, onRemove: () => {} };
     }
   });
 }

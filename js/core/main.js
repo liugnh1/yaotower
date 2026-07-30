@@ -56,9 +56,10 @@ initAudio();
 TapSave.init();
 TapLeaderboard.init();
 TapAchievement.init();
-// 桥接存档：Game.save后自动同步云端
+// 桥接存档：Game.save后自动同步云端（节流：1秒最多1次）
+var _lastCloudSave = 0;
 var _origSave = Game.save.bind(Game);
-Game.save = function() { _origSave(); if (this.state.totalFloor > 0) TapSave.saveToCloud('auto_save', this.state); };
+Game.save = function() { _origSave(); if (this.state.totalFloor > 0) { var now = Date.now(); if (now - _lastCloudSave > 1000) { _lastCloudSave = now; TapSave.saveToCloud('auto_save', this.state); } } };
 // 桥接成就
 var _origUnlock = Game.unlockAchievement.bind(Game);
 Game.unlockAchievement = function(id) { _origUnlock(id); TapAchievement.unlock(id); };
@@ -67,6 +68,7 @@ var _origAddLB = Game.addLeaderboard.bind(Game);
 Game.addLeaderboard = function(entry) { _origAddLB(entry); TapLeaderboard.submitScore('total', entry.floor); };
 
 window._usePotion = i => { Combat.usePotion(i); };
+window._nextRoom = () => { hideModal("reward"); nextRoom(); };
 window._showAchPanel = () => { showAchievementPanel(); };
 
 // ===================== 序幕（首次访问） =====================
@@ -201,6 +203,8 @@ Events.on(E.ENEMY_KILLED, d => {
   if (roomType === 'elite') trackQuest('elite', 1);
 });
 
+Events.on(E.CURSE_REMOVED, d => { trackQuest('cleanse', 1); });
+
 Events.on(E.GOLD_CHANGED, d => {
   if (d.delta > 0) {
     if (d.fast) log(`<span class="win">🏆 限时击杀！仅用${Game.state.turnInFloor}回合，金币翻倍！</span>`);
@@ -223,6 +227,13 @@ Events.on(E.TURN_END, d => {
 
 Events.on(E.GAME_OVER, () => { stopHeartbeat(); onGameOver(); });
 Events.on(E.GAME_CLEAR, () => { stopHeartbeat(); gameClear(); });
+Events.on(E.META_UPGRADED, () => {
+  // 刷新主界面遗物进度、称号等
+  var relP = document.getElementById("relic-progress");
+  if (relP) { var d2 = Game.meta?.discoveredRelics?.length || 0; var t2 = (R.get('relics')||[]).length; relP.textContent = '📚 遗物 ' + d2 + '/' + t2; }
+  var rcB = document.getElementById("relic-count-bar");
+  if (rcB) { var d3 = Game.meta?.discoveredRelics?.length || 0; var t3 = (R.get('relics')||[]).length; rcB.textContent = '🔮' + d3 + '/' + t3; }
+});
 
 // ===================== 按钮绑定 =====================
 document.getElementById("btn-newgame").onclick = () => { initAudio(); startNewGame(); };
@@ -248,6 +259,8 @@ document.getElementById("btn-atk").onclick = _safe(function() { Combat.clearAuto
 document.getElementById("btn-skill").onclick = _safe(function() { Combat.clearAuto(); showSkillPopup(); }, "openSkillPopup");
 // 闪避按钮
 document.getElementById("btn-def").onclick = _safe(function() { Combat.clearAuto(); Combat.doDefend(); }, "doDefend");
+// 结束回合按钮
+document.getElementById("btn-endturn").onclick = _safe(function() { Combat.doEndTurn(); }, "doEndTurn");
 document.getElementById("btn-auto").onclick = _safe(Combat.toggleAuto, "toggleAuto");
 
 Combat.setCB(onWin, () => {}); // onOver 由 Events 处理
@@ -409,7 +422,8 @@ function pickClass(cls) {
     skillMul: cls.skillMul, mpCost: cls.mpCost, pen: cls.pen,
     lifeSteal: cls.lifesteal || 0, thorn: 0, goldMul: 1, dodge: cls.dodge || 0, bleed: 0,
     rage: false, doubleFirst: false, debuffAtk: null, dmgReduce: 0,
-    berserk: false, rebirth: false, regen: 0
+    berserk: false, rebirth: false, regen: 0,
+    energy: 3, maxEnergy: 3
   };
   // 影卫被动：击杀回复20%生命
   if (cls.id === "shadow") s.player._shadowBorn = true;
@@ -436,11 +450,17 @@ function pickClass(cls) {
         buildTalentSelect(function(tal) {
           s.talent = tal;
           tal.apply(s.player);
-          initZone("plains");
+          // 追猎目标选择（在天赋之后，进入区域之前）
+          buildHuntSelect(function() {
+            initZone("plains");
+          });
         });
         switchScreen("talent-select");
       } else {
-        initZone("plains");
+        // 每日挑战无天赋：直接追猎选择
+        buildHuntSelect(function() {
+          initZone("plains");
+        });
       }
     });
     switchScreen("talent-select"); // 复用天赋选择屏幕
@@ -635,11 +655,13 @@ function nextRoom() {
 function unlockAchievement(id) { Game.unlockAchievement(id); }
 
 function onWin(isFast) {
+  try {
   const s = Game.state;
   const roomType = s._currentRoomType;
   // 心魔镜像战：胜利给传说遗物
   if (s._mirrorFight) {
     s._mirrorFight = false;
+    Game.recordKill("心魔镜像", s.totalFloor, { maxHp: 100, atk: s.player ? s.player.atk : 20, def: 5 });
     const legendary = (R.get('relics') || []).filter(r => r.rarity === "legendary");
     if (legendary.length > 0) {
       const r = s.rng.pick(legendary);
@@ -716,6 +738,13 @@ function onWin(isFast) {
     showReward(isFast, eq => takeEquip(eq), attr => takeAttrReward(attr, isFast, false), s._riskReward || false);
   }
   showModal("reward");
+  } catch(e) {
+    console.error("[main] onWin崩溃:", e);
+    toast("奖励异常，点击继续");
+    var list2 = document.getElementById("reward-list");
+    if (list2) { list2.innerHTML = '<button class="modal-btn" onclick="window._nextRoom()">继续冒险</button>'; showModal("reward"); }
+    else { nextRoom(); }
+  }
 }
 
 function onGameOver() {
@@ -860,8 +889,15 @@ function showChaosModifier() {
     card.onmouseenter = function(){this.style.borderColor="#ff4444";this.style.transform="scale(1.04)";};
     card.onmouseleave = function(){this.style.borderColor="#8b0000";this.style.transform="scale(1)";};
     card.onclick = function() {
+      // 防止相同突变重复叠加
+      if (s._appliedMutations && s._appliedMutations.indexOf(mod.name) >= 0) {
+        log("<span class='info'>🌀 已拥有此混沌词条，选择其他</span>");
+        return;
+      }
       mod.apply(s);
-      log("<span class='warn'>🌀 混沌词条：" + mod.name + "</span>");
+      if (!s._appliedMutations) s._appliedMutations = [];
+      s._appliedMutations.push(mod.name);
+      log("<span class='warn'>🌀 混沌词条：" + mod.name + "（共" + s._appliedMutations.length + "个）</span>");
       el.style.display = "none";
       initEndlessZone();
     };
@@ -886,7 +922,8 @@ function showHunterLodge() {
   }
   var offlineHours = Math.floor(offlineMs / 3600000);
   // 衰减：前1小时100%，第2小时80%，之后每小时间50%
-  var decayedHours = offlineHours <= 1 ? offlineHours : (1 + (offlineHours - 1) * 0.5);
+  // 离线收益：前2h全价，之后70%效率，最低50%保底
+  var decayedHours = offlineHours <= 2 ? offlineHours : Math.max(offlineHours * 0.5, 2 + (offlineHours - 2) * 0.7);
   var offlineStones = Math.min(50, Math.floor(decayedHours * 3));
   var offlineSouls = Math.min(20, Math.floor(decayedHours * 1));
 
@@ -934,7 +971,18 @@ function initEndlessZone() {
 function doGameClear() {
   const s = Game.state;
   Game.meta.totalWins++;
+  // all_classes 追踪
+  if (!Game.meta.clearedClasses) Game.meta.clearedClasses = [];
+  var cid = s.playerClass ? s.playerClass.id : null;
+  // all_classes: 至少标准难度才算
+  if (cid && s.difficulty && !s.difficulty.startsWith('casual') && !Game.meta.clearedClasses.includes(cid)) {
+    Game.meta.clearedClasses.push(cid);
+    if (Game.meta.clearedClasses.length >= 5) Game.unlockAchievement("all_classes");
+  }
   saveRunHistory(true);
+  // 通关时也保存遗产
+  var legacy = saveLegacy();
+  if (legacy) log('<span class="info">📦 遗产仓库：' + (legacy.data.name || '物品') + '已保存，下局可用</span>');
   // 难度币+灵石：通关奖励
   if (!Game.meta.difficultyCoins) Game.meta.difficultyCoins = 0;
   Game.meta.difficultyCoins++;
@@ -987,18 +1035,23 @@ window._addEquip = function(eq) {
     playSound("equip");
     log(`${eq.icon} <span style="color:${eq.color}"><b>${eq.fullName||eq.name}</b></span> 已装备！${eq.stat.toUpperCase()}+${eq.val}`, "win");
     trackQuest('equip', 1);
-    Game.sync();
+    Combat.recalcEquipSetBonus(); Game.sync();
   }
 };
 
 // 丢弃装备（从装备栏点击触发）
+var _discarding = false;
 window._discardEquip = function(idx) {
-  const s = Game.state;
-  if (idx < 0 || idx >= s.equip.length) return;
-  const eq = s.equip.splice(idx, 1)[0];
-  removeEquipStats(s.player, eq);
-  log(`<span class='warn'>已丢弃 ${eq.fullName||eq.name}</span>`);
-  Game.sync();
+  if (_discarding) return;
+  _discarding = true;
+  try {
+    const s = Game.state;
+    if (idx < 0 || idx >= s.equip.length) return;
+    const eq = s.equip.splice(idx, 1)[0];
+    removeEquipStats(s.player, eq);
+    log(`<span class='warn'>已丢弃 ${eq.fullName||eq.name}</span>`);
+    Combat.recalcEquipSetBonus(); Game.sync();
+  } finally { _discarding = false; }
 };
 
 // 满装备时弹出替换选择
@@ -1125,15 +1178,22 @@ function openEvent(roomType) {
   trackQuest('event', 1);
   let type;
   if (roomType === "event") {
-    // 随机事件类型（15种事件池）
+    // 事件池 + 冷却：最近3次事件不会重复
+    if (!s._recentEvents) s._recentEvents = [];
     const pool = [
       "shrine", "shrine", "altar", "altar",
       "gamble", "trade", "mystery",
       "memory_merchant", "mirror_fight", "training_stone",
       "beast_arena", "time_rift", "heal_spring",
-      "black_market", "wandering_sage", "forge"
+      "black_market", "wandering_sage", "forge",
+      "fate_wheel", "death_gamble", "void_trade"
     ];
-    type = s.rng.pick(pool);
+    // 过滤最近3次事件，防重复
+    var filtered = pool.filter(function(t) { return s._recentEvents.indexOf(t) === -1; });
+    if (filtered.length === 0) filtered = pool;
+    type = s.rng.pick(filtered);
+    s._recentEvents.push(type);
+    if (s._recentEvents.length > 3) s._recentEvents.shift();
   } else {
     type = roomType;
   }
@@ -1405,7 +1465,86 @@ function openEvent(roomType) {
     addEventBtn("不回答（安全离开）", onClose);
   } else if (type === "forge") {
     openForgeStone(onClose);
+  } else if (type === "fate_wheel") {
+    // 🎲 命运轮盘
+    title.textContent = "🎡 命运轮盘";
+    desc.textContent = "命运之轮缓缓转动……50%概率获得传说遗物，50%概率失去所有金币。";
+    addEventBtn("转动轮盘！", () => {
+      if (s.rng.chance(0.5)) {
+        var legends = (R.get('relics') || []).filter(function(r) { return r.rarity === 'legendary'; });
+        var r = legends.length > 0 ? s.rng.pick(legends) : Loot.genRelic();
+        Shop.acquireRelic(r);
+        log("<span class='win'>🎡 命运眷顾！获得传说遗物：" + r.name + "！</span>");
+        toast("🎡 命运眷顾！" + r.name);
+      } else {
+        s.gold = 0;
+        log("<span class='warn'>🎡 命运嘲弄……金币归零！</span>");
+      }
+      Game.sync(); onClose();
+    });
+    addEventBtn("不赌（安全离开）", onClose);
+  } else if (type === "death_gamble") {
+    // 💀 死神赌局
+    title.textContent = "💀 死神赌局";
+    desc.textContent = "\"把命押上，我给你力量……\" 生命永久降至1，但攻击力翻倍。";
+    addEventBtn("接受赌局", () => {
+      s.player.hp = 1; s.player.maxHp = Math.max(1, s.player.maxHp);
+      s.player.atk = Math.floor(s.player.atk * 2);
+      s._deathGamble = true;
+      log("<span class='win'>💀 死神赌局！HP→1，ATK×2！</span>");
+      toast("💀 生命=1，攻击翻倍！");
+      Game.sync(); onClose();
+    });
+    addEventBtn("拒绝（安全离开）", onClose);
+  } else if (type === "void_trade") {
+    // 🕳️ 虚空交易 — Build定义事件
+    title.textContent = "🕳️ 虚空交易";
+    desc.textContent = "交出你拥有的3件遗物，从核心遗物中选择1件。核心遗物将改变你的战斗方式。";
+    if (s.relics.length < 3) {
+      desc.textContent += "\n（你需要至少3件遗物才能交易……）";
+      addEventBtn("离开", onClose);
+    } else {
+      addEventBtn("交易（交出3件→选1件核心）", () => {
+        // 移除前3件遗物
+        var removed = s.relics.splice(0, 3);
+        removed.forEach(function(r) { if (r.onRemove) r.onRemove(s.player); });
+        // 重检羁绊（移除遗物后可能失效）
+        import('../systems/synergy.js').then(function(m) { m.recheckSynergies(); });
+        // 展示核心遗物选择
+        var coreRelics = (R.get('relics') || []).filter(function(r) {
+          return r.id === 'core_flame' || r.id === 'core_ice' || r.id === 'core_shadow' || r.id === 'core_curse';
+        });
+        showCoreRelicChoice(coreRelics, onClose);
+      });
+      addEventBtn("离开", onClose);
+    }
   }
+}
+
+// ---- 核心遗物选择弹窗 ----
+function showCoreRelicChoice(coreRelics, onClose) {
+  var el = document.getElementById("event"); el.style.display = "block";
+  var title = document.getElementById("event-title");
+  var desc = document.getElementById("event-desc");
+  var btns = document.getElementById("event-btns");
+  title.textContent = "🔮 选择你的核心遗物";
+  desc.textContent = "每种核心遗物将定义一个完全不同的Build方向：";
+  btns.innerHTML = "";
+  coreRelics.forEach(function(r) {
+    var btn = document.createElement("button");
+    btn.className = "modal-btn";
+    btn.style.cssText = "text-align:left;padding:10px;margin-bottom:6px;border:2px solid #ffa502;color:#ffcc88";
+    btn.innerHTML = r.icon + " <b>" + r.name + "</b><br><span style='font-size:11px;color:#8899bb'>" + r.desc + "</span>";
+    btn.onclick = function() {
+      Shop.acquireRelic(r);
+      log("<span class='win'>🕳️ 虚空交易完成！获得核心遗物：" + r.name + "！</span>");
+      toast("🕳️ 获得：" + r.name);
+      Game.sync();
+      el.style.display = "none";
+      onClose();
+    };
+    btns.appendChild(btn);
+  });
 }
 
 // ===================== 锻造石台（局内装备合成/重铸） =====================
@@ -1520,7 +1659,7 @@ function openForgeStone(onClose) {
     applyEquipStats(s.player, newEq);
     log("<span class='win'>🔮 重铸完成：" + newEq.fullName + "</span>");
     toast("🔮 重铸完成");
-    playSound("equip");
+    trackQuest('forge', 1); playSound("equip");
     Game.sync();
     hideModal("event"); onClose();
   });
@@ -1564,6 +1703,7 @@ function openForgeStone(onClose) {
       if (!Game.meta.forgedItems) Game.meta.forgedItems = [];
       if (!Game.meta.forgedItems.includes(recipe.id)) {
         Game.meta.forgedItems.push(recipe.id);
+        trackQuest('forge', 1);
         Game.saveMeta();
       }
       log("<span class='win'>⚒️ 锻造神话装备：" + recipe.name + "！</span>");
@@ -1664,7 +1804,7 @@ function showSkillUpgrade(onDone) {
     btn.className = "modal-btn";
     btn.style.cssText = "text-align:left;padding:10px;margin-bottom:6px;border:2px solid #5a3bab";
     btn.innerHTML = "⬆ " + sk.icon + " 升级<b style=\"color:#c8a8ff\">" + sk.name + "</b> → <b style=\"color:#ffa502\">Lv" + (lv + 1) + " " + up.name + "</b><br>" +
-      "<span style=\"color:#8899bb;font-size:11px\">" + up.desc + " CD:" + (up.cd || sk.cooldown) + "回合</span>";
+      "<span style=\"color:#8899bb;font-size:11px\">" + up.desc + " CD:" + (up.cd || sk.cooldown) + "回合 ⚡" + (up.energyCost || sk.energyCost || 1) + "</span>";
     btn.onclick = function() {
       sk.name = up.name;
       sk.mul = up.mul;
@@ -1701,12 +1841,12 @@ function showSkillUpgrade(onDone) {
         b.className = "modal-btn";
         b.style.cssText = "text-align:left;padding:10px;margin-bottom:6px;border:2px solid #89e894";
         b.innerHTML = nsk.icon + " <b style=\"color:#89e894\">" + nsk.name + "</b><br>" +
-          "<span style=\"color:#8899bb;font-size:11px\">" + nsk.desc + " CD:" + (nsk.cooldown || 2) + "回合</span>";
+          "<span style=\"color:#8899bb;font-size:11px\">" + nsk.desc + " CD:" + (nsk.cooldown || 2) + "回合 ⚡" + (nsk.energyCost || 1) + "</span>";
         b.onclick = function() {
           var newSk = { ...nsk };
           skills.push(newSk);
           s.skillLevels[newSk.id] = 1;
-          s.activeSkill = skills[0];
+          // 不覆盖 activeSkill，保留玩家最初选择的技能引用
           log("<span class='win'>📖 学会新技能：" + newSk.icon + " " + newSk.name + "！</span>");
           toast("📖 学会：" + newSk.name);
           finish();
@@ -1801,7 +1941,8 @@ function showDailyPanel() {
         skillMul: cls.skillMul, mpCost: cls.mpCost, pen: cls.pen,
         lifeSteal: 0, thorn: 0, goldMul: 1, dodge: 0, bleed: 0,
         rage: false, doubleFirst: false, debuffAtk: null, dmgReduce: 0,
-        berserk: false, rebirth: false, regen: 0
+        berserk: false, rebirth: false, regen: 0,
+        energy: 3, maxEnergy: 3
       };
       Game.applyMetaBonus(s.player);
       applySoulUpgrades(s);
@@ -1877,6 +2018,8 @@ function trackQuest(type, val = 1) {
         case 'relic': if (id.includes('relic')) qp.daily[id] += val; break;
         case 'equip': if (id.includes('equip')) qp.daily[id] += val; break;
         case 'curse': if (id.includes('curse')) qp.daily[id] += val; break;
+        case 'cleanse': if (id.includes('cleanse')) qp.daily[id] += val; break;
+        case 'forge': if (id.includes('forge')) qp.daily[id] += val; break;
         case 'event': if (id.includes('event')) qp.daily[id] += val; break;
       }
       if (qp.daily[id] >= q.target) {
@@ -1995,7 +2138,8 @@ function showQuestBoard() {
         skillMul: cls.skillMul, mpCost: cls.mpCost, pen: cls.pen,
         lifeSteal: 0, thorn: 0, goldMul: 1, dodge: 0, bleed: 0,
         rage: false, doubleFirst: false, debuffAtk: null, dmgReduce: 0,
-        berserk: false, rebirth: false, regen: 0
+        berserk: false, rebirth: false, regen: 0,
+        energy: 3, maxEnergy: 3
       };
       Game.applyMetaBonus(s.player);
       applySoulUpgrades(s);
@@ -2134,6 +2278,64 @@ function buildTalentSelect(onPick) {
   console.log("[妖塔] buildTalentSelect: grid children=", grid.children.length);
 }
 
+// ---- 追猎目标选择 ----
+var _huntPicks = [];
+function buildHuntSelect(onDone) {
+  var s = Game.state;
+  s.huntTargets = [];
+  var grid = document.getElementById("hunt-grid"); grid.innerHTML = "";
+  document.getElementById("hunt-count").textContent = "0/2";
+  _huntPicks = [];
+  // 从已发现的遗物中选（至少需要发现过遗物）
+  var discovered = Game.meta && Game.meta.discoveredRelics ? Game.meta.discoveredRelics : [];
+  if (discovered.length < 3) {
+    // 发现不足，显示提示后跳过
+    document.getElementById("hunt-pool-info").textContent = '🔍 需要发现至少3种圣物才能解锁追猎（当前：' + discovered.length + '种）';
+    document.getElementById("hunt-grid").innerHTML = '<div style="color:#667788;padding:20px;text-align:center">📚 继续冒险来发现更多圣物吧！</div>';
+    document.getElementById("btn-hunt-confirm").style.display = 'none';
+    document.getElementById("btn-hunt-skip").textContent = '继续冒险';
+    document.getElementById("btn-hunt-skip").onclick = function() { onDone(); };
+    document.getElementById("btn-hunt-back").onclick = function() { switchScreen("talent-select"); };
+    switchScreen("hunt-select");
+    return;
+  }
+  var allRelics = R.get('relics') || [];
+  var pool = discovered.map(function(id) { return allRelics.find(function(r) { return r.id === id; }); }).filter(Boolean);
+  // 随机展示最多12个可选遗物
+  var show = s.rng ? s.rng.shuffle(pool).slice(0, 12) : pool.slice(0, 12);
+  document.getElementById("hunt-pool-info").textContent = '已发现 ' + discovered.length + ' 种圣物，选择追猎目标（5倍出现率）';
+  show.forEach(function(rel) {
+    var div = document.createElement("div"); div.className = "card";
+    div.style.cssText = "position:relative;cursor:pointer;transition:all .15s";
+    div.innerHTML = '<div class="icon">' + rel.icon + '</div><div class="name" style="color:' + (RARITY_COLOR[rel.rarity] || '#ccc') + '">' + rel.name + '</div><div class="desc" style="font-size:10px">' + rel.desc + '</div><div class="hunt-mark" style="display:none;position:absolute;top:4px;right:4px;color:#ffa502;font-size:14px">🎯</div>';
+    div.onclick = function() {
+      var mark = div.querySelector(".hunt-mark");
+      var idx = _huntPicks.indexOf(rel.id);
+      if (idx >= 0) { _huntPicks.splice(idx, 1); mark.style.display = "none"; div.style.borderColor = ""; div.style.boxShadow = ""; }
+      else if (_huntPicks.length < 2) { _huntPicks.push(rel.id); mark.style.display = "block"; div.style.borderColor = "#ffa502"; div.style.boxShadow = "0 0 12px rgba(255,165,2,.4)"; }
+      document.getElementById("hunt-count").textContent = _huntPicks.length + "/2";
+    };
+    grid.appendChild(div);
+  });
+  // 确认按钮
+  document.getElementById("btn-hunt-confirm").onclick = function() {
+    s.huntTargets = _huntPicks.slice();
+    s.buildDirection = _huntPicks.length > 0 ? 'hunt' : '';
+    Game.sync();
+    onDone();
+  };
+  document.getElementById("btn-hunt-skip").onclick = function() {
+    s.huntTargets = []; s.buildDirection = '';
+    Game.sync();
+    onDone();
+  };
+  document.getElementById("btn-hunt-back").onclick = function() {
+    // 回退到天赋选择
+    switchScreen("talent-select");
+  };
+  switchScreen("hunt-select");
+}
+
 function buildZoneSelect(choices, onPick) {
   document.getElementById("zone-info").textContent = `前方出现岔路，选择你的道路`;
   const grid = document.getElementById("zone-grid"); grid.innerHTML = "";
@@ -2150,8 +2352,9 @@ function buildZoneSelect(choices, onPick) {
 // ---- 战利品弹窗 ----
 function showReward(isFast, onEquip, onAttr, isElite) {
   var s = Game.state;
-  var el = document.getElementById("reward"); el.style.display = "block";
-  var list = document.getElementById("reward-list"); list.innerHTML = "";
+  var list = document.getElementById("reward-list"); if (!list) return;
+  try {
+  list.innerHTML = "";
   list.style.display = "grid"; list.style.gridTemplateColumns = "1fr 1fr"; list.style.gap = "10px";
 
   var hdr = document.createElement("div");
@@ -2187,12 +2390,15 @@ function showReward(isFast, onEquip, onAttr, isElite) {
     btn.onclick = function() { onAttr(a.id, isFast); };
     list.appendChild(btn);
   });
+  } catch(e) {
+    console.error("[showReward] 异常:", e);
+    list.innerHTML = '<button class="modal-btn" onclick="window._nextRoom()">继续冒险（奖励异常）</button>';
+  }
 }
 
 // ---- Boss 遗物三选一 ----
 function showBossRelicPick(isFast) {
-  var el = document.getElementById("reward"); el.style.display = "block";
-  var list = document.getElementById("reward-list"); list.innerHTML = "";
+  var list = document.getElementById("reward-list"); if (!list) return; list.innerHTML = "";
   list.style.display = "grid"; list.style.gridTemplateColumns = "1fr 1fr"; list.style.gap = "10px";
 
   var hdr = document.createElement("div");
@@ -2237,29 +2443,30 @@ function showSkillPopup() {
   if (skills.length === 0) { toast("没有可用技能"); return; }
   var el = document.getElementById("event");
   el.style.display = "block";
-  document.getElementById("event-title").textContent = "⚡ 选择技能";
-  document.getElementById("event-desc").textContent = "点击技能释放（冷却中的不可用）";
+  document.getElementById("event-title").textContent = "⚡ 选择技能（能量: " + (s.player ? s.player.energy : 0) + "/" + (s.player ? s.player.maxEnergy || 3 : 3) + "）";
+  document.getElementById("event-desc").textContent = "点击技能释放";
   var btns = document.getElementById("event-btns");
   btns.innerHTML = "";
 
   skills.forEach(function(sk, i) {
     var cdKey = sk.id || ('skill_' + i);
     var cd = s.skillCooldowns ? (s.skillCooldowns[cdKey] || 0) : 0;
+    var cost = sk.energyCost || 1;
     var lv = s.skillLevels ? (s.skillLevels[sk.id] || 1) : 1;
-    var label = sk.icon + " " + sk.name + " Lv" + lv;
-    if (cd > 0) label += " [冷却" + cd + "回合]";
-    else label += " → 释放";
+    var label = sk.icon + " " + sk.name + " Lv" + lv + " [" + cost + "⚡]";
+    if (cd > 0) label += " CD" + cd;
     var btn = document.createElement("button");
     btn.className = "modal-btn";
     btn.textContent = label;
-    btn.style.color = cd > 0 ? "#665588" : "#c8a8ff";
-    if (cd === 0) {
+    var noEnergy = s.player && s.player.energy < cost;
+    if (cd > 0) { btn.style.color = "#665588"; btn.disabled = true; }
+    else if (noEnergy) { btn.style.color = "#886644"; btn.disabled = true; btn.textContent += " (能量不足)"; }
+    else { btn.style.color = "#c8a8ff"; }
+    if (cd === 0 && !noEnergy) {
       btn.onclick = function() {
         el.style.display = "none";
         Combat.doSkill(i);
       };
-    } else {
-      btn.disabled = true;
     }
     btns.appendChild(btn);
   });
@@ -2268,7 +2475,10 @@ function showSkillPopup() {
   cancelBtn.className = "modal-btn";
   cancelBtn.style.background = "#1a1a2a"; cancelBtn.style.color = "#667788";
   cancelBtn.textContent = "取消";
-  cancelBtn.onclick = function() { el.style.display = "none"; };
+  cancelBtn.onclick = function() {
+    el.style.display = "none";
+    Combat.resumeAuto();
+  };
   btns.appendChild(cancelBtn);
 }
 
@@ -2927,7 +3137,12 @@ function renderCompEquip(content) {
 
   html += '<div style="color:#ccaa88;font-weight:bold;margin-bottom:6px;font-size:13px">✨ 稀有前缀（' + prefixes.length + '种）</div><div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px">';
   prefixes.forEach(p => {
-    html += `<div class="comp-item"><div class="comp-item-name">${p.name}</div><div class="comp-item-desc">${p.statBonus||''}</div></div>`;
+    var bonusText = '';
+    if (p.statBonus && typeof p.statBonus === 'object') {
+      var labels = { atk:'⚔️攻击', def:'🛡️防御', maxHp:'❤️生命', critRate:'💥暴击', maxMp:'🔮灵力' };
+      Object.keys(p.statBonus).forEach(function(k) { if (p.statBonus[k]) bonusText += (labels[k]||k) + '+' + p.statBonus[k] + ' '; });
+    }
+    html += '<div class="comp-item"><div class="comp-item-name">' + p.name + '</div><div class="comp-item-desc">' + (bonusText || '—') + '</div></div>';
   });
   html += '</div>';
 

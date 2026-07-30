@@ -1,11 +1,11 @@
 // ===================== 事件总线（地基）=====================
 // 所有模块间通信的唯一渠道。DLC 通过 Events.on() 注入行为。
 class EventBus {
-  constructor() { this._listeners = {}; }
+  constructor() { this._listeners = {}; this._depth = {}; }
 
   on(event, fn) {
     (this._listeners[event] || (this._listeners[event] = [])).push(fn);
-    return () => this.off(event, fn); // 返回取消订阅函数
+    return () => this.off(event, fn);
   }
 
   off(event, fn) {
@@ -14,12 +14,14 @@ class EventBus {
   }
 
   emit(event, data) {
-    // 复制一份再遍历，防止订阅者在回调中修改监听列表
+    // 递归深度保护：同一事件最多嵌套10层
+    this._depth[event] = (this._depth[event] || 0) + 1;
+    if (this._depth[event] > 10) { this._depth[event]--; console.error('EventBus: 递归溢出', event); return; }
     const list = (this._listeners[event] || []).slice();
     list.forEach(fn => { try { fn(data); } catch (e) { console.error('EventBus:', event, e); } });
+    this._depth[event]--;
   }
 
-  // 清除某事件的所有监听（调试用）
   clear(event) { delete this._listeners[event]; }
 }
 

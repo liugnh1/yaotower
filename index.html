@@ -145,6 +145,20 @@
   <div style="color:#667788;font-size:12px">三选一，每局一次</div>
 </div>
 
+<!-- 追猎目标选择 -->
+<div id="hunt-select" class="hidden">
+  <button class="city-back-btn" style="position:absolute;top:10px;left:10px;z-index:10" id="btn-hunt-back">← 返回</button>
+  <h2>🎯 追猎目标</h2>
+  <p style="color:#8899bb;font-size:12px;margin-bottom:4px">选择1-2个圣物作为追猎目标，出现概率大幅提升</p>
+  <div id="hunt-pool-info" style="color:#ffa502;font-size:11px;margin-bottom:8px"></div>
+  <div style="color:#667788;font-size:11px;margin-bottom:12px">已选择: <b id="hunt-count">0/2</b> — <span style="color:#ffa502">选中的圣物出现概率×5</span></div>
+  <div id="hunt-grid" class="card-grid" style="max-height:55vh;overflow-y:auto"></div>
+  <div class="btn-row" style="margin-top:12px">
+    <button class="start-btn" id="btn-hunt-confirm">🎯 确认追猎目标</button>
+    <button class="restart-btn" id="btn-hunt-skip">跳过（随机冒险）</button>
+  </div>
+</div>
+
 <!-- 关卡（主题）选择 -->
 <div id="zone-select" class="hidden">
   <button class="city-back-btn" style="position:absolute;top:10px;left:10px;z-index:10" onclick="document.getElementById('zone-select').classList.add('hidden');document.getElementById('start').classList.remove('hidden')">← 返回</button>
@@ -203,8 +217,10 @@
   <div id="player-box" class="panel">
     <div class="stat-row"><span class="stat-label">生命</span><span class="stat-val" id="pl-hp">--</span></div>
     <div class="bar-bg"><div id="hp-fill" style="width:100%"></div></div>
-    <div class="stat-row" style="margin-top:6px"><span class="stat-label">灵力</span><span class="stat-val" id="pl-mp">--</span></div>
-    <div class="bar-bg"><div id="mp-fill" style="width:100%"></div></div>
+    <div class="stat-row" style="margin-top:4px">
+      <span class="stat-label">能量</span><span class="stat-val" id="pl-energy">3/3</span>
+    </div>
+    <div class="energy-bar"><div id="energy-fill" style="width:100%"></div></div>
     <div class="stat-row" style="margin-top:8px">
       <span>⚔️ <b id="pl-atk">--</b></span>
       <span>🛡️ <b id="pl-def">--</b></span>
@@ -228,9 +244,10 @@
 
   <div id="auto-indicator"></div>
   <div id="actions">
-    <button id="btn-atk" class="act-btn big-btn">⚔️ 攻击</button>
+    <button id="btn-atk" class="act-btn big-btn">⚔️ 攻击 (1⚡)</button>
     <button id="btn-skill" class="act-btn big-btn">⚡ 技能</button>
-    <button id="btn-def" class="act-btn big-btn">🛡️ 闪避</button>
+    <button id="btn-def" class="act-btn big-btn">🛡️ 闪避 (0⚡)</button>
+    <button id="btn-endturn" class="act-btn big-btn" style="background:#3a2a0a;color:#ffcc66">⏩ 结束回合</button>
     <button id="btn-auto" class="act-btn big-btn" style="grid-column:1/-1;min-height:36px;font-size:12px;background:rgba(30,40,60,.8)">▶️ 手动</button>
   </div>
 </div>

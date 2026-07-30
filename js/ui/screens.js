@@ -1,6 +1,9 @@
 // ===================== 屏幕/弹窗切换 =====================
-export const SCREENS = ["start","city-hub","difficulty-select","class-select","skill-select","talent-select","zone-select","room-select","main","gameover"];
+export const SCREENS = ["start","city-hub","difficulty-select","class-select","skill-select","talent-select","hunt-select","zone-select","room-select","main","gameover"];
 export const MODALS = ["reward","shop","event","endless-choice","potion-modal","daily-panel","leaderboard","compendium","skill-popup"];
+
+var _modalStack = [];
+var _modalBaseZ = 1000;
 
 export function switchScreen(id) {
   SCREENS.forEach(s => {
@@ -11,6 +14,26 @@ export function switchScreen(id) {
   if (id === "main") { const m = document.getElementById("main"); if (m) m.classList.remove("hidden"); }
   if (id === "gameover") { const g = document.getElementById("gameover"); if (g) g.style.display = "block"; }
 }
-export function showModal(id) { const el = document.getElementById(id); if (el) el.style.display = "block"; else console.warn("[screens] showModal: element not found:", id); }
-export function hideModal(id) { const el = document.getElementById(id); if (el) el.style.display = "none"; }
-export function hideAllModals() { MODALS.forEach(id => hideModal(id)); }
+
+export function showModal(id) {
+  const el = document.getElementById(id);
+  if (!el) { console.warn("[screens] showModal: element not found:", id); return; }
+  // z-index 层叠管理：后开的弹窗永远在最上面
+  var idx = _modalStack.indexOf(id);
+  if (idx >= 0) _modalStack.splice(idx, 1);
+  _modalStack.push(id);
+  el.style.zIndex = _modalBaseZ + _modalStack.length * 10;
+  el.style.display = "block";
+}
+
+export function hideModal(id) {
+  const el = document.getElementById(id);
+  if (el) { el.style.display = "none"; el.style.zIndex = ""; }
+  var idx = _modalStack.indexOf(id);
+  if (idx >= 0) _modalStack.splice(idx, 1);
+}
+
+export function hideAllModals() {
+  MODALS.forEach(id => hideModal(id));
+  _modalStack = [];
+}

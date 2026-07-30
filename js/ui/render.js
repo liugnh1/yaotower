@@ -62,20 +62,26 @@ export function render(s) {
 
   if (s.player) {
     const hpPct = s.player.maxHp > 0 ? Math.max(0, s.player.hp) / s.player.maxHp * 100 : 0;
-    const mpPct = s.player.maxMp > 0 ? s.player.mp / s.player.maxMp * 100 : 0;
+    // 能量条
+    var maxE = s.player.maxEnergy || 3;
+    var curE = Math.max(0, s.player.energy || 0);
+    var ePct = Math.min(100, maxE > 0 ? curE / maxE * 100 : 0);
+    var overflow = Math.max(0, curE - maxE);
+    var energyEl = document.getElementById("pl-energy");
+    if (energyEl) energyEl.textContent = '⚡'.repeat(Math.min(curE, maxE)) + (overflow > 0 ? '💛'.repeat(overflow) : '') + '⚫'.repeat(Math.max(0, maxE - curE)) + ' ' + curE + '/' + maxE;
+    var energyFill = document.getElementById("energy-fill");
+    if (energyFill) energyFill.style.width = ePct + "%";
     // 低血量红屏效果
     const mainEl = document.getElementById("main");
     if (mainEl) { if (hpPct < 25 && s.enemy) mainEl.classList.add("low-hp"); else mainEl.classList.remove("low-hp"); }
     document.getElementById("pl-hp").textContent = `${Math.max(0, s.player.hp)}/${s.player.maxHp}`;
     document.getElementById("hp-fill").style.width = hpPct + "%";
-    document.getElementById("pl-mp").textContent = `${s.player.mp || 0}/${s.player.maxMp || 0}`;
-    document.getElementById("mp-fill").style.width = mpPct + "%";
     let ba = s.player.atk, bd = s.player.def;
     let ab = s.equip.reduce((sum, e) => sum + (e.stat === "atk" ? e.val : 0), 0);
     let db = s.equip.reduce((sum, e) => sum + (e.stat === "def" ? e.val : 0), 0);
     document.getElementById("pl-atk").textContent = ab ? `${ba + ab}(+${ab})` : ba;
     document.getElementById("pl-def").textContent = db ? `${bd + db}(+${db})` : bd;
-    // 技能按钮状态（CD系统）
+    // 技能按钮状态（CD系统 + 能量消耗显示）
     var skills = s.activeSkills || [];
     var skillBtn = document.getElementById("btn-skill");
     var allReady = true, totalCD = 0, maxCD = 0;
@@ -88,27 +94,29 @@ export function render(s) {
         skillBtn.classList.remove("on-cd");
         skillBtn.disabled = true;
       } else if (allReady) {
-        // 显示各技能名
-        var skillNames = skills.map(function(sk) { return sk.icon + sk.name; }).join(" ");
+        // 显示各技能名+能量消耗
+        var skillNames = skills.map(function(sk) { return sk.icon + sk.name + '(' + (sk.energyCost||1) + '⚡)'; }).join(" ");
         skillBtn.textContent = "⚡ " + skillNames;
         skillBtn.classList.remove("on-cd");
-        skillBtn.disabled = false;
+        skillBtn.disabled = (s.player.energy <= 0);
       } else {
         // 显示每个技能的CD
         var cdTexts = skills.map(function(sk, i) {
           var cdKey = sk.id || ('skill_' + i);
           var cd = s.skillCooldowns[cdKey] || 0;
-          return cd > 0 ? sk.icon + "CD" + cd : sk.icon + "就绪";
+          return cd > 0 ? sk.icon + "CD" + cd : sk.icon + '(' + (sk.energyCost||1) + '⚡)';
         });
         skillBtn.textContent = "⚡ " + cdTexts.join(" ");
         skillBtn.classList.add("on-cd");
-        skillBtn.disabled = false;
+        // 所有技能都在CD中 → 禁用按钮
+        var allOnCD = skills.every(function(sk, i) {
+          var cdKey = sk.id || ('skill_' + i);
+          return (s.skillCooldowns && s.skillCooldowns[cdKey]) ? s.skillCooldowns[cdKey] > 0 : false;
+        });
+        skillBtn.disabled = allOnCD;
       }
     }
-    document.getElementById("pl-skill-name").textContent = skills.length > 0 ? skills.map(function(sk) { return sk.icon + sk.name + "(CD" + (sk.cooldown || 1) + ")"; }).join(" ") : "无技能";
-    // MP/灵力显示改为CD状态条
-    document.getElementById("pl-mp").textContent = skills.length + "技能";
-    document.getElementById("mp-fill").style.width = (allReady ? 100 : Math.max(10, 100 - totalCD * 15)) + "%";
+    document.getElementById("pl-skill-name").textContent = skills.length > 0 ? skills.map(function(sk) { return sk.icon + sk.name + "(CD" + (sk.cooldown || 1) + " ⚡" + (sk.energyCost||1) + ")"; }).join(" ") : "无技能";
     // 自动战斗指示器
     var ai = document.getElementById("auto-indicator");
     if (ai) ai.textContent = s._speedMode ? "⚡ 加速战斗中..." : (s.auto ? "🤖 自动战斗中..." : "");
@@ -229,7 +237,7 @@ export function render(s) {
     updateArena(pIcon, pLabel, eIcon, eLabel);
   }
 
-  // 低血量心跳音效
+  // 低血量心跳音效（血量恢复后自动停止）
   if (s.player && s.enemy && s.player.hp > 0 && s.player.hp < s.player.maxHp * 0.25) {
     startHeartbeat();
   } else {
@@ -242,20 +250,18 @@ export function render(s) {
   document.getElementById("floor").textContent = `第 ${s.totalFloor} 层`;
   const zn = document.getElementById("zone-name"); if (zn && s.zone) zn.textContent = s.zone.name;
 
-  // 技能按钮（CD系统：所有技能CD中则禁用）
-  const btnSkill = document.getElementById("btn-skill");
-  if (btnSkill) {
-    var skillsAll = s.activeSkills || [];
-    var allOnCD = skillsAll.length > 0 && skillsAll.every(function(sk, i) {
-      var cdKey = sk.id || ('skill_' + i);
-      return (s.skillCooldowns && s.skillCooldowns[cdKey]) ? s.skillCooldowns[cdKey] > 0 : false;
-    });
-    btnSkill.disabled = skillsAll.length === 0 || allOnCD;
-  }
-
   var anyAlive = (s.enemies || []).some(function(e) { return e.hp > 0; });
-  document.getElementById("btn-atk").disabled = !anyAlive;
-  document.getElementById("btn-def").disabled = !anyAlive;
+  var hasEnergy = (s.player && s.player.energy > 0);
+  var actionsTaken = s._actionsThisTurn || 0;
+  var actionsLeft = 2 - actionsTaken;
+  var canAct = !s.gameOver && anyAlive && actionsLeft > 0;
+  document.getElementById("btn-atk").disabled = !canAct || !hasEnergy;
+  document.getElementById("btn-def").disabled = !canAct || s._defendedThisTurn;
+  var btnEnd = document.getElementById("btn-endturn");
+  if (btnEnd) {
+    btnEnd.disabled = !anyAlive || s.gameOver;
+    btnEnd.textContent = (s.player && s.player.energy > 0) ? '⏩ 结束回合 (' + s.player.energy + '⚡→💚)' : '⏩ 结束回合';
+  }
   const btnAuto = document.getElementById("btn-auto");
   if (btnAuto) {
     if (s._speedMode) { btnAuto.style.background = "#8b4500"; btnAuto.textContent = "⚡ 加速中"; }
