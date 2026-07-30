@@ -936,6 +936,7 @@ function win() {
         // 清除已死的小怪
         s.enemies = s.enemies.filter(function(e) { return e.hp > 0 || e === bossEnemy; });
         s.auto = false; s._speedMode = false; clearAuto();
+        s._winning = false; // 重置胜利锁，让二阶段击败后正常触发奖励
         Events.emit(E.BATTLE_START, { type: 'bossPhase2', name: p2.name });
         Game.sync();
       };

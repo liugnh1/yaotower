@@ -2434,6 +2434,7 @@ function showBossRelicPick(isFast) {
   skipBtn.textContent = "放弃遗物（+30金币）";
   skipBtn.onclick = function() { Game.state.gold += 30; hideModal("reward"); nextRoom(); };
   list.appendChild(skipBtn);
+  showModal("reward");
 }
 
 // ===================== 技能弹出面板（复用event弹窗） =====================
