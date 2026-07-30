@@ -68,6 +68,8 @@ export function initZone(zoneId) {
   s._bossReady = false;
   s._roomForkUsed = false;
 
+  // v0.50 重置Zone结局统计
+  resetZoneStats();
   Events.emit(E.ZONE_CHANGE, { zone: s.zone, zoneIndex: entry.depth });
 
   var choices = getChoices(entry, s.difficulty);
@@ -110,6 +112,32 @@ export function returnRoom(type) {
 }
 
 // ---- 检查是否 Zone 结束 ----
+// v0.50 分支结局：Zone结束时根据行为判定结局类型
+export function checkZoneEnding() {
+  var s = Game.state;
+  if (!s._zoneStats) return null;
+  var stats = s._zoneStats;
+  if (stats.battles >= 4 && stats.eventsPerfect === 0) return 'war';       // 战狂
+  if (stats.sacrifices >= 2) return 'sacrifice';                          // 献祭
+  if (stats.eventsPerfect >= 3 && stats.battles <= 2) return 'perfect';   // 完美
+  return null;
+}
+
+export function getZoneEndingReward(endingType) {
+  switch (endingType) {
+    case 'war': return { memoryFragments: 2, text: '⚔️ 战狂结局：血路杀出，回忆碎片+2' };
+    case 'sacrifice': return { memoryFragments: 1, materials: 5, text: '💀 献祭结局：以代价换取力量，碎片+1 素材+5' };
+    case 'perfect': return { memoryFragments: 5, essence: 10, text: '✨ 完美结局：智慧与勇气的结晶，碎片+5 灵蕴+10' };
+    default: return null;
+  }
+}
+
+// Zone结束时重置统计
+export function resetZoneStats() {
+  var s = Game.state;
+  s._zoneStats = { battles: 0, eventsPerfect: 0, sacrifices: 0 };
+}
+
 export function isZoneEnd() {
   const s = Game.state;
   return s._roomPool.length === 0 && s._bossReady;
@@ -143,6 +171,15 @@ export function prepareRoomEntry() {
   const s = Game.state;
   s.potionAtk = 0; s.potionDef = 0;
   s.adDiscount = false; s.adRefreshCount = 0;
+  // v0.50 清理战斗临时标记
+  if (s.player) {
+    s.player._keystoneFiredThisBattle = false;
+    s.player._ninjaCounter = false;
+    s.player._avengerAtk = 0;
+    s.player._overload = false;
+    s.player._superconduct = false;
+  }
+  s._smokeNext = false; s._curseTradeCount = 0;
   // 诅咒：恐惧（每进入新房间扣5%当前生命）
   if (s.player && s.player._fearCurse) {
     const loss = Math.max(1, Math.floor(s.player.hp * 0.05));

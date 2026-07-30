@@ -23,6 +23,15 @@ class EventBus {
   }
 
   clear(event) { delete this._listeners[event]; }
+
+  // v0.50 批量清理频道（按前缀匹配，如 "battle:"）
+  clearChannel(channel) {
+    var prefix = channel + ':';
+    var self = this;
+    Object.keys(this._listeners).forEach(function(key) {
+      if (key.indexOf(prefix) === 0) delete self._listeners[key];
+    });
+  }
 }
 
 export const Events = new EventBus();

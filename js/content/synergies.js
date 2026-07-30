@@ -54,4 +54,34 @@ R.registerAll('synergies', [
   { id: "shadow_chain_3", relics: ["shadow_cloak","spike_shell","death_mark"], name: "暗影共鸣·暗杀", desc: "反击击杀重置闪避·可无限连闪", icon: "🌟",
     apply: (p) => { p._shadowChain = 3; p.critRate += 0.15; },
     onRemove: (p) => { p._shadowChain = 2; p.critRate -= 0.15; } },
+
+  // ===== v0.50 雷霆共鸣 =====
+  { id: "thunder_chain_1", relics: ["lightning_rod"], name: "雷霆共鸣·初雷", desc: "闪电链弹射+1", icon: "⚡",
+    apply: (p) => { p._thunderChain = 1; },
+    onRemove: (p) => { p._thunderChain = 0; } },
+  { id: "thunder_chain_2", relics: ["lightning_rod","thunder_clap"], name: "雷霆共鸣·连锁", desc: "暴击时额外释放闪电链", icon: "🌩️",
+    apply: (p) => { p._thunderChain = 2; p.atk += 4; },
+    onRemove: (p) => { p._thunderChain = 1; p.atk -= 4; } },
+  { id: "thunder_chain_3", relics: ["lightning_rod","thunder_clap","core_thunder"], name: "雷霆共鸣·雷神", desc: "闪电链可弹射回同一目标，每次+20%伤害", icon: "⚡",
+    apply: (p) => { p._thunderChain = 3; p.atk += 8; p.critRate += 0.05; },
+    onRemove: (p) => { p._thunderChain = 2; p.atk -= 8; p.critRate -= 0.05; } },
+
+  // ===== v0.50 圣光共鸣 =====
+  { id: "light_chain_1", relics: ["healing_tears"], name: "圣光共鸣·初愈", desc: "治疗+25%", icon: "💚",
+    apply: (p) => { p._lightChain = 1; },
+    onRemove: (p) => { p._lightChain = 0; } },
+  { id: "light_chain_2", relics: ["healing_tears","golden_apple"], name: "圣光共鸣·涌泉", desc: "溢出治疗50%转为永久HP（每局上限+30）", icon: "🌟",
+    apply: (p) => { p._lightChain = 2; p.maxHp += 15; p.hp += 15; },
+    onRemove: (p) => { p._lightChain = 1; p.maxHp -= 15; p.hp = Math.min(p.hp, p.maxHp); } },
+  { id: "light_chain_3", relics: ["healing_tears","golden_apple","core_light"], name: "圣光共鸣·救赎", desc: "治疗可净化诅咒+解除debuff", icon: "✨",
+    apply: (p) => { p._lightChain = 3; p.regen = (p.regen||0) + 3; },
+    onRemove: (p) => { p._lightChain = 2; p.regen = Math.max(0, (p.regen||0) - 3); } },
+
+  // ===== v0.50 诅咒正向构筑 =====
+  { id: "curse_lord", relics: [], name: "咒缚之王", desc: "持有3+诅咒时每个诅咒+20%全伤害", icon: "💀",
+    apply: (p) => { p._curseLord = true; p.skillMul += 0.6; },
+    onRemove: (p) => { p._curseLord = false; p.skillMul = Math.max(1.0, (p.skillMul||1.5) - 0.6); } },
+  { id: "curse_plague", relics: [], name: "行走的天灾", desc: "持有5诅咒时敌人每回合-3%HP", icon: "☠️",
+    apply: (p) => { p._cursePlague = true; },
+    onRemove: (p) => { p._cursePlague = false; } },
 ]);

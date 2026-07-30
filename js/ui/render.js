@@ -44,6 +44,11 @@ export function render(s) {
     relProgress.style.color = discovered >= total ? '#ffa502' : '#667788';
   }
   document.getElementById("gold-text").textContent = s.gold || 0;
+  // v0.50 局外货币栏
+  var mcb = document.getElementById("meta-currency-bar");
+  if (mcb && Game.meta) {
+    mcb.textContent = '🌟' + (Game.meta.essence || 0) + ' 💎' + (Game.meta.souls || 0);
+  }
   // 遗物收集进度常驻
   var rcBar = document.getElementById("relic-count-bar");
   if (rcBar) {
@@ -210,9 +215,16 @@ export function render(s) {
         card.style.borderColor = selected ? "#ffdd77" : (isBoss ? "#ffa502" : "#5a3a3a");
         card.style.boxShadow = selected ? "0 0 12px rgba(255,200,100,.5)" : "none";
         var intentText = '';
-        if (e._intent) { intentText = '<div style="font-size:9px;color:#ffcc00;margin-top:2px">' + e._intent.icon + e._intent.name + '</div>'; }
+        if (e._intent) { intentText = '<div style="font-size:9px;color:#ffcc00;margin-top:2px">' + e._intent.icon + ' <b>' + e._intent.name + '</b></div>'; }
+        // v0.50 敌人buff图标
+        var buffIcons = '';
+        if (e._buffs && e._buffs.length > 0) {
+          var buffMap = { burn: '🔥', poison: '☠️', slow: '❄️', stun: '💫', crystal: '💎' };
+          buffIcons = '<div style="font-size:8px;margin-top:1px">' + e._buffs.map(function(b){return buffMap[b.id]||'🔹';}).join('') + '</div>';
+        }
         var tagText = (e.tags && e.tags.length > 0) ? '<div style="font-size:8px;color:#ff8844">' + e.tags.map(function(t){return t.name;}).join(' ') + '</div>' : '';
         card.innerHTML = '<div class="enemy-card-icon">' + (e.icon || '👹') + '</div>' +
+          buffIcons +
           '<div class="enemy-card-name" style="color:' + (isBoss ? '#ffa502' : '#ff7b7b') + '">' + e.name + '</div>' +
           tagText +
           '<div class="enemy-card-hp-bar"><div class="enemy-card-hp-fill" style="width:' + ehp + '%;background:' + (ehp > 60 ? '#c04040' : ehp > 30 ? '#c08030' : '#c02020') + '"></div></div>' +

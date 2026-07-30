@@ -159,6 +159,87 @@ R.registerAll('classes', {
   }
 });
 
+// ===== v0.50 职业精通技能（Lv3解锁第4技能，Lv10解锁第5技能/大招）=====
+R.registerAll('classMasterySkills', {
+  warrior: [
+    { id: "war_whirlwind", name: "旋风斩", icon: "🌪️", desc: "AOE全体80%×3 ⚡2", mul: 0.8, aoe: true, multiHit: 3, cooldown: 4, energyCost: 2, masteryLv: 3 },
+    { id: "war_godforce",  name: "战神降临", icon: "⚡", desc: "本回合ATK×3+免疫 ⚡3", mul: 3.0, cooldown: 8, energyCost: 3, selfImmune: true, masteryLv: 10 }
+  ],
+  mage: [
+    { id: "mage_icenova",  name: "冰霜新星", icon: "❄️", desc: "AOE+全体迟缓2回合 ⚡2", mul: 2.0, effect: "slow", aoe: true, cooldown: 5, energyCost: 2, masteryLv: 3 },
+    { id: "mage_meteor",   name: "陨石风暴", icon: "☄️", desc: "AOE 200%+燃烧3层 ⚡3", mul: 2.0, effect: "burn", aoe: true, cooldown: 7, energyCost: 3, masteryLv: 10 }
+  ],
+  shadow: [
+    { id: "shd_assault",   name: "暗杀", icon: "🗡️", desc: "单体300%，击杀返还1⚡ ⚡2", mul: 3.0, cooldown: 4, energyCost: 2, killRefund: 1, masteryLv: 3 },
+    { id: "shd_clone",     name: "影分身", icon: "👥", desc: "本回合行动次数+2 ⚡3", mul: 1.0, cooldown: 8, energyCost: 3, extraActions: 2, masteryLv: 10 }
+  ],
+  archer: [
+    { id: "arc_rain",      name: "箭雨", icon: "🏹", desc: "AOE 120%+暴击率+30% ⚡2", mul: 1.2, aoe: true, cooldown: 4, energyCost: 2, critUp: 0.30, masteryLv: 3 },
+    { id: "arc_snipe",     name: "狙击", icon: "🎯", desc: "单体500%+必暴+无视防 ⚡3", mul: 5.0, cooldown: 7, energyCost: 3, forceCrit: true, ignoreDef: true, masteryLv: 10 }
+  ],
+  monk: [
+    { id: "monk_palm",     name: "金刚掌", icon: "✋", desc: "单体150%+回复等量HP ⚡2", mul: 1.5, cooldown: 3, energyCost: 2, lifeSteal: 1.0, masteryLv: 3 },
+    { id: "monk_nirvana",  name: "涅槃", icon: "🕉️", desc: "满血复活+全属性+30%(3回合) ⚡3", mul: 1.0, cooldown: 10, energyCost: 3, rebirth: true, allBuff: 0.3, masteryLv: 10 }
+  ]
+});
+
+// ===== v0.50 职业专属遗物（Lv5解锁，开局自动获得）=====
+R.registerAll('classMasteryRelics', {
+  warrior: { id: "mastery_warrior", name: "狂战徽章", icon: "🛡️", rarity: "epic", desc: "击杀后ATK+3（本局永久叠加）", _masteryRelic: true },
+  mage:    { id: "mastery_mage",    name: "元素结晶", icon: "💎", rarity: "epic", desc: "每使用技能，下次普攻+30%伤害", _masteryRelic: true },
+  shadow:  { id: "mastery_shadow",  name: "暗杀者匕首", icon: "🗡️", rarity: "epic", desc: "对满血敌人伤害+50%", _masteryRelic: true },
+  archer:  { id: "mastery_archer",  name: "鹰眼透镜", icon: "🔭", rarity: "epic", desc: "暴击时额外造成30%ATK伤害", _masteryRelic: true },
+  monk:    { id: "mastery_monk",    name: "金刚念珠", icon: "📿", rarity: "epic", desc: "每回合回复5%最大生命", _masteryRelic: true }
+});
+
+// ===== v0.50 转职系统（精通Lv10 + 50魂晶 + 30灵石，二选一不可逆）=====
+R.registerAll('classAdvancements', {
+  warrior: [
+    { id: "war_berserker", name: "狂战士", icon: "🩸", desc: "牺牲防御换取极致输出",
+      statChange: { atk: 10, def: -3 }, passive: "击杀后额外+1⚡" },
+    { id: "war_paladin",   name: "圣骑士", icon: "🛡️", desc: "坚不可摧的防御者",
+      statChange: { def: 8, maxHp: 30 }, passive: "每回合回复3%HP" }
+  ],
+  mage: [
+    { id: "mage_archmage",    name: "大魔导", icon: "🔮", desc: "法术之力达到极致",
+      statChange: { skillMul: 0.5 }, passive: "技能⚡消耗-1" },
+    { id: "mage_elementalist",name: "元素使", icon: "🌋", desc: "掌握多重元素之力",
+      statChange: {}, passive: "可同时持有2个元素核心遗物" }
+  ],
+  shadow: [
+    { id: "shd_assassin", name: "刺客", icon: "💀", desc: "一击必杀的死神",
+      statChange: { critMul: 1.0 }, passive: "对Boss伤害+30%" },
+    { id: "shd_ninja",    name: "忍者", icon: "🍃", desc: "来去无踪的幻影",
+      statChange: { dodge: 0.10 }, passive: "闪避后下次攻击3倍" }
+  ],
+  archer: [
+    { id: "arc_sniper", name: "狙击手", icon: "🎯", desc: "千里之外取敌首级",
+      statChange: { pen: 0.20 }, passive: "单体伤害+40%" },
+    { id: "arc_ranger", name: "游侠", icon: "🌲", desc: "箭雨覆盖整个战场",
+      statChange: {}, passive: "AOE伤害+25%，每回合随机标记1敌人(+30%承伤)" }
+  ],
+  monk: [
+    { id: "monk_enlightened", name: "悟道者", icon: "🌟", desc: "治愈之力超越极限",
+      statChange: {}, passive: "治疗+50%，溢出治疗转护盾" },
+    { id: "monk_avenger",     name: "复仇者", icon: "🔥", desc: "以伤痛换取力量",
+      statChange: { atk: 12 }, passive: "每受击+ATK 3(本回合)" }
+  ]
+});
+
+// ===== v0.50 觉醒被动（转职完成 + 80魂晶 + 50灵石 + 3神话材料）=====
+R.registerAll('awakeningPassives', {
+  war_berserker:    { name: "血怒", desc: "血量每降10%，伤害+8%", icon: "🩸" },
+  war_paladin:      { name: "圣盾光环", desc: "全场敌人ATK-15%", icon: "🛡️" },
+  mage_archmage:    { name: "奥术回响", desc: "技能击杀重置该技能CD（每回合1次）", icon: "🔄" },
+  mage_elementalist:{ name: "元素爆发", desc: "切换元素时免费释放一次该元素技能", icon: "💥" },
+  shd_assassin:     { name: "孤立无援", desc: "对孤立敌人伤害×2", icon: "💀" },
+  shd_ninja:        { name: "影之舞", desc: "每闪避3次，获得1回合无敌", icon: "🍃" },
+  arc_sniper:       { name: "穿透射击", desc: "暴击时对后排造成50%溅射", icon: "🎯" },
+  arc_ranger:       { name: "标记连锁", desc: "标记敌人死亡时自动标记新敌人", icon: "🎪" },
+  monk_enlightened: { name: "永恒之泉", desc: "过量治疗转化为永久HP（每局上限+50）", icon: "💚" },
+  monk_avenger:     { name: "怒火不熄", desc: "击杀后保留50%本回合累积的ATK加成", icon: "🔥" }
+});
+
 // 技能合成配方（两满级技能 → 终极技）
 R.registerAll('skillRecipes', [
   { id: "synth_fire_ice", name: "冰火两重天", icon: "🌊🔥", desc: "伤害×5.0+燃烧3回合+迟缓3回合 ⚡3", mul: 5.0, cooldown: 3, energyCost: 3,

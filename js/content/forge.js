@@ -58,3 +58,25 @@ R.registerAll('forgeRecipes', [
     combatEffect: { type: "executioner", value: 0.40 }
   },
 ]);
+
+// ===== v0.50 隐藏传说装备合成表（局外锻造工坊）=====
+R.registerAll('hiddenLegendaries', [
+  { id: "hidden_shield_achilles", name: "阿喀琉斯之盾", icon: "🛡️", rarity: "legendary", type: "armor", stat: "def", val: 25,
+    cost: { forgeStones: 120, materials: 30, bossMats: ["mat_ancient_seal", "mat_ice_soul"] },
+    condition: "synergy_frost_king", conditionDesc: "持有「冰霜之王」协同", bonus: { maxHp: 80 }, effect: "免疫冻结+迟缓，受击反弹50%伤害", _hidden: true },
+  { id: "hidden_boots_hermes", name: "赫尔墨斯之靴", icon: "👢", rarity: "legendary", type: "helm", stat: "dodge", val: 18,
+    cost: { forgeStones: 100, materials: 25, bossMats: ["mat_void_shard", "mat_desert_core"] },
+    condition: "dodge_30", conditionDesc: "闪避率>30%时解锁", bonus: { atk: 12 }, effect: "闪避后下回合行动次数+1", _hidden: true },
+  { id: "hidden_eye_odin", name: "奥丁之眼", icon: "👁️", rarity: "legendary", type: "ring", stat: "critRate", val: 20,
+    cost: { forgeStones: 150, materials: 35, bossMats: ["mat_demon_soul", "mat_fire_core"] },
+    condition: "crit_kill_boss", conditionDesc: "暴击击杀过Boss", bonus: { pen: 30 }, effect: "暴击时显示敌人详细弱点", _hidden: true },
+  { id: "hidden_staff_sage", name: "贤者之杖", icon: "🪄", rarity: "legendary", type: "weapon", stat: "atk", val: 20,
+    cost: { forgeStones: 130, materials: 30, bossMats: ["mat_tower_heart", "mat_forest_heart"] },
+    condition: "skills_3", conditionDesc: "拥有3个以上技能", bonus: { skillMul: 1.0, maxEnergy: 1 }, effect: "技能击杀返还全部能量", _hidden: true },
+  { id: "hidden_armor_dragon", name: "龙鳞铠", icon: "🦾", rarity: "legendary", type: "armor", stat: "def", val: 30,
+    cost: { forgeStones: 140, materials: 30, bossMats: ["mat_general_seal", "mat_swamp_venom"] },
+    condition: "hit_by_dragon", conditionDesc: "被龙类Boss攻击过", bonus: { maxHp: 100 }, effect: "每受击永久+2 DEF（每局上限+20）", _hidden: true },
+  { id: "hidden_ring_fate", name: "命运之戒", icon: "💍", rarity: "legendary", type: "ring", stat: "atk", val: 8,
+    cost: { forgeStones: 200, materials: 50, bossMats: [] },
+    condition: "all_relics", conditionDesc: "收集全部基础遗物", bonus: { def: 8, maxHp: 50 }, effect: "遗物上限+2，协同效果×1.5", _hidden: true }
+]);

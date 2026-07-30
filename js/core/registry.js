@@ -12,11 +12,13 @@ class Registry {
       monsterTags: [], equipQualities: [], equipTypes: [],
       equipPrefixes: [], potions: [], difficulties: {},
       dailyGlobalMods: [], dailyPlayerMods: [], dailyEnemyMods: [],
-      metaLimits: {}, roomTypes: {}, roomTemplates: { simple: [], normal: [] },
+      metaLimits: {}, roomTypes: {}, roomTemplates: {},
       simpleRoute: {}, synergies: [], achievements: [],
       dailyQuests: [], weeklyQuests: [],
       forgeRecipes: [], bossMaterials: {}, extraMaterials: [],
-      skillRecipes: []
+      skillRecipes: [], talentTree: [],  // v0.50 天赋树
+      classMasterySkills: {}, classMasteryRelics: {}, classAdvancements: {}, awakeningPassives: {},  // v0.50
+      hiddenLegendaries: [], fateBrands: []  // v0.50
     };
   }
 
@@ -38,10 +40,29 @@ class Registry {
     const store = this._store[category];
     if (!store) { console.warn(`Registry: unknown category "${category}"`); return; }
     if (Array.isArray(store)) {
-      store.push(...items);
+      // v0.50 查重
+      items.forEach(function(item) {
+        if (item && item.id) {
+          var dup = store.find(function(s) { return s.id === item.id; });
+          if (dup) { console.warn('Registry: 重复注册 [' + category + '] ' + item.id + ' — 已跳过'); return; }
+        }
+        store.push(item);
+      });
     } else {
+      // 对象类型：检查key冲突
+      var dupKeys = [];
+      Object.keys(items).forEach(function(k) {
+        if (store.hasOwnProperty(k)) { dupKeys.push(k); console.warn('Registry: 重复key [' + category + '] ' + k + ' — 将被覆盖'); }
+      });
       Object.assign(store, items);
     }
+  }
+
+  has(category, id) {
+    var store = this._store[category];
+    if (!store) return false;
+    if (Array.isArray(store)) return store.some(function(s) { return s.id === id; });
+    return !!store[id];
   }
 
   /** 获取内容。id 为空时返回整个类别 */

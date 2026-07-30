@@ -72,8 +72,14 @@ export function acquireRelic(rel) {
     Game.sync();
     return;
   }
-  // 满6件时移除最旧的
+  // 满6件时弹出选择面板（不再自动丢弃）
   if (s.relics.length >= 6) {
+    // 如果主界面有选择回调，触发选择面板；否则Fallback自动丢弃最旧的
+    if (typeof window._onRelicFull === 'function') {
+      window._onRelicFull(rel);
+      return; // 暂停获取，等用户选择
+    }
+    // Fallback: 自动丢弃最旧的
     const old = s.relics[0];
     if (old && old.onRemove) old.onRemove(s.player);
     Events.emit(E.RELIC_REMOVED, { relic: old });
@@ -83,6 +89,12 @@ export function acquireRelic(rel) {
   if (rel.passive && !rel.applied) { rel.passive(s.player); rel.applied = true; }
   rel.stars = 1;
   s.relics.push(rel);
+  // v0.50 遗物许愿保底：获得研究的遗物时重置计数器
+  if (Game.meta.studiedRelic === rel.id) {
+    Game.meta.studiedPity = 0;
+    Game.saveMeta();
+    log('<span class="win">🔮 许愿遗物出现！保底计数器已重置</span>');
+  }
   // 遗物发现追踪
   if (!Game.meta.discoveredRelics) Game.meta.discoveredRelics = [];
   if (!Game.meta.discoveredRelics.includes(rel.id)) {

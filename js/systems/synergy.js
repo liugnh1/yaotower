@@ -55,3 +55,32 @@ export function getActiveSynergies() {
   if (!s._activeSynergies || !s._activeSynergies.length) return [];
   return R.get('synergies').filter(syn => s._activeSynergies.includes(syn.id));
 }
+
+// v0.50 诅咒正向构筑检测（基于诅咒数量）
+export function checkCurseSynergies() {
+  const s = Game.state;
+  if (!s.player) return;
+  if (!s._activeSynergies) s._activeSynergies = [];
+  var curseCount = (s.curses || []).length;
+
+  // 咒缚之王：3+诅咒
+  if (curseCount >= 3 && !s._activeSynergies.includes('curse_lord')) {
+    var cl = R.get('synergies').find(function(syn){return syn.id==='curse_lord';});
+    if (cl) { cl.apply(s.player); s._activeSynergies.push('curse_lord'); bigFloat('💀咒缚之王！每个诅咒+20%伤害', 'float-gold', 800); }
+  }
+  if (curseCount < 3 && s._activeSynergies.includes('curse_lord')) {
+    var cl2 = R.get('synergies').find(function(syn){return syn.id==='curse_lord';});
+    if (cl2 && cl2.onRemove) cl2.onRemove(s.player);
+    s._activeSynergies = s._activeSynergies.filter(function(id){return id!=='curse_lord';});
+  }
+  // 行走的天灾：5+诅咒
+  if (curseCount >= 5 && !s._activeSynergies.includes('curse_plague')) {
+    var cp = R.get('synergies').find(function(syn){return syn.id==='curse_plague';});
+    if (cp) { cp.apply(s.player); s._activeSynergies.push('curse_plague'); bigFloat('☠️行走的天灾！敌人每回合-3%HP', 'float-gold', 800); }
+  }
+  if (curseCount < 5 && s._activeSynergies.includes('curse_plague')) {
+    var cp2 = R.get('synergies').find(function(syn){return syn.id==='curse_plague';});
+    if (cp2 && cp2.onRemove) cp2.onRemove(s.player);
+    s._activeSynergies = s._activeSynergies.filter(function(id){return id!=='curse_plague';});
+  }
+}
