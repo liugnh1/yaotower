@@ -37,15 +37,15 @@ R.registerAll('classes', {
   mage: {
     id: "mage", name: "法修", icon: "🔮",
     hp: 85, maxHp: 85, mp: 0, maxMp: 0,
-    atk: 14, def: 2, critRate: 0.10, critMul: 1.5,
+    atk: 16, def: 2, critRate: 0.10, critMul: 1.5,
     skillMul: 2.2, mpCost: 0, pen: 0.5,
     desc: "高伤法术·穿透50%·CD较长",
     skills: [
-      { id: "fireball",   name: "炎爆术",   icon: "🔥", desc: "伤害×3.0+燃烧3回合(AOE) ⚡3", mul: 3.0, effect: "burn", cooldown: 3, aoe: true, energyCost: 3,
+      { id: "fireball",   name: "炎爆术",   icon: "🔥", desc: "伤害×3.0+燃烧3回合(AOE) ⚡2", mul: 3.0, effect: "burn", cooldown: 3, aoe: true, energyCost: 2,
         upgrades: [
-          { name: "炎爆·陨石", desc: "伤害×4.0+燃烧4回合 ⚡3", mul: 4.0, effect: "burn", cd: 4, energyCost: 3 },
-          { name: "炎爆·火雨", desc: "伤害×3.0+燃烧3回合+穿透+20% ⚡3", mul: 3.0, effect: "burn", cd: 3, pen: 0.2, energyCost: 3 },
-          { name: "炎爆·阳炎", desc: "伤害×3.5+燃烧3回合+回复10灵力 ⚡3", mul: 3.5, effect: "burn", cd: 3, energyCost: 3 }
+          { name: "炎爆·陨石", desc: "伤害×4.0+燃烧4回合 ⚡2", mul: 4.0, effect: "burn", cd: 4, energyCost: 2 },
+          { name: "炎爆·火雨", desc: "伤害×3.0+燃烧3回合+穿透+20% ⚡2", mul: 3.0, effect: "burn", cd: 3, pen: 0.2, energyCost: 2 },
+          { name: "炎爆·阳炎", desc: "伤害×3.5+燃烧3回合+回复10灵力 ⚡2", mul: 3.5, effect: "burn", cd: 3, energyCost: 2 }
         ]
       },
       { id: "frost_nova", name: "冰霜新星", icon: "❄️", desc: "伤害×2.2+迟缓2回合(AOE) ⚡2", mul: 2.2, effect: "slow", cooldown: 2, aoe: true, energyCost: 2,
@@ -67,12 +67,12 @@ R.registerAll('classes', {
   shadow: {
     id: "shadow", name: "影卫", icon: "🗡️",
     hp: 75, maxHp: 75, mp: 0, maxMp: 0,
-    atk: 22, def: 1, critRate: 0.35, critMul: 2.0,
+    atk: 22, def: 1, critRate: 0.28, critMul: 2.0,
     skillMul: 1.8, mpCost: 0, pen: 0.3,
-    dodge: 0.15, lifesteal: 0,
-    desc: "高速刺客·暴击35%·CD极短",
+    dodge: 0.10, lifesteal: 0,
+    desc: "高速刺客·暴击28%·CD极短",
     skills: [
-      { id: "assassinate", name: "暗杀",   icon: "💀", desc: "伤害×3.5+扣10%当前生命 ⚡2", mul: 3.5, effect: null, cooldown: 2, selfDmg: 0.1, energyCost: 2,
+      { id: "assassinate", name: "暗杀",   icon: "💀", desc: "伤害×3.5+扣12%当前生命 ⚡2", mul: 3.5, effect: null, cooldown: 2, selfDmg: 0.12, energyCost: 2,
         upgrades: [
           { name: "暗杀·绝命", desc: "伤害×5.0+扣15%生命 ⚡3", mul: 5.0, effect: null, cd: 3, selfDmg: 0.15, energyCost: 3 },
           { name: "暗杀·血宴", desc: "伤害×3.5+扣10%生命+吸血30% ⚡2", mul: 3.5, effect: null, cd: 2, selfDmg: 0.1, lifeSteal: 0.3, energyCost: 2 },
@@ -98,7 +98,7 @@ R.registerAll('classes', {
   archer: {
     id: "archer", name: "弓手", icon: "🏹",
     hp: 90, maxHp: 90, mp: 0, maxMp: 0,
-    atk: 20, def: 2, critRate: 0.20, critMul: 2.5,
+    atk: 22, def: 2, critRate: 0.20, critMul: 2.5,
     skillMul: 1.6, mpCost: 0, pen: 0.3,
     dodge: 0.10, lifesteal: 0,
     desc: "远程狙击·超高暴伤·先手优势",
@@ -117,11 +117,11 @@ R.registerAll('classes', {
           { name: "箭雨·穿心", desc: "伤害×2.0+燃烧2回合+暴击率+10% ⚡2", mul: 2.0, effect: "burn", cd: 2, critUp: 0.10, energyCost: 2 }
         ]
       },
-      { id: "snipe",       name: "狙击",     icon: "🔭", desc: "伤害×4.0+穿透50% ⚡3", mul: 4.0, effect: null, cooldown: 4, extraPen: 0.5, energyCost: 3,
+      { id: "snipe",       name: "狙击",     icon: "🔭", desc: "伤害×4.0+穿透50% ⚡3", mul: 4.0, effect: null, cooldown: 3, extraPen: 0.5, energyCost: 3,
         upgrades: [
-          { name: "狙击·死神", desc: "伤害×6.0+穿透60% ⚡3", mul: 6.0, effect: null, cd: 5, extraPen: 0.6, energyCost: 3 },
-          { name: "狙击·弱点", desc: "伤害×4.5+穿透50%+下回合必暴 ⚡3", mul: 4.5, effect: null, cd: 4, extraPen: 0.5, nextCrit: true, energyCost: 3 },
-          { name: "狙击·速射", desc: "伤害×3.5+穿透40%+CD-1 ⚡2", mul: 3.5, effect: null, cd: 3, extraPen: 0.4, energyCost: 2 }
+          { name: "狙击·死神", desc: "伤害×6.0+穿透60% ⚡3", mul: 6.0, effect: null, cd: 4, extraPen: 0.6, energyCost: 3 },
+          { name: "狙击·弱点", desc: "伤害×4.5+穿透50%+下回合必暴 ⚡3", mul: 4.5, effect: null, cd: 3, extraPen: 0.5, nextCrit: true, energyCost: 3 },
+          { name: "狙击·速射", desc: "伤害×3.5+穿透40%+CD-1 ⚡2", mul: 3.5, effect: null, cd: 2, extraPen: 0.4, energyCost: 2 }
         ]
       }
     ]
@@ -129,12 +129,12 @@ R.registerAll('classes', {
   monk: {
     id: "monk", name: "武僧", icon: "🧘",
     hp: 110, maxHp: 110, mp: 0, maxMp: 0,
-    atk: 15, def: 4, critRate: 0.15, critMul: 1.8,
+    atk: 17, def: 4, critRate: 0.15, critMul: 1.8,
     skillMul: 2.0, mpCost: 0, pen: 0.1,
     dodge: 0.08, lifesteal: 0,
     desc: "攻守兼备·生命回复·韧性极强",
     skills: [
-      { id: "palm_strike", name: "金刚掌",   icon: "🖐️", desc: "伤害×2.5+回复20%生命 ⚡2", mul: 2.5, effect: null, cooldown: 3, energyCost: 2,
+      { id: "palm_strike", name: "金刚掌",   icon: "🖐️", desc: "伤害×2.5+回复25%生命 ⚡2", mul: 2.5, effect: null, cooldown: 3, heal: 0.25, energyCost: 2,
         upgrades: [
           { name: "金刚·大悲", desc: "伤害×3.5+回复30%生命 ⚡2", mul: 3.5, effect: null, cd: 3, heal: 0.30, energyCost: 2 },
           { name: "金刚·伏魔", desc: "伤害×3.0+回复20%+概率眩晕 ⚡2", mul: 3.0, effect: "stun", cd: 3, heal: 0.20, energyCost: 2 },
@@ -202,7 +202,7 @@ R.registerAll('classAdvancements', {
   ],
   mage: [
     { id: "mage_archmage",    name: "大魔导", icon: "🔮", desc: "法术之力达到极致",
-      statChange: { skillMul: 0.5 }, passive: "技能⚡消耗-1" },
+      statChange: { skillMul: 0.5, critRate: 0.15 }, passive: "技能⚡消耗-1" },
     { id: "mage_elementalist",name: "元素使", icon: "🌋", desc: "掌握多重元素之力",
       statChange: {}, passive: "可同时持有2个元素核心遗物" }
   ],

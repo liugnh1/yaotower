@@ -17,9 +17,9 @@ function startAutoLoop() {
   clearAuto();
   const s = Game.state;
   if (!s || !s.auto || s.gameOver) return;
-  var spd = s._speedMode ? 350 : 700;
+  var spd = s._turboMode ? 175 : (s._speedMode ? 350 : 700);
   _autoTimer = setInterval(function() {
-    if (!s.auto || s.gameOver) { clearAuto(); return; }
+    if ((!s.auto && !s._speedMode && !s._turboMode) || s.gameOver) { clearAuto(); return; }
     try { autoLoop(); } catch(e) { console.error(e); }
   }, spd);
 }
@@ -76,7 +76,7 @@ export function startBattle(type) {
   // 能量系统初始化
   if (s.player) { s.player.energy = s.player.maxEnergy || MAX_ENERGY; }
   s._actionsThisTurn = 0; s._defendedThisTurn = false;
-  if (s.auto) startAutoLoop();
+  if (s.auto || s._speedMode || s._turboMode) startAutoLoop();
   s._bossPhase2 = false; s._bossDamaged = false;
   s._desperationUsed = false; s._despAtkDoubled = false;
   s._acting = false; s._winning = false;
@@ -191,6 +191,12 @@ export function startBattle(type) {
       if (type === "boss" && s._zoneMod?.id === "tower_regen") {
         em.hp = Math.floor(em.hp * 1.3); em.atk = Math.floor(em.atk * 1.3); em.maxHp = em.hp;
       }
+      // v0.50 P1: 怪物动态成长 — 每层HP+2%, ATK+1.5%, DEF+1%
+      var floorScale = s.totalFloor || 1;
+      em.hp = Math.floor(em.hp * (1 + floorScale * 0.02));
+      em.atk = Math.floor(em.atk * (1 + floorScale * 0.015));
+      em.def = Math.floor((em.def || 0) * (1 + floorScale * 0.01));
+      em.maxHp = em.hp;
     });
     s.enemy = s.enemies[0];
     s.selectedTarget = 0;
@@ -203,7 +209,6 @@ export function startBattle(type) {
     if (s.player._set_critRate) s.player.critRate -= s.player._set_critRate;
     if (s.player._set_critMul) s.player.critMul -= s.player._set_critMul;
     if (s.player._set_pen) s.player.pen = (s.player.pen||0) - s.player._set_pen;
-    if (s.player._set_dodge) s.player.dodge = (s.player.dodge||0) - s.player._set_dodge;
     if (s.player._set_dmgReduce) s.player.dmgReduce = (s.player.dmgReduce||0) - s.player._set_dmgReduce;
     // 清零追踪变量
     ['_set_atk','_set_def','_set_maxHp','_set_dodge','_set_lifeSteal','_set_critRate','_set_critMul','_set_pen','_set_maxMp','_set_dmgReduce'].forEach(function(k){ s.player[k]=0; });
@@ -227,13 +232,17 @@ export function startBattle(type) {
       if (bonus.critRate) s.player.critRate += bonus.critRate;
       if (bonus.critMul) s.player.critMul += bonus.critMul;
       if (bonus.pen) s.player.pen = (s.player.pen||0) + bonus.pen;
-      if (bonus.dodge) { s.player.dodge = (s.player.dodge||0) + bonus.dodge; }
       if (bonus.dmgReduce) s.player.dmgReduce = (s.player.dmgReduce||0) + bonus.dmgReduce;
     });
     // 套装激活日志
     if (s.player._setActive4) { setTimeout(function(){ log('<span class="win">🏷️ 套装激活：' + s.player._setActive4 + ' 4件套！</span>'); }, 200); }
     else if (s.player._setActive2) { setTimeout(function(){ log('<span class="info">🏷️ 套装激活：' + s.player._setActive2 + ' 2件套</span>'); }, 200); }
     // 恢复怪物标签系统
+    // v0.50 P2: 精英怪必定携带词条，炼狱难度精英2词条
+    if (type === "elite") {
+      addTag(s); // 精英必定1词条
+      if (diff2.id && diff2.id.startsWith('hell')) addTag(s); // 炼狱精英2词条
+    }
     if (s._zoneMod?.id === "ruins_ancient") addTag(s);
     if (s.floorInZone > 3 && s.rng.chance(0.55)) addTag(s);
     if (diff2.extraTag && s.rng.chance(0.35)) addTag(s);
@@ -348,12 +357,13 @@ export function doAttack() {
     return;
   }
   // 能量和行动次数检查（含NaN防护）
-  var attackCost = s.player._forgetfulCurse ? 2 : 1;
+  var attackCost = Math.max(1, s.player._forgetfulCurse ? 2 : 1);
   if (typeof s.player.energy !== 'number' || isNaN(s.player.energy) || s.player.energy < attackCost) { s.player.energy = 0; return; }
   if ((s._actionsThisTurn || 0) >= MAX_ACTIONS) return;
   s.player.energy = Math.max(0, s.player.energy - attackCost);
   s._actionsThisTurn = (s._actionsThisTurn || 0) + 1;
   s.defending = false;
+  s._skillUseStreak = 0; // 重置技能疲劳
   animPlayerAttack();
   if (s.player._stoneGaze) { delete s.player._stoneGaze; afterAction(s); return; }
   let dmg = calcDmg(null, t);
@@ -410,7 +420,17 @@ export function doSkill(skillIdx) {
   if ((s.skillCooldowns[cdKey] || 0) > 0) return;
   // 能量和行动次数检查
   if ((s._actionsThisTurn || 0) >= MAX_ACTIONS) return;
-  var cost = (sk.energyCost || 1) + (s.player._forgetfulCurse ? 1 : 0);
+  // v0.50 P1: 能量消耗计算（含精通Lv7减免 + 过载 + 健忘诅咒 + 精通Lv15负面），最低1能量
+  var baseCost = (sk.energyCost || 1);
+  var energyReduction = 0;
+  if (s.player._masteryEnergy) energyReduction++; // 精通Lv7
+  if (s.player._overload) { energyReduction = 99; s.player._overload = false; } // 过载：一次性免费
+  if (s.player._forgetfulCurse) baseCost++; // 健忘诅咒：+1消耗
+  if (s.player._masteryDownside === 'energy') baseCost++; // 战士精通Lv15负面：技能能量+1
+  // v0.50 P3: 技能疲劳 — 连续3回合使用技能后，第3回合额外+1能量消耗
+  s._skillUseStreak = (s._skillUseStreak || 0) + 1;
+  if (s._skillUseStreak >= 3) { baseCost++; bigFloat('😫 疲劳！', 'float-dmg', 500); }
+  var cost = Math.max(1, baseCost - energyReduction);
   if (s.player.energy < cost) return;
   // 没有活着的敌人→胜利
   var anyAlive = (s.enemies || []).some(function(e) { return e.hp > 0; });
@@ -421,10 +441,17 @@ export function doSkill(skillIdx) {
   s._interrupted = true; // 技能也能打断敌人蓄力
   animPlayerAttack();
   if (s.player._stoneGaze) { delete s.player._stoneGaze; afterAction(s); return; }
-  s.skillCooldowns[cdKey] = (sk.cooldown != null ? sk.cooldown : 2);
-  // 遗物：回音石（20%概率技能不进入冷却）
+  // v0.50 P1: 应用CD减免（天赋树"疾风" + 精通Lv4 + 无限法力遗物），最低CD=2
+  var baseCD = (sk.cooldown != null ? sk.cooldown : 2);
+  var cdReduction = 0;
+  if (s.player.skillCDR) cdReduction++;       // 天赋树"疾风"
+  if (s.player._masteryCDR) cdReduction++;     // 精通Lv4
+  if (s.player._infMana) cdReduction++;        // 无限法力遗物
+  baseCD = Math.max(0, baseCD - cdReduction);
+  s.skillCooldowns[cdKey] = Math.max(2, baseCD);
+  // 遗物：回音石（20%概率技能不进入冷却）— 但CD最低仍为2
   if (s.player._echoStone && s.rng && s.rng.chance(0.20)) {
-    s.skillCooldowns[cdKey] = 0;
+    s.skillCooldowns[cdKey] = 2;
     bigFloat("🪨 回音！", "float-dmg", 600);
   }
   if (sk.selfDmg) { const cost = Math.max(1, Math.floor(s.player.hp * sk.selfDmg)); s.player.hp -= cost; if (s.player.hp <= 0) { s.player.hp = 0; Game.sync(); setTimeout(() => gameOver(), 500); return; } }
@@ -485,6 +512,11 @@ export function doSkill(skillIdx) {
     if (sk.doubleHit && t.hp > 0) { var d2 = calcDmg(sk, t); applyDmg(d2, true, t); }
     if (sk.effect && t.hp > 0 && sk.effect !== "smoke" && sk.effect !== "pen") applySkillEffectTo(sk.effect, t, s);
     if (t.hp > 0) checkElementalReaction(sk, t, s); // v0.50 元素联动
+    // v0.50 P3: Boss反制 — 炼狱难度Boss/精英被技能命中后下次攻击+20%（叠3层）
+    if (t.hp > 0 && (s._currentRoomType === 'boss' || s._currentRoomType === 'elite')) {
+      var isHell2 = s.difficulty && s.difficulty.startsWith('hell');
+      if (isHell2) t._counterStacks = Math.min(3, (t._counterStacks || 0) + 1);
+    }
   }
 
   var alive = (s.enemies || []).filter(function(e) { return e.hp > 0; });
@@ -501,26 +533,26 @@ function checkElementalReaction(skill, enemy, s) {
   // 蒸发：燃烧目标被冰霜技能命中 → 额外15%当前HP伤害
   if (effect === 'slow' && enemy._buffs && enemy._buffs.some(function(b){return b.id==='burn';})) {
     var extra = Math.floor(enemy.hp * 0.15);
-    if (extra > 0) { enemy.hp -= extra; bigFloat('🔥蒸发！-' + extra, 'big-crit', 600); log('<span class="warn">🔥 蒸发！冰霜命中燃烧目标，额外' + extra + '伤害</span>'); }
+    if (extra > 0) { enemy.hp -= extra; bigFloat('🔥蒸发！-' + extra, 'big-fire', 600); log('<span class="warn">🔥 蒸发！冰霜命中燃烧目标，额外' + extra + '伤害</span>'); }
   }
   // 超导：迟缓目标被闪电技能命中 → 闪电链弹射+2
   if (skill.id && skill.id.indexOf('thunder') >= 0 && enemy._buffs && enemy._buffs.some(function(b){return b.id==='slow';})) {
-    p._superconduct = true; bigFloat('⚡超导！弹射+2', 'float-gold', 500); log('<span class="win">⚡ 超导！迟缓传导闪电，弹射+2</span>');
+    p._superconduct = true; bigFloat('⚡超导！弹射+2', 'big-thunder', 500); log('<span class="win">⚡ 超导！迟缓传导闪电，弹射+2</span>');
   }
   // 过载：闪电技能暴击 → 下次技能免费
   if (s._lastCrit && (skill.id && (skill.id.indexOf('thunder') >= 0 || skill.id.indexOf('lightning') >= 0)) && p._coreThunder) {
-    p._overload = true; bigFloat('⚡过载！下次技能免费', 'float-gold', 500); log('<span class="win">⚡ 过载！下次技能免费</span>');
+    p._overload = true; bigFloat('⚡过载！下次技能免费', 'big-thunder', 500); log('<span class="win">⚡ 过载！下次技能免费</span>');
   }
   // 侵蚀：中毒目标被暗影技能命中 → 中毒立即结算3回合
   if ((effect === 'poison' || (skill.id && skill.id.indexOf('shd') >= 0)) && enemy._buffs) {
     var pois = enemy._buffs.filter(function(b){return b.id==='poison';});
-    pois.forEach(function(pb){ if(pb.data&&pb.data.dmg){ var d=pb.data.dmg*Math.min(3,pb.turns||1); enemy.hp-=d; pb.turns=Math.max(0,(pb.turns||0)-3); bigFloat('☠️侵蚀！-' + d, 'big-crit', 500); log('<span class="warn">☠️ 侵蚀！暗影引爆中毒，' + d + '伤害</span>'); } });
+    pois.forEach(function(pb){ if(pb.data&&pb.data.dmg){ var d=pb.data.dmg*Math.min(3,pb.turns||1); enemy.hp-=d; pb.turns=Math.max(0,(pb.turns||0)-3); bigFloat('☠️侵蚀！-' + d, 'big-shadow', 500); log('<span class="warn">☠️ 侵蚀！暗影引爆中毒，' + d + '伤害</span>'); } });
   }
   // 净化：诅咒持有者被圣光技能命中 → 移除1诅咒永久HP+5
   if (p._coreLight && s.curses.length > 0 && (skill.id && (skill.id.indexOf('light') >= 0 || skill.id.indexOf('heal') >= 0))) {
     var removed = s.curses.shift();
     p.maxHp += 5; p.hp += 5;
-    bigFloat('✨净化！-' + (removed?removed.name:'诅咒') + ' HP+5', 'float-heal', 700); log('<span class="heal">✨ 净化！移除' + (removed?removed.name:'诅咒') + '，HP+5</span>');
+    bigFloat('✨净化！-' + (removed?removed.name:'诅咒') + ' HP+5', 'big-light', 700); log('<span class="heal">✨ 净化！移除' + (removed?removed.name:'诅咒') + '，HP+5</span>');
   }
   // 共鸣：持有2个同元素遗物+使用该元素技能 → 免费协同攻击50%ATK
   var eleFlags = [{k:'_coreFlame',e:'burn'},{k:'_coreIce',e:'slow'},{k:'_coreShadow',e:'poison'},{k:'_coreThunder',e:'stun'}];
@@ -565,6 +597,7 @@ export function doDefend() {
   if ((s._actionsThisTurn || 0) >= MAX_ACTIONS) return;
   s._defendedThisTurn = true;
   s._actionsThisTurn = (s._actionsThisTurn || 0) + 1;
+  s._skillUseStreak = 0; // 重置技能疲劳
   s.defending = true; s.nextBoost = 0.35;
   s._interrupted = true; // 打断敌人本回合技能/蓄力
   // 【极寒之心】防御后下次普攻施加迟缓
@@ -581,25 +614,25 @@ export function doEndTurn() {
   if (s.gameOver || s._acting) return;
   s._acting = true;
   try {
-  var wasAuto = s.auto, wasSpeed = s._speedMode;
+  var wasAuto = s.auto, wasSpeed = s._speedMode, wasTurbo = s._turboMode;
   clearAuto();
   if (s.player && s.player.energy > 0 && s.player.hp < s.player.maxHp) {
     var healAmt = s.player.energy;
     s.player.hp = Math.min(s.player.maxHp, s.player.hp + healAmt);
     if (healAmt > 0) log('<span class="heal">💤 剩余能量转化为' + healAmt + '点治疗</span>');
   }
-  // v0.50 圣光之佑：每回合回复10%HP，治疗时对敌人造成等量伤害
+  // v0.50 圣光之佑：每回合回复6%HP，治疗时对敌人造成50%等量伤害
   if (s.player && s.player._coreLight && s.player.hp < s.player.maxHp) {
     var p2 = s.player;
-    var lightHeal = Math.floor(p2.maxHp * 0.10);
+    var lightHeal = Math.floor(p2.maxHp * 0.06);
     var actualHeal = Math.min(lightHeal, p2.maxHp - p2.hp);
     p2.hp = Math.min(p2.maxHp, p2.hp + lightHeal);
     if (actualHeal > 0 && s.enemies && s.enemies.length > 0) {
       var alive = s.enemies.filter(function(ee){return ee && ee.hp > 0;});
       if (alive.length > 0) {
         var target = alive[Math.floor(Math.random() * alive.length)];
-        target.hp -= actualHeal;
-        bigFloat('-' + actualHeal + '✨', 'float-heal', 400);
+        target.hp -= Math.floor(actualHeal * 0.5);
+        bigFloat('-' + Math.floor(actualHeal * 0.5) + '✨', 'float-heal', 400);
       }
     }
   }
@@ -628,7 +661,9 @@ function calcDmg(sk, targetEnemy) {
     const pen = (p.pen || 0) + (sk.extraPen || 0) + (sk.pen || 0);
     def = Math.floor(def * (1 - pen));
   }
-  let dmg = Math.max(1, atk - def);
+  // v0.50 P2: 护甲减伤公式 — def越高收益越递减
+  let dmg = Math.floor(atk * (1 - def / (def + 100)));
+  dmg = Math.max(1, dmg);
   // 【破绽系统】每3回合敌人露破绽，技能和普攻均享受3倍伤害
   if (s.turnInFloor > 0 && s.turnInFloor % 3 === 0 && !s._weakSpotShown) {
     dmg = Math.floor(dmg * 3); s._weakSpotShown = true;
@@ -637,7 +672,7 @@ function calcDmg(sk, targetEnemy) {
     dmg = Math.floor(dmg * 3);
   }
   // 【咒缚之源】每个诅咒+20%总伤害（必须在 dmg 定义之后）
-  if (p._coreCurse && s.curses.length > 0) { dmg = Math.floor(dmg * (1 + s.curses.length * 0.2)); }
+  if (p._coreCurse && s.curses.length > 0) { dmg = Math.floor(dmg * (1 + s.curses.length * 0.12)); }
   if (isSkill) dmg = Math.floor(dmg * (sk.mul || p.skillMul));
   else if (sk && sk.mul) dmg = Math.floor(dmg * sk.mul);
   dmg = Math.max(dmg, Math.floor(atk * 0.15));
@@ -681,9 +716,9 @@ function applyDmg(dmg, skill, targetEnemy, forceCrit) {
   }
   // v0.50 雷霆之怒：暴击时释放闪电链
   if (crit && p._coreThunder && s.enemies && s.enemies.length > 1) {
-    var chainDmg = Math.floor(dmg * 0.5); // 闪电伤害+50%
+    var chainDmg = Math.floor(dmg * 0.3); // 闪电伤害+30%
     var chainTargets = s.enemies.filter(function(te) { return te !== e && te.hp > 0; });
-    var chainCount = Math.min(p._thunderChain >= 1 ? 4 : 3, chainTargets.length);
+    var chainCount = Math.min(p._thunderChain >= 1 ? 3 : 2, chainTargets.length);
     bigFloat('⚡ 闪电链！×' + chainCount, 'float-gold', 500);
     for (var ci = 0; ci < chainCount; ci++) {
       var target = chainTargets[ci % chainTargets.length];
@@ -846,6 +881,12 @@ function enemyTurn() {
   if (p._cursePlague) {
     s.enemies.forEach(function(e) { if (e && e.hp > 0) { var d = Math.max(1, Math.floor(e.maxHp * 0.03)); e.hp -= d; } });
   }
+  // v0.50 P2: 厄运诅咒 — 持有3+诅咒时每回合损失2%最大生命
+  if (p._doomCurse && s.curses.length >= 3) {
+    var doomDmg = Math.max(1, Math.floor(p.maxHp * 0.02));
+    p.hp = Math.max(0, p.hp - doomDmg);
+    if (p.hp <= 0) { p.hp = 0; Game.sync(); setTimeout(function() { gameOver(); }, 500); return; }
+  }
   // 过滤已死亡敌人，防止空对象访问
   s.enemies = (s.enemies || []).filter(function(e) { return e && e.hp > 0; });
   if (s.selectedTarget >= s.enemies.length) s.selectedTarget = 0;
@@ -862,7 +903,18 @@ function enemyTurn() {
       e._intent = null; e.chargeTurns = 0;
       setTimeout(function() { bigFloat("🛡️ 打断！", "big-crit", 800); screenShake(1); }, 50);
     }
-    var dmg = Math.max(1, e.atk - p.def);
+    // v0.50 P2: 护甲减伤公式
+    var dmg = Math.floor(e.atk * (1 - p.def / (p.def + 100)));
+    dmg = Math.max(1, dmg);
+    // v0.50 P3: Boss反制 — 每层+20%伤害，攻击后重置
+    if (e._counterStacks > 0) {
+      dmg = Math.floor(dmg * (1 + e._counterStacks * 0.2));
+      e._counterStacks = 0;
+    }
+    // v0.50 P0: 精通Lv15负面效果（所有难度生效）
+    if (p._masteryDownside === 'fragile') dmg = Math.floor(dmg * 1.3);       // 影卫: 承伤+30%
+    if (p._masteryDownside === 'elemental') dmg = Math.floor(dmg * 1.2);      // 法师: 元素伤+20%
+    if (p._masteryDownside === 'close') dmg = Math.floor(dmg * 1.25);         // 弓手: 近身受罚
     // 应用减伤属性
     if (p.dmgReduce > 0) dmg = Math.floor(dmg * (1 - Math.min(p.dmgReduce, 0.8)));
     if (hasBuff(e, 'slow')) { dmg = Math.floor(dmg * 0.7); removeBuff(e, 'slow'); }
@@ -888,6 +940,29 @@ function enemyTurn() {
     if (p.hp <= 0) return;
   });
 
+  // v0.50 P1: Boss Rage — 二阶段Boss额外攻击一次，无视50%闪避
+  if (s._bossRage && s._currentRoomType === 'boss' && p.hp > 0) {
+    enemies.forEach(function(e) {
+      if (!e || e.hp <= 0 || p.hp <= 0) return;
+      var rageDmg = Math.floor(e.atk * (1 - p.def / (p.def + 100)));
+      rageDmg = Math.max(1, rageDmg);
+      if (p.dmgReduce > 0) rageDmg = Math.floor(rageDmg * (1 - Math.min(p.dmgReduce, 0.8)));
+      if (s.defending) rageDmg = Math.floor(rageDmg * 0.5);
+      // Rage无视50%闪避
+      var effectiveDodge = (p.dodge || 0) * (1 - (s._bossRageIgnoreDodge || 0.5));
+      if (effectiveDodge > 0 && s.rng.chance(effectiveDodge)) {
+        rageDmg = 0; Events.emit(E.BATTLE_START, { type: 'dodge' });
+        bigFloat('🌑 闪避！', 'big-dodge', 700);
+        return;
+      }
+      // 镜盾仍可格挡
+      if (p._mirrorShield && s.rng && s.rng.chance(0.2)) {
+        rageDmg = 0; bigFloat("🛡️ 格挡！", "big-dodge", 700); return;
+      }
+      strike(rageDmg, e);
+    });
+  }
+
   if (p.hp <= 0) { p.hp = 0; Game.sync(); setTimeout(() => gameOver(), 500); return; }
   s._interrupted = false;
   var realAlive = (s.enemies || []).some(function(e) { return e.hp > 0; });
@@ -902,12 +977,23 @@ function enemyTurn() {
     win(); return;
   }
   if (s.defending) s.defending = false;
+  // 标准回合CD-1
   if (s.skillCooldowns) {
+    Object.keys(s.skillCooldowns).forEach(function(k) { if (s.skillCooldowns[k] > 0) s.skillCooldowns[k]--; });
+  }
+  // v0.50: 精通Lv4 CDR额外-1
+  if (s.player._masteryCDR && s.skillCooldowns) {
     Object.keys(s.skillCooldowns).forEach(function(k) { if (s.skillCooldowns[k] > 0) s.skillCooldowns[k]--; });
   }
   // 【无限法力】额外-1CD
   if (s.player._infMana && s.skillCooldowns) {
     Object.keys(s.skillCooldowns).forEach(function(k) { if (s.skillCooldowns[k] > 0) s.skillCooldowns[k]--; });
+  }
+  // v0.50 P1: CD最低2回合硬底线
+  if (s.skillCooldowns) {
+    Object.keys(s.skillCooldowns).forEach(function(k) {
+      if (s.skillCooldowns[k] > 0 && s.skillCooldowns[k] < 2) s.skillCooldowns[k] = 2;
+    });
   }
   // 新Zone环境
   if (s._zoneMod?.id === "tower_lower_drain") { s.player.hp = Math.max(0, s.player.hp - Math.max(1, Math.floor(s.player.maxHp * 0.02))); }
@@ -1022,13 +1108,19 @@ function win() {
   s.relics.forEach(function(r) { if (r.onKill) r.onKill(s.player, s); });
   if (s._waveIndex + 1 < s._waveTotal && s._waves && s._waves[s._waveIndex + 1]) {
     s._waveIndex++;
-    var wasAuto = s.auto; var wasSpeed = s._speedMode;
+    var wasAuto = s.auto; var wasSpeed = s._speedMode; var wasTurbo = s._turboMode;
     var nextWave = s._waves[s._waveIndex];
     var dScale = R.get('difficulties', s.difficulty) || {};
     var zScale = s.zone ? (s.zone.scale || 1.0) : 1.0;
     nextWave.forEach(function(em) {
       em.hp = Math.floor(em.hp * (dScale.monsterMul||1) * zScale);
       em.atk = Math.floor(em.atk * (dScale.monsterMul||1) * (1 + (zScale-1)*0.25));
+      em.maxHp = em.hp;
+      // v0.50 P1: 怪物动态成长
+      var floorScale = s.totalFloor || 1;
+      em.hp = Math.floor(em.hp * (1 + floorScale * 0.02));
+      em.atk = Math.floor(em.atk * (1 + floorScale * 0.015));
+      em.def = Math.floor((em.def || 0) * (1 + floorScale * 0.01));
       em.maxHp = em.hp;
     });
     s.enemies = nextWave;
@@ -1052,12 +1144,12 @@ function win() {
     Game.sync();
     clearAuto();
     s._winning = false; // 重置胜利锁，让下一波能正常触发奖励
-    if (wasAuto || wasSpeed) { var s2 = Game.state; if (s2.auto || s2._speedMode) startAutoLoop(); }
+    if (wasAuto || wasSpeed || wasTurbo) { var s2 = Game.state; if (s2.auto || s2._speedMode || s2._turboMode) startAutoLoop(); }
     return;
   }
 
   if (s._currentRoomType === "boss" && !s._bossPhase2 && bossEnemy && bossEnemy.phase2) {
-    var phase2TriggerHp = Math.floor((bossEnemy.maxHp || bossEnemy.hp * 2) * 0.4);
+    var phase2TriggerHp = Math.floor((bossEnemy.maxHp || bossEnemy.hp * 2) * 0.3);
     if (bossEnemy.hp <= phase2TriggerHp) {
       s._bossPhase2 = true;
       var p2 = bossEnemy.phase2;
@@ -1082,11 +1174,16 @@ function win() {
             onTick: function(em,b){ em.hp -= b.data.dmg; if (em.hp <= 0) return 'dead'; } });
         }
         s._furyActive = false;
+        // v0.50 P1: Boss二阶段"狂暴"状态 — 每回合攻击+1次，无视50%闪避
+        s._bossRage = true;
+        s._bossRageAttacks = 1;
+        s._bossRageIgnoreDodge = 0.5;
         s.enemy = bossEnemy;
+        // 清除已死的小怪，确保Boss在敌人列表中
+        s.enemies = s.enemies.filter(function(e) { return e.hp > 0 || e === bossEnemy; });
+        if (s.enemies.indexOf(bossEnemy) < 0) s.enemies.push(bossEnemy);
         s.selectedTarget = s.enemies.indexOf(bossEnemy);
         if (s.selectedTarget < 0) s.selectedTarget = 0;
-        // 清除已死的小怪
-        s.enemies = s.enemies.filter(function(e) { return e.hp > 0 || e === bossEnemy; });
         s.auto = false; s._speedMode = false; clearAuto();
         s._winning = false;
         // v0.50 喘息回合：恢复玩家30%HP + 50%能量
@@ -1182,6 +1279,8 @@ function win() {
   if (s.curses.length >= 3) checkAchievement(s, "three_curses");
   if (s.totalFloor >= 30 && s.endless) checkAchievement(s, "endless_30");
   // _furyActive 由 startBattle() 清除，此处不再清零（否则狂战士之魂永远不触发）
+  // v0.51: 遗物保底计数器（每场战斗+1，掉落遗物时重置）
+  s._relicPity = (s._relicPity || 0) + 1;
   s.stats.roomsCleared++;
   s.auto = false; s._speedMode = false; clearAuto();
   Game.sync();
@@ -1226,20 +1325,21 @@ function gameOver() {
   if (_onOver) _onOver();
 }
 
-// ---- 战斗模式（手动→加速→自动 三档循环）----
+// ---- 战斗模式（手动→×2→自动→×4 四档循环）----
 export function toggleAuto() {
   const s = Game.state; clearAuto();
-  if (!s.auto && !s._speedMode) { s._speedMode = true; s.auto = false; }
-  else if (s._speedMode) { s._speedMode = false; s.auto = true; }
-  else { s._speedMode = false; s.auto = false; }
+  if (!s.auto && !s._speedMode && !s._turboMode) { s._speedMode = true; s.auto = false; s._turboMode = false; }     // ×2
+  else if (s._speedMode) { s._speedMode = false; s.auto = true; s._turboMode = false; }                              // 自动
+  else if (s.auto) { s._speedMode = false; s.auto = false; s._turboMode = true; }                                    // ×4
+  else { s._speedMode = false; s.auto = false; s._turboMode = false; }                                                // 手动
   Game.sync();
-  if (s.auto || s._speedMode) startAutoLoop();
+  if (s.auto || s._speedMode || s._turboMode) startAutoLoop();
 }
 function autoLoop() {
   const s = Game.state;
   if (!s || s.gameOver || s._winning || !s.player || !s.enemies) { clearAuto(); return; }
   var anyAlive = s.enemies.some(function(e) { return e && e.hp > 0; });
-  if (!anyAlive || (!s.auto && !s._speedMode)) { clearAuto(); return; }
+  if (!anyAlive || (!s.auto && !s._speedMode && !s._turboMode)) { clearAuto(); return; }
   // 能量耗尽→直接结束回合（绕过doEndTurn的_acting锁，防卡死）
   if (!s.player || s.player.energy <= 0 || (s._actionsThisTurn || 0) >= MAX_ACTIONS) {
     s._acting = true; try { enemyTurn(); Game.sync(); } finally { s._acting = false; }
@@ -1268,7 +1368,7 @@ function autoLoop() {
 // ---- 药水（含炼金宗师羁绊增强）----
 export function usePotion(idx) {
   const s = Game.state; if (idx < 0 || idx >= s.potions.length) return false;
-  var wasAuto = s.auto, wasSpeed = s._speedMode;
+  var wasAuto = s.auto, wasSpeed = s._speedMode, wasTurbo = s._turboMode;
   clearAuto();
   try {
   const pot = s.potions[idx];
@@ -1291,7 +1391,8 @@ export function usePotion(idx) {
   playSound("potion");
   Events.emit(E.BATTLE_START, { type: 'potion', name: pot.name, desc: pot.desc });
   } finally {
-    if (wasAuto || wasSpeed) { s.auto = wasAuto; s._speedMode = wasSpeed; }
+    if (wasAuto || wasSpeed || wasTurbo) { s.auto = wasAuto; s._speedMode = wasSpeed; s._turboMode = wasTurbo; }
+    if (wasAuto || wasSpeed || wasTurbo) startAutoLoop();
     Game.sync();
   }
   return true;

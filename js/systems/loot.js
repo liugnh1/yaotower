@@ -1,6 +1,7 @@
 // ===================== 装备/遗物生成 =====================
 import { Game } from '../core/state.js';
 import { R } from '../core/registry.js';
+import { log } from '../ui/effects.js';
 
 // ---- 加权选择（基于 RNG）----
 function weightedPick(arr, rng) {
@@ -89,6 +90,14 @@ export function genEquip(zoneId) {
 export function genRelic() {
   const s = Game.state;
   const rng = (s && s.rng) ? s.rng : { next: () => Math.random(), pick: (arr) => arr[Math.floor(Math.random() * arr.length)], chance: (p) => Math.random() < p, range: (min, max) => min + Math.floor(Math.random() * (max - min + 1)), shuffle: (arr) => { var a = arr.slice(); for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; } };
+  // v0.51: 遗物保底 — 连续3场战斗无遗物，强制掉落
+  if (s && s._relicPity >= 3) {
+    s._relicPity = 0;
+    var commons = (R.get('relics') || []).filter(function(r) { return r.rarity === 'common'; });
+    if (commons.length > 0) { log('🍀 运势积累！遗物降临！', 'win'); return { ...rng.pick(commons) }; }
+  }
+  // 正常生成后重置保底计数器
+  if (s) s._relicPity = 0;
   const diff = R.get('difficulties', s?.difficulty) || R.get('difficulties', 'standard');
   const legendRate = diff.legendRate || 0.02;
   // 诅咒"恐惧"/"贫困"：遗物掉率翻倍（提高稀有度分布）
@@ -116,6 +125,16 @@ export function genRelic() {
   if (s.zone && s.zone.relicPool && rng.next() < 0.5) {
     pool = s.zone.relicPool.map(id => allRelics.find(r => r.id === id)).filter(Boolean);
     if (pool.length === 0) pool = allRelics;
+  }
+
+  // v0.51: 核心遗物在普通难度低概率出现（1%），炼狱正常概率
+  var isHell = s.difficulty && s.difficulty.startsWith('hell');
+  if (!isHell) {
+    // 1%概率保留核心遗物（让普通玩家也能体验），否则过滤掉
+    if (!rng.chance(0.01)) {
+      pool = pool.filter(function(r) { return !r.id || !r.id.startsWith('core_'); });
+      if (pool.length === 0) pool = allRelics.filter(function(r) { return r.rarity !== 'legendary'; });
+    }
   }
 
   // 追猎目标加成：选中的遗物出现率×5

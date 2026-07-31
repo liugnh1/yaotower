@@ -5,10 +5,29 @@ import { E, Events } from '../core/event-bus.js';
 import { log, toast, float, updateArena } from './effects.js';
 import { switchScreen, showModal, hideModal, hideAllModals } from './screens.js';
 import { RARITY_COLOR } from '../content/relics.js';
-import { getIntent } from '../systems/combat.js';
 import { startHeartbeat, stopHeartbeat } from '../core/audio.js';
+import { TIPS } from '../content/tips.js';
 
+var _lastTipFloor = -1;
 export function render(s) {
+  // v0.51: 房间切换时显示随机提示
+  if (s && s.totalFloor !== _lastTipFloor && TIPS && TIPS.length > 0) {
+    _lastTipFloor = s.totalFloor;
+    var tip = TIPS[Math.floor(Math.random() * TIPS.length)];
+    var tipEl = document.getElementById("loading-tip");
+    if (tipEl) { tipEl.textContent = '💡 ' + tip; tipEl.style.display = 'block'; setTimeout(function() { tipEl.style.display = 'none'; }, 4000); }
+  }
+  // v0.51 主界面资源条实时刷新（每次 render 都更新）
+  var metaBar = document.getElementById("meta-bar");
+  if (metaBar && Game.meta) {
+    metaBar.textContent = '🌟' + (Game.meta.essence||0) + '灵蕴 · 💎' + (Game.meta.souls||0) + '魂晶 · ⚒️' + (Game.meta.forgeStones||0) + '锻石 · 📦' + (Game.meta.materials||0) + '素材';
+  }
+  var loginBtn = document.getElementById("btn-login");
+  if (loginBtn && Game.meta) {
+    var todayStr = new Date().getFullYear() + '-' + (new Date().getMonth()+1) + '-' + new Date().getDate();
+    var claimed = Game.meta.lastClaimDay === todayStr;
+    loginBtn.textContent = claimed ? '✅ 已签到(' + (Game.meta.loginStreak||1) + '天)' : '📅 每日签到(连续' + (Game.meta.loginStreak||1) + '天)';
+  }
   // 称号显示
   var titleEl = document.getElementById("player-title");
   if (titleEl && Game.meta) {
@@ -96,19 +115,19 @@ export function render(s) {
         skillBtn.classList.remove("on-cd");
         skillBtn.disabled = true;
       } else if (allReady) {
-        // 显示各技能名+能量消耗
+        // v0.50 全部就绪：显示各技能名+能量消耗
         var skillNames = skills.map(function(sk) { return sk.icon + sk.name + '(' + (sk.energyCost||1) + '⚡)'; }).join(" ");
-        skillBtn.textContent = "⚡ " + skillNames;
+        skillBtn.innerHTML = "⚡ " + skillNames;
         skillBtn.classList.remove("on-cd");
         skillBtn.disabled = (s.player.energy <= 0);
       } else {
-        // 显示每个技能的CD
+        // 显示每个技能的CD（就绪+冷却混合）
         var cdTexts = skills.map(function(sk, i) {
           var cdKey = sk.id || ('skill_' + i);
           var cd = s.skillCooldowns[cdKey] || 0;
-          return cd > 0 ? sk.icon + "CD" + cd : sk.icon + '(' + (sk.energyCost||1) + '⚡)';
+          return cd > 0 ? sk.icon + ' <b style="font-size:13px;color:#ff6644">⏳' + cd + '</b>' : sk.icon + ' <span style="color:#89e894">✓</span>';
         });
-        skillBtn.textContent = "⚡ " + cdTexts.join(" ");
+        skillBtn.innerHTML = "⚡ " + cdTexts.join(" ");
         skillBtn.classList.add("on-cd");
         // 所有技能都在CD中 → 禁用按钮
         var allOnCD = skills.every(function(sk, i) {
@@ -118,10 +137,17 @@ export function render(s) {
         skillBtn.disabled = allOnCD;
       }
     }
-    document.getElementById("pl-skill-name").textContent = skills.length > 0 ? skills.map(function(sk) { return sk.icon + sk.name + "(CD" + (sk.cooldown || 1) + " ⚡" + (sk.energyCost||1) + ")"; }).join(" ") : "无技能";
+    // v0.50 显示技能基础CD + 当前剩余CD（若在冷却中）
+    var skillEl = document.getElementById("pl-skill-name");
+    if (skillEl) skillEl.innerHTML = skills.length > 0 ? skills.map(function(sk) {
+      var cdKey = sk.id || 'skill_0';
+      var remaining = s.skillCooldowns && s.skillCooldowns[cdKey] ? s.skillCooldowns[cdKey] : 0;
+      var cdInfo = remaining > 0 ? '<b style="color:#ff6644">🔒' + remaining + '/' + (sk.cooldown || 1) + '</b>' : 'CD' + (sk.cooldown || 1);
+      return sk.icon + sk.name + '(' + cdInfo + ' ⚡' + (sk.energyCost||1) + ')';
+    }).join(' ') : '无技能';
     // 自动战斗指示器
     var ai = document.getElementById("auto-indicator");
-    if (ai) ai.textContent = s._speedMode ? "⚡ 加速战斗中..." : (s.auto ? "🤖 自动战斗中..." : "");
+    if (ai) ai.textContent = s._turboMode ? "💨 ×4极速中..." : (s._speedMode ? "⚡ ×2加速中..." : (s.auto ? "🤖 自动中..." : ""));
   }
 
   // 装备列表（可点击丢弃）+ 套装进度
@@ -214,8 +240,15 @@ export function render(s) {
         card.className = "enemy-card";
         card.style.borderColor = selected ? "#ffdd77" : (isBoss ? "#ffa502" : "#5a3a3a");
         card.style.boxShadow = selected ? "0 0 12px rgba(255,200,100,.5)" : "none";
+        var blind = s.player && s.player._blindCurse;
         var intentText = '';
-        if (e._intent) { intentText = '<div style="font-size:9px;color:#ffcc00;margin-top:2px">' + e._intent.icon + ' <b>' + e._intent.name + '</b></div>'; }
+        if (e._intent) {
+          if (blind) {
+            intentText = '<div style="font-size:9px;color:#888;margin-top:2px">❓ <b>未知</b></div>';
+          } else {
+            intentText = '<div style="font-size:9px;color:#ffcc00;margin-top:2px">' + e._intent.icon + ' <b>' + e._intent.name + '</b></div>';
+          }
+        }
         // v0.50 敌人buff图标
         var buffIcons = '';
         if (e._buffs && e._buffs.length > 0) {
@@ -223,12 +256,19 @@ export function render(s) {
           buffIcons = '<div style="font-size:8px;margin-top:1px">' + e._buffs.map(function(b){return buffMap[b.id]||'🔹';}).join('') + '</div>';
         }
         var tagText = (e.tags && e.tags.length > 0) ? '<div style="font-size:8px;color:#ff8844">' + e.tags.map(function(t){return t.name;}).join(' ') + '</div>' : '';
+        // v0.50 失明诅咒：隐藏敌人HP和ATK数值
+        var hpText = blind ? '???/???' : Math.max(0, e.hp) + '/' + e.maxHp;
+        var atkText = blind ? 'ATK:???' : 'ATK:' + (e.atk || 0);
+        // HP条在失明时也隐藏（显示为空条）
+        var hpBarWidth = blind ? 0 : ehp;
+        // HP 条颜色根据剩余比例动态变化：红(<30%) → 橙(30-60%) → 绿(>60%)
+        var hpColor = ehp > 60 ? '#4caf50' : ehp > 30 ? '#ff9800' : '#f44336';
         card.innerHTML = '<div class="enemy-card-icon">' + (e.icon || '👹') + '</div>' +
           buffIcons +
           '<div class="enemy-card-name" style="color:' + (isBoss ? '#ffa502' : '#ff7b7b') + '">' + e.name + '</div>' +
           tagText +
-          '<div class="enemy-card-hp-bar"><div class="enemy-card-hp-fill" style="width:' + ehp + '%;background:' + (ehp > 60 ? '#c04040' : ehp > 30 ? '#c08030' : '#c02020') + '"></div></div>' +
-          '<div class="enemy-card-hp-text">' + Math.max(0, e.hp) + '/' + e.maxHp + ' ATK:' + (e.atk || 0) + '</div>' +
+          '<div class="enemy-card-hp-bar"><div class="enemy-card-hp-fill" style="width:' + hpBarWidth + '%;background:' + hpColor + '"></div></div>' +
+          '<div class="enemy-card-hp-text">' + hpText + ' ' + atkText + '</div>' +
           intentText;
         card.onclick = function() { s.selectedTarget = i; render(s); };
         enemyArea.appendChild(card);
@@ -272,8 +312,9 @@ export function render(s) {
   }
   const btnAuto = document.getElementById("btn-auto");
   if (btnAuto) {
-    if (s._speedMode) { btnAuto.style.background = "#8b4500"; btnAuto.textContent = "⚡ 加速中"; }
-    else if (s.auto) { btnAuto.style.background = "#8b0000"; btnAuto.textContent = "🤖 自动中"; }
+    if (s._turboMode) { btnAuto.style.background = "#6a0dad"; btnAuto.textContent = "💨 ×4 极速"; }
+    else if (s._speedMode) { btnAuto.style.background = "#8b4500"; btnAuto.textContent = "⚡ ×2 加速"; }
+    else if (s.auto) { btnAuto.style.background = "#8b0000"; btnAuto.textContent = "🤖 自动"; }
     else { btnAuto.style.background = "#2a3d66"; btnAuto.textContent = "▶️ 手动"; }
   }
 }

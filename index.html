@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <link rel="icon" href="data:,">
-<title>妖塔 v0.47 · 肉鸽爬塔</title>
+<title>妖塔 v0.50 · 肉鸽爬塔</title>
 <link rel="stylesheet" href="css/main.css">
 </head>
 <body>
@@ -28,7 +28,7 @@
     <!-- 种子输入 -->
     <div id="daily-fortune" style="color:#ffa502;font-size:11px;margin-bottom:4px"></div>
     <div id="player-title" style="color:#ffa502;font-size:13px;font-weight:bold;margin-bottom:2px;cursor:pointer" title="点击查看成就与称号"></div>
-    <span id="login-streak" style="color:#ff6644;font-size:10px"></span>
+    <button id="btn-login" style="color:#ff6644;font-size:10px;background:none;border:1px solid #5a3030;border-radius:10px;padding:2px 10px;cursor:pointer;margin-bottom:4px">📅 每日签到</button>
     <div id="meta-bar" style="color:#8888aa;font-size:10px;margin-bottom:4px"></div>
     <div class="seed-row">
       <input id="seed-input" placeholder="📜 输入种子（留空随机）" maxlength="20">
@@ -84,7 +84,11 @@
   <div class="tome-footer">
     <div class="footer-btn" id="btn-daily">📅 每日悬赏</div>
     <div class="footer-divider">│</div>
-    <div class="footer-btn" id="btn-show-lb-start">📊 功勋柱</div>
+    <div class="footer-btn" id="btn-show-lb-start">📊 丰碑史记</div>
+    <div class="footer-divider">│</div>
+    <div class="footer-btn" id="btn-tap-lb" style="color:#86c0ff">🌐 在线排行</div>
+    <div class="footer-divider">│</div>
+    <div class="footer-btn" id="btn-cloud-save" style="color:#89e894">☁️ 云存档</div>
     <div class="footer-divider">│</div>
     <div class="footer-btn footer-btn-danger" id="btn-delete">🌊 重置旅程</div>
   </div>
@@ -99,6 +103,30 @@
     <span id="relic-progress" style="cursor:pointer" onclick="document.getElementById('btn-compendium').click()">📚 遗物 0/0</span>
     <br>「魔塔的阴影正在蔓延……勇士，请做好准备。」
   </div>
+</div>
+
+<!-- TapTap 在线排行面板 -->
+<div id="tap-lb-panel" class="modal">
+  <h3>🌐 在线排行榜</h3>
+  <div id="tap-lb-status" style="color:#8899bb;font-size:12px;margin-bottom:10px">检测中...</div>
+  <div id="tap-lb-content" style="text-align:left;font-size:13px;max-height:50vh;overflow-y:auto"></div>
+  <div style="display:flex;gap:6px;margin-top:10px">
+    <button class="modal-btn" id="btn-tap-lb-total" style="flex:1;text-align:center;font-size:12px">🏆 最高层数</button>
+    <button class="modal-btn" id="btn-tap-lb-daily" style="flex:1;text-align:center;font-size:12px">📅 每日挑战</button>
+  </div>
+  <button class="restart-btn" style="margin-top:8px;width:100%" id="btn-close-tap-lb">关闭</button>
+</div>
+
+<!-- TapTap 云存档面板 -->
+<div id="tap-cloud-panel" class="modal">
+  <h3>☁️ 云存档</h3>
+  <div id="tap-cloud-status" style="color:#8899bb;font-size:12px;margin-bottom:10px">检测中...</div>
+  <div id="tap-cloud-slots" style="text-align:left;font-size:12px;max-height:40vh;overflow-y:auto;margin-bottom:10px"></div>
+  <div style="display:flex;gap:6px">
+    <button class="modal-btn" id="btn-cloud-upload" style="flex:1;text-align:center;font-size:12px;background:#1a2a1a;border-color:#2a3a2a;color:#89e894">📤 上传存档</button>
+    <button class="modal-btn" id="btn-cloud-download" style="flex:1;text-align:center;font-size:12px;background:#2a1a1a;border-color:#3a2a2a;color:#ffa502">📥 下载存档</button>
+  </div>
+  <button class="restart-btn" style="margin-top:8px;width:100%" id="btn-close-tap-cloud">关闭</button>
 </div>
 
 <!-- 主城 · NPC聚集地 -->
@@ -211,6 +239,7 @@
 <!-- 战斗主界面 -->
 <div id="main" class="hidden">
   <div id="gold-bar">💰 <b id="gold-text">0</b> <span id="relic-count-bar" style="margin-left:8px;font-size:11px"></span> <span id="bounty-tracker" style="margin-left:8px;font-size:10px;color:#ffa502"></span> <span id="meta-currency-bar" style="margin-left:8px;font-size:10px;color:#8888aa"></span></div>
+  <div id="loading-tip" style="display:none;text-align:center;padding:3px 8px;font-size:10px;color:#8899aa;background:#1a1a2e;border-radius:4px;margin-bottom:4px"></div>
   <div id="relic-bar" class="panel" style="padding:6px 8px;margin-bottom:6px;min-height:28px;font-size:12px;display:flex;flex-wrap:wrap;gap:4px;align-items:center"></div>
   <div id="floor">第 1 层</div>
   <div id="zone-name" style="text-align:center;color:#8899bb;font-size:12px;margin-bottom:4px">迷雾平原</div>
@@ -311,6 +340,19 @@
   <button class="modal-btn" id="btn-end-run">🏠 见好就收（结算）</button>
 </div>
 
+<!-- 每日签到 -->
+<div id="daily-checkin" class="modal" style="padding:20px">
+  <h3>📅 每日签到</h3>
+  <div id="checkin-streak" style="color:#ffa502;font-size:13px;margin-bottom:12px"></div>
+  <div id="checkin-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:14px"></div>
+  <div id="checkin-status" style="color:#8899bb;font-size:13px;margin-bottom:10px;min-height:20px"></div>
+  <div style="display:flex;gap:6px">
+    <button id="btn-checkin-claim" class="modal-btn" style="flex:1;text-align:center;font-size:14px;background:#2a1a0a;border-color:#8a6030;color:#ffcc88">📅 签到</button>
+    <button id="btn-checkin-ad" class="modal-btn" style="flex:1;text-align:center;font-size:14px;background:#1a1a2a;border-color:#3a4a7a;color:#86c0ff">📺 广告双倍</button>
+  </div>
+  <button class="restart-btn" style="margin-top:8px;width:100%" id="btn-close-checkin">关闭</button>
+</div>
+
 <!-- 每日挑战 -->
 <div id="daily-panel" class="modal">
   <h3>📅 每日挑战</h3>
@@ -345,27 +387,81 @@
 </div>
 
 <!-- 设置面板 -->
-<div id="settings-panel" class="modal">
-  <h3>⚙️ 设置</h3>
-  <div style="text-align:left;font-size:12px;color:#8899bb;line-height:1.8">
-    <div style="margin-bottom:8px">版本：<b style="color:#ffa502">v0.50 天赋树时代</b></div>
-    <div style="margin-bottom:8px">作者：<b>妖塔开发组</b></div>
-    <div style="margin-bottom:8px">
-      <label style="cursor:pointer">
-        <input type="checkbox" id="chk-pure-mode" style="margin-right:4px"> 🗿 修行模式（关闭局外加成）
-      </label>
+<div id="settings-panel" class="modal" style="max-width:380px;padding:0;overflow:hidden">
+  <!-- 标题栏 -->
+  <div class="settings-header">
+    <h3>⚙️ 游戏设置</h3>
+  </div>
+
+  <!-- 内容区 -->
+  <div class="settings-body">
+    <!-- 音效 -->
+    <div class="settings-section">
+      <div class="settings-section-title">🎧 音频</div>
+      <div class="settings-row">
+        <span>🔊 音效</span>
+        <input type="range" id="snd-sfx-vol" min="0" max="100" value="75" class="settings-slider" oninput="document.getElementById('snd-sfx-val').textContent=this.value+'%'">
+        <span id="snd-sfx-val" class="settings-val">75%</span>
+      </div>
+      <div class="settings-row">
+        <span>🎵 音乐</span>
+        <input type="range" id="snd-music-vol" min="0" max="100" value="35" class="settings-slider">
+        <span id="snd-music-val" class="settings-val">35%</span>
+      </div>
+      <div class="settings-row">
+        <span>🔇 静音</span>
+        <label class="settings-toggle">
+          <input type="checkbox" id="chk-music-mute">
+          <span class="settings-toggle-slider"></span>
+        </label>
+      </div>
     </div>
-    <hr style="border-color:#1a1a2e;margin:8px 0">
-    <div style="display:flex;gap:4px;margin-bottom:8px">
-      <button id="btn-export-save" style="flex:1;font-size:9px;padding:4px;background:#1a2a1a;color:#89e894;border:1px solid #2a3a2a;border-radius:4px;cursor:pointer">📤 导出存档</button>
-      <button id="btn-import-save" style="flex:1;font-size:9px;padding:4px;background:#2a1a1a;color:#ffa502;border:1px solid #3a2a2a;border-radius:4px;cursor:pointer">📥 导入存档</button>
+
+    <!-- 游戏 -->
+    <div class="settings-section">
+      <div class="settings-section-title">🎮 游戏</div>
+      <div class="settings-row">
+        <span>🗿 修行模式</span>
+        <span style="color:#667;font-size:10px">关闭所有局外加成</span>
+        <label class="settings-toggle">
+          <input type="checkbox" id="chk-pure-mode">
+          <span class="settings-toggle-slider"></span>
+        </label>
+      </div>
     </div>
-    <div id="admin-section" style="opacity:0.3;font-size:10px;color:#445">
-      🪟 奇怪的窗口<br>
-      <input id="admin-input" placeholder="..." maxlength="20" style="width:100%;background:#0a0a0a;border:1px solid #1a1a2e;color:#445;padding:4px;border-radius:4px;font-size:10px;margin-top:4px">
+
+    <!-- 数据 -->
+    <div class="settings-section">
+      <div class="settings-section-title">💾 数据</div>
+      <div class="settings-btn-row">
+        <button id="btn-export-save" class="settings-btn settings-btn-export">📤 导出存档</button>
+        <button id="btn-import-save" class="settings-btn settings-btn-import">📥 导入存档</button>
+      </div>
+      <div class="settings-btn-row" style="margin-top:4px">
+        <button id="btn-reset-all" class="settings-btn settings-btn-danger">🌊 重置全部数据</button>
+      </div>
+    </div>
+
+    <!-- 关于 -->
+    <div class="settings-section">
+      <div class="settings-section-title">ℹ️ 关于</div>
+      <div class="settings-about">
+        <div class="settings-about-row"><span>版本</span><span style="color:#ffa502">v0.50 · 天赋树时代</span></div>
+        <div class="settings-about-row"><span>制作</span><span>白夜夜白</span></div>
+      </div>
+    </div>
+
+    <!-- 管理员（隐藏入口） -->
+    <div id="admin-section" class="settings-admin">
+      <div class="settings-admin-trigger" id="admin-trigger">🪟</div>
+      <input id="admin-input" placeholder="输入口令..." maxlength="20">
     </div>
   </div>
-  <button class="restart-btn" style="margin-top:10px;width:100%" id="btn-close-settings">关闭</button>
+
+  <!-- 底部按钮 -->
+  <div class="settings-footer">
+    <button id="btn-close-settings" class="settings-btn-close">✔ 完成</button>
+  </div>
 </div>
 
 <!-- 万象宝典 v0.50 左栏导航 -->

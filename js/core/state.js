@@ -171,6 +171,8 @@ function defMeta() {
     // === 局外装备 ===
     outgameEquip: [],   // 局外装备 ⭐NEW
     decorations: [],    // 城镇装饰 ⭐NEW
+    trainingLevel: 0,   // 训练场等级 v0.50 P2
+    lastFreeReset: '',  // 天赋树每周免费重置日期戳 v0.51
 
     // === 星象 ===
     stars: { daily: null, permanent: [], seasonal: null }, // ⭐NEW
@@ -188,7 +190,7 @@ function defMeta() {
     hiddenEquipFound: [], // ⭐NEW
 
     // === 签到 ===
-    loginStreak: 0, lastLogin: "", lastClaimDay: "" // ⭐NEW
+    loginStreak: 0, lastLogin: "", lastClaimDay: "", _adClaimedDay: "" // ⭐NEW
 
     // 注意: deepMergeMeta 会将旧 tp 字段保留，需要在 _loadMeta 中做迁移
   };
@@ -305,7 +307,7 @@ export const Game = {
     } catch (e) { console.warn("[妖塔] 元数据损坏，已重置", e); this.meta = defMeta(); }
     this._checkAdReset();
   },
-  saveMeta() { try { localStorage.setItem(META_KEY, JSON.stringify(this.meta)); } catch (e) { console.error("妖塔3.0: 元数据保存失败", e); } },
+  saveMeta() { try { localStorage.setItem(META_KEY, JSON.stringify(this.meta)); } catch (e) { console.error("妖塔3.0: 元数据保存失败", e); } if (_render) _render(this.state); },
 
   _checkAdReset() {
     if (!this.meta) return;
@@ -337,6 +339,11 @@ export const Game = {
   getEssence() { return this.meta.essence || 0; },
   addSouls(n) { if (!this.meta) return; this.meta.souls = Math.min((this.meta.souls || 0) + n, 9999); this.saveMeta(); },
   addStones(n) { if (!this.meta) return; this.meta.stones = Math.min((this.meta.stones || 0) + n, 9999); this.saveMeta(); },
+  // v0.50 P2: 灵石兑换魂晶 (10:1)
+  exchangeStonesForSouls() { if (!this.meta) return false; if ((this.meta.stones || 0) < 10) return false; this.meta.stones -= 10; this.meta.souls = Math.min((this.meta.souls || 0) + 1, 9999); this.saveMeta(); return true; },
+  // v0.50 P2: 训练场升级（消耗灵石永久+属性）
+  getTrainingLevel() { return this.meta.trainingLevel || 0; },
+  upgradeTraining() { if (!this.meta) return false; var lv = this.meta.trainingLevel || 0; if (lv >= 5) return false; var costs = [0, 10, 25, 50, 80, 120]; if ((this.meta.stones || 0) < costs[lv + 1]) return false; this.meta.stones -= costs[lv + 1]; this.meta.trainingLevel = (lv || 0) + 1; this.saveMeta(); return true; },
   addForgeStones(n) { if (!this.meta) return; this.meta.forgeStones = Math.min((this.meta.forgeStones || 0) + n, 999); this.saveMeta(); },
   addMaterials(n) { if (!this.meta) return; this.meta.materials = Math.min((this.meta.materials || 0) + n, 999); this.saveMeta(); },
 
@@ -344,7 +351,8 @@ export const Game = {
   hasTalentNode(nodeId) { return (this.meta.talentNodes || []).includes(nodeId); },
   unlockTalentNode(nodeId) {
     if (!this.meta.talentNodes) this.meta.talentNodes = [];
-    if (!this.meta.talentNodes.includes(nodeId)) { this.meta.talentNodes.push(nodeId); this.saveMeta(); }
+    this.meta.talentNodes.push(nodeId); // 允许重复购买（根节点叠加层数）
+    this.saveMeta();
   },
   resetAllTalents() { this.meta.talentNodes = []; this.saveMeta(); },
   resetTalentBranch(nodes) {
@@ -441,13 +449,14 @@ export const Game = {
     var s = this.state;
     // v0.50 修行模式：关闭所有局外加成
     if (this.meta._pureMode) return;
-    // 计算局外成长衰减比例（普通模式25%，炼狱50%，无尽深渊75%，其他100%）
+    // v0.50 天赋树加成衰减：休闲/标准15%，炼狱35%，无尽60%
+    // 无尽挑战/BossRush/地下城 使用100%加成（不衰减）
     var decay = 1.0;
-    if (s.mode === 'daily') decay = 0.25;
-    else if (s.difficulty && s.difficulty.startsWith('casual')) decay = 0.25;
-    else if (s.difficulty === 'standard' || (s.difficulty && s.difficulty.startsWith('standard'))) decay = 0.25;
-    else if (s.difficulty === 'hell' || (s.difficulty && s.difficulty.startsWith('hell'))) decay = 0.50;
-    else if (s.endless) decay = 0.75;
+    if (s.mode === 'daily') decay = 0.10;
+    else if (s.difficulty && s.difficulty.startsWith('casual')) decay = 0.15;
+    else if (s.difficulty === 'standard' || (s.difficulty && s.difficulty.startsWith('standard'))) decay = 0.15;
+    else if (s.difficulty === 'hell' || (s.difficulty && s.difficulty.startsWith('hell'))) decay = 0.35;
+    else if (s.endless) decay = 0.60;
     // 无尽挑战/BossRush/地下城 使用100%加成（不衰减）
 
     // 成就加成只应用一次
@@ -463,6 +472,9 @@ export const Game = {
           if (ach.bonus.defBonus) totalDefBonus += ach.bonus.defBonus;
           if (ach.bonus.critBonus) p.critRate += ach.bonus.critBonus;
           if (ach.bonus.goldBonus) p.goldMul = (p.goldMul || 1) * (1 + ach.bonus.goldBonus);
+          if (ach.bonus.dodgeBonus) p.dodge = Math.min(0.75, (p.dodge || 0) + ach.bonus.dodgeBonus);
+          if (ach.bonus.luckBonus) p._achLuckBonus = (p._achLuckBonus || 0) + ach.bonus.luckBonus;
+          if (ach.bonus.startPotion) p._achStartPotion = (p._achStartPotion || 0) + ach.bonus.startPotion;
           if (ach.bonus.allBonus) totalAllBonus += ach.bonus.allBonus;
         }
       });
@@ -476,6 +488,8 @@ export const Game = {
     }
 
     // v0.50 旧TP升级已废弃 → 统一用天赋树
+    // v0.50 P0平衡：记录原始基准值用于硬上限计算
+    var baseAtk = p.atk, baseHp = p.maxHp, baseDef = p.def, baseCrit = p.critRate;
     // 天赋树加成（应用衰减）
     var tb = this.getTalentBonuses();
     if (tb.atkMul) p.atk = Math.floor(p.atk * (1 + tb.atkMul * decay));
@@ -497,17 +511,33 @@ export const Game = {
       if (d.effect === 'hp') { p.maxHp += Math.floor(15 * decay); p.hp += Math.floor(15 * decay); }
       if (d.effect === 'gold') p.goldMul = (p.goldMul || 1) + 0.2 * decay;
     });
+
+    // v0.50 P2: 训练场永久属性加成
+    var tl = this.meta.trainingLevel || 0;
+    if (tl > 0) { p.atk += tl; p.maxHp += tl * 5; p.hp += tl * 5; p.def += tl; }
+
+    // v0.50 P0硬上限：所有局外永久加成封顶
+    var MAX_ATK_BONUS = 0.35, MAX_HP_BONUS = 0.45, MAX_DEF_BONUS = 0.30, MAX_CRIT_BONUS = 0.25;
+    p.atk = Math.min(p.atk, Math.floor(baseAtk * (1 + MAX_ATK_BONUS)));
+    p.maxHp = Math.min(p.maxHp, Math.floor(baseHp * (1 + MAX_HP_BONUS)));
+    p.hp = Math.min(p.hp, p.maxHp);
+    p.def = Math.min(p.def, Math.floor(baseDef * (1 + MAX_DEF_BONUS)));
+    p.critRate = Math.min(p.critRate, baseCrit + MAX_CRIT_BONUS);
+    p.dodge = Math.min(0.75, p.dodge || 0); // 闪避硬上限75%
+    p.lifeSteal = Math.min(0.40, p.lifeSteal || 0); // 吸血硬上限40%
   },
 
-  // 获取开局药水数量（修复 startPotion 陷阱）
+  // 获取开局药水数量（修复 startPotion 陷阱 — v0.50 合并成就加成）
   getStartPotions() {
-    const count = Math.min(this.meta.upgrades?.startPotion || 0, 2); // 上限2瓶
+    var achBonus = this.state.player ? (this.state.player._achStartPotion || 0) : 0;
+    var upgradeCount = this.meta.upgrades?.startPotion || 0;
+    const count = Math.min(upgradeCount + achBonus, 3); // 上限3瓶
     if (count <= 0) return [];
     const potionPool = R.get('potions').filter(p => p.id !== 'cleanse');
     const result = [];
     for (let i = 0; i < count; i++) {
       var src = potionPool[i % potionPool.length];
-      result.push({ ...src, fn: src.fn }); // 保留函数引用
+      result.push({ ...src, fn: src.fn });
     }
     return result;
   },
@@ -557,28 +587,28 @@ export const Game = {
     if (lv <= 0) return;
     // Lv1: 技能伤害+10%
     if (lv >= 1) p.skillMul = (p.skillMul || 1.5) + 0.10;
-    // Lv2: 主属性+5% (读取classes.js中的职业数据)
+    // Lv2: 主属性+3% (读取classes.js中的职业数据)
     if (lv >= 2) {
       var cls = R.get('classes', charId);
       if (cls) {
-        if (cls.id === 'warrior') p.atk = Math.floor(p.atk * 1.05);
+        if (cls.id === 'warrior') p.atk = Math.floor(p.atk * 1.03);
         if (cls.id === 'mage') { p.maxEnergy = (p.maxEnergy || 3) + 1; p.energy = p.maxEnergy; }
-        if (cls.id === 'shadow') p.dodge = Math.min(0.75, (p.dodge || 0) + 0.05);
-        if (cls.id === 'archer') p.critMul = (p.critMul || 1.5) + 0.10;
-        if (cls.id === 'monk') p.def = Math.floor(p.def * 1.05);
+        if (cls.id === 'shadow') p.dodge = Math.min(0.75, (p.dodge || 0) + 0.03);
+        if (cls.id === 'archer') p.critMul = (p.critMul || 1.5) + 0.06;
+        if (cls.id === 'monk') p.def = Math.floor(p.def * 1.03);
       }
     }
     // Lv4: 技能CD-1
     if (lv >= 4) p._masteryCDR = true;
-    // Lv6: 主属性+10%
+    // Lv6: 主属性+6%
     if (lv >= 6) {
       var cls2 = R.get('classes', charId);
       if (cls2) {
-        if (cls2.id === 'warrior') p.atk = Math.floor(p.atk * 1.10);
+        if (cls2.id === 'warrior') p.atk = Math.floor(p.atk * 1.06);
         if (cls2.id === 'mage') { p.maxEnergy = (p.maxEnergy || 3) + 1; p.energy = p.maxEnergy; }
-        if (cls2.id === 'shadow') p.dodge = Math.min(0.75, (p.dodge || 0) + 0.10);
-        if (cls2.id === 'archer') p.critMul = (p.critMul || 1.5) + 0.20;
-        if (cls2.id === 'monk') p.def = Math.floor(p.def * 1.10);
+        if (cls2.id === 'shadow') p.dodge = Math.min(0.75, (p.dodge || 0) + 0.06);
+        if (cls2.id === 'archer') p.critMul = (p.critMul || 1.5) + 0.12;
+        if (cls2.id === 'monk') p.def = Math.floor(p.def * 1.06);
       }
     }
     // Lv7: 技能能量-1
@@ -587,27 +617,28 @@ export const Game = {
     if (lv >= 8) p.critRate += 0.05;
     // Lv9: HP+15%
     if (lv >= 9) { p.maxHp = Math.floor(p.maxHp * 1.15); p.hp = Math.floor(p.hp * 1.15); }
-    // Lv11: 全属性+5%
+    // Lv11: 全属性+3%
     if (lv >= 11) {
-      p.atk = Math.floor(p.atk * 1.05);
-      p.def = Math.floor(p.def * 1.05);
-      p.maxHp = Math.floor(p.maxHp * 1.05); p.hp = Math.floor(p.hp * 1.05);
+      p.atk = Math.floor(p.atk * 1.03);
+      p.def = Math.floor(p.def * 1.03);
+      p.maxHp = Math.floor(p.maxHp * 1.03); p.hp = Math.floor(p.hp * 1.03);
     }
-    // Lv12: 额外药水（在getStartPotions中处理）
+    // Lv12: 额外药水（在getStartPotions中处理）+ 药水效果+10%
+    if (lv >= 12) p._masteryPotionBonus = true;
     // Lv13: 初始金币+30（在startNewGame中处理）
-    // Lv14: 主属性+15%
+    // Lv14: 主属性+10%
     if (lv >= 14) {
       var cls3 = R.get('classes', charId);
       if (cls3) {
-        if (cls3.id === 'warrior') p.atk = Math.floor(p.atk * 1.15);
+        if (cls3.id === 'warrior') p.atk = Math.floor(p.atk * 1.10);
         if (cls3.id === 'mage') { p.maxEnergy = (p.maxEnergy || 3) + 1; p.energy = p.maxEnergy; }
-        if (cls3.id === 'shadow') p.dodge = Math.min(0.75, (p.dodge || 0) + 0.15);
-        if (cls3.id === 'archer') p.critMul = (p.critMul || 1.5) + 0.30;
-        if (cls3.id === 'monk') p.def = Math.floor(p.def * 1.15);
+        if (cls3.id === 'shadow') p.dodge = Math.min(0.75, (p.dodge || 0) + 0.10);
+        if (cls3.id === 'archer') p.critMul = (p.critMul || 1.5) + 0.20;
+        if (cls3.id === 'monk') p.def = Math.floor(p.def * 1.10);
       }
     }
-    // Lv15: 职业负面（在高难度中触发，降低全局碾压）
-    if (lv >= 15 && this.state.difficulty !== 'hell' && !(this.state.difficulty || '').startsWith('hell')) {
+    // Lv15: 职业负面（v0.50 P1：所有难度生效）
+    if (lv >= 15) {
       this._applyMasteryDownside(p, charId);
     }
   },
@@ -647,6 +678,7 @@ export const Game = {
     if (sc.maxHp) { p.maxHp += sc.maxHp; p.hp += sc.maxHp; }
     if (sc.skillMul) p.skillMul = (p.skillMul || 1.5) + sc.skillMul;
     if (sc.critMul) p.critMul = (p.critMul || 1.5) + sc.critMul;
+    if (sc.critRate) p.critRate = (p.critRate || 0) + sc.critRate;
     if (sc.pen) p.pen = (p.pen || 0) + sc.pen;
     if (sc.dodge) p.dodge = Math.min(0.75, (p.dodge || 0) + sc.dodge);
     p._advancementId = advId;

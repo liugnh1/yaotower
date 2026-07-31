@@ -104,17 +104,17 @@ R.registerAll('relics', [
     passive: p => { if (!p._coreShadow) { p.dodge = Math.min(0.75, (p.dodge || 0) * 2); p._coreShadow = true; } },
     onRemove: p => { if (p._coreShadow) { p.dodge = (p.dodge || 0) / 2; p._coreShadow = false; } } },
   { id: "core_curse", name: "咒缚之源", rarity: "legendary", icon: "💀",
-    desc: "每个诅咒使所有伤害+20%。诅咒负面效果减半。",
+    desc: "每个诅咒使所有伤害+12%。",
     passive: p => { p._coreCurse = true; },
     onRemove: p => { p._coreCurse = false; } },
 
   // ===== v0.50 新增元素核心 =====
   { id: "core_thunder", name: "雷霆之怒", rarity: "legendary", icon: "⚡",
-    desc: "暴击时释放闪电链（弹射3次每次衰减30%）。闪电伤害+50%。",
+    desc: "暴击时释放闪电链（弹射2次每次衰减30%）。闪电伤害+30%。",
     passive: p => { p._coreThunder = true; },
     onRemove: p => { p._coreThunder = false; } },
   { id: "core_light", name: "圣光之佑", rarity: "legendary", icon: "🌟",
-    desc: "每回合回复10%HP。治疗时对敌人造成等量伤害。无法触发吸血。",
+    desc: "每回合回复6%HP。治疗时对敌人造成50%等量伤害。无法触发吸血。",
     passive: p => { p._coreLight = true; },
     onRemove: p => { p._coreLight = false; } },
 ]);

@@ -35,5 +35,9 @@ R.registerAll('curses', [
     remove: p => { if (p._badLuckOrig !== undefined) { p.critRate = p._badLuckOrig; delete p._badLuckOrig; } if (p._badLuckCritMul !== undefined) { p.critMul = p._badLuckCritMul; delete p._badLuckCritMul; } } },
   { id: "greed",  name: "贪婪", desc: "金币获取+50%，商店价格翻倍",
     apply: p => { p.goldMul = (p.goldMul || 1) * 1.5; p._greedCurse = true; },
-    remove: p => { p.goldMul = (p.goldMul || 1) / 1.5; p._greedCurse = false; } }
+    remove: p => { p.goldMul = (p.goldMul || 1) / 1.5; p._greedCurse = false; } },
+  // v0.50 P2: 厄运 — 持有3+诅咒时每回合损失2%最大生命
+  { id: "doom",   name: "厄运", desc: "持有3个以上诅咒时，每回合损失2%最大生命",
+    apply: p => { p._doomCurse = true; },
+    remove: p => { p._doomCurse = false; } }
 ]);

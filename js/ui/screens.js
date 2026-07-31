@@ -1,6 +1,8 @@
 // ===================== 屏幕/弹窗切换 =====================
+import { playMusic } from '../core/audio.js';
+
 export const SCREENS = ["start","city-hub","difficulty-select","class-select","skill-select","talent-select","hunt-select","zone-select","room-select","main","gameover"];
-export const MODALS = ["reward","shop","event","endless-choice","potion-modal","daily-panel","leaderboard","compendium","skill-popup"];
+export const MODALS = ["reward","shop","event","endless-choice","potion-modal","daily-panel","daily-checkin","leaderboard","compendium","tap-lb-panel","tap-cloud-panel","skill-popup"];
 
 var _modalStack = [];
 var _modalBaseZ = 1000;
@@ -13,6 +15,8 @@ export function switchScreen(id) {
   });
   if (id === "main") { const m = document.getElementById("main"); if (m) m.classList.remove("hidden"); }
   if (id === "gameover") { const g = document.getElementById("gameover"); if (g) g.style.display = "block"; }
+  // 返回主界面时恢复菜单音乐
+  if (id === "start" || id === "city-hub") { playMusic('menu'); }
 }
 
 export function showModal(id) {

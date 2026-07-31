@@ -17,8 +17,8 @@ function checkAchievement2(s, id) {
 export function getShopItems() {
   const s = Game.state;
   const items = [];
-  items.push({ name: "生命药水", cost: 20, icon: "🧪", type: 'potion',
-    fn: () => { s.player.hp = Math.min(s.player.maxHp, s.player.hp + 50); Events.emit(E.PLAYER_HEALED, { amount: 50, hp: s.player.hp, maxHp: s.player.maxHp }); } });
+  items.push({ name: "生命药水", cost: 30, icon: "🧪", type: 'potion',
+    fn: () => { var pct = s.player._masteryPotionBonus ? 0.35 : 0.25; var amt = Math.floor(s.player.maxHp * pct); s.player.hp = Math.min(s.player.maxHp, s.player.hp + amt); Events.emit(E.PLAYER_HEALED, { amount: amt, hp: s.player.hp, maxHp: s.player.maxHp }); } });
   items.push({ name: "能量药剂", cost: 15, icon: "⚡", type: 'potion',
     fn: () => { s.player.energy = Math.min((s.player.maxEnergy||3)+2, (s.player.energy||0)+3); } });
   items.push({ name: "强力药水", cost: 35, icon: "🧴", type: 'potion',
@@ -31,6 +31,16 @@ export function getShopItems() {
     const rel = genRelic();
     items.push({ name: rel.name, cost: 80, icon: rel.icon, type: 'relic', data: rel,
       fn: () => { acquireRelic(rel); } });
+  }
+  // v0.50 P2: 高层商店概率出现传说遗物（500G+）
+  if (s.totalFloor >= 30 && s.rng.chance(0.25)) {
+    var legendaries = (R.get('relics') || []).filter(function(r) { return r.rarity === 'legendary'; });
+    if (legendaries.length > 0) {
+      var premiumRelic = { ...s.rng.pick(legendaries) };
+      var premiumCost = 500 + Math.floor(s.totalFloor * 2);
+      items.push({ name: '⭐ ' + premiumRelic.name, cost: premiumCost, icon: premiumRelic.icon, type: 'relic', data: premiumRelic,
+        fn: function() { acquireRelic(premiumRelic); } });
+    }
   }
   return items;
 }
