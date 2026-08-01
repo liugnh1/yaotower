@@ -54,7 +54,17 @@ function deserializePlayer(bp) {
     'skillMul','mpCost','pen','lifeSteal','thorn','goldMul','dodge','bleed','rage',
     'doubleFirst','debuffAtk','dmgReduce','berserk','rebirth','regen',
     'energy','maxEnergy','buildDirection',
-    '_deathGamble','_coreFlame','_coreIce','_coreShadow','_coreCurse']);
+    '_deathGamble','_coreFlame','_coreIce','_coreShadow','_coreCurse',
+    '_coreThunder','_coreLight','_thunderChain','_lightChain',
+    '_masteryCDR','_masteryEnergy','_masteryDownside','_advancementId',
+    '_fearCurse','_fearLucky','_fragileFlag','_badLuckOrig',
+    '_greedCurse','_blindCurse','_blindCritGain','_shadowBorn',
+    '_luckyCharm','_shadowCloak','_lightningRod','_echoStone',
+    '_bloodShield','_greedBag','_chaosBlade','_deathMark',
+    '_infMana','_godHand','_glassCannon','_vampLord',
+    '_angelWings','_bossPlains','_bossForest','_bossCave',
+    '_bossRuins','_bossFrozen','_bossVoid','_bossTower',
+    '_bossDesert','_bossSwamp']);
   // 收集 bp 中的未知字段（新版本新增的字段），保留不丢
   // 注意：_syn* 标记由羁绊系统重新计算，不复原；其他 _ 字段（如链标记、突变标记）需保留
   const extra = {};
@@ -133,7 +143,9 @@ function defState() {
     _runCrits: 0, _runDodges: 0, _runKills: 0, _runSynergies: [], _runRelics: [],
     _appliedMutations: [], _recentEvents: [],
     _fortuneName: '', _mutationName: '',
-    _zoneStats: { battles: 0, eventsPerfect: 0, sacrifices: 0 } // v0.50 分支结局
+    _zoneStats: { battles: 0, eventsPerfect: 0, sacrifices: 0 }, // v0.50 分支结局
+    _relicPity: 0, _curseTradeCount: 0, _riskRoom: false, _riskReward: false,
+    endlessFloor: 0, endlessChaosCount: 0
   };
 }
 
@@ -189,12 +201,33 @@ function defMeta() {
     // === 隐藏装备 ===
     hiddenEquipFound: [], // ⭐NEW
 
+    // === Boss专属遗物 ===
+    bossRelicsFound: [],
+
     // === 签到 ===
-    loginStreak: 0, lastLogin: "", lastClaimDay: "", _adClaimedDay: "" // ⭐NEW
+    loginStreak: 0, lastLogin: "", lastClaimDay: "", _adClaimedDay: "",
+
+    // === 版本迁移标记 ===
+    _version: 2,
+
+    // === 深渊裂隙 v0.60 — 地下城/天梯/锻造 ===
+    dungeon: {
+      keys: 0, keyFragments: 0, totalCleared: 0,
+      bossMarks: {},
+      clears: {},  // { plains: count, forest: count, ... }
+      forge: { enchantAtk:0, enchantHp:0, enchantDef:0, enchantCrit:0, enchantPen:0, enchantVamp:0, refineAtk:0, refineHp:0, refineDef:0, runes:[] },
+      tower: { bestScore:0, bestFloor:0, seasonScore:0, seasonFloor:0, combo:0, maxCombo:0 }
+    },
+    // 局外装备（DNF纸娃娃）
+    outgameEquipped: { weapon:null, helm:null, armor:null, ringL:null, ringR:null, braceletL:null, braceletR:null, amulet:null, belt:null, medal:null },
+    outgameInventory: [],
 
     // 注意: deepMergeMeta 会将旧 tp 字段保留，需要在 _loadMeta 中做迁移
   };
 }
+
+const LB_PURE_KEY = "yaotower_v3.1_lb_pure";
+const LB_CULTIVATE_KEY = "yaotower_v3.1_lb_culti";
 
 // ---- Game 对象 ----
 export const Game = {
@@ -368,7 +401,10 @@ export const Game = {
     if (!tree) return {};
     var bonuses = { atkMul: 0, hpMul: 0, defMul: 0, critRate: 0, critMul: 0, lifeSteal: 0, pen: 0,
       dodge: 0, dmgReduce: 0, goldMul: 0, relicRate: 0, shopDiscount: 0, eventGood: 0,
-      rareWeight: 0, eliteRate: 0, curseReduce: 0, startRelic: false };
+      rareWeight: 0, eliteRate: 0, curseReduce: 0, startRelic: false,
+      skillCDR: false, keystone_break: false, keystone_immortal: false,
+      keystone_doubleChest: false, keystone_startRareRelic: false,
+      startShield: 0, regenPct: 0, relicSlots: 0, chestBonus: 0, relicChoice: 0 };
     nodes.forEach(function(nid) {
       var node = tree.find(function(nd) { return nd.id === nid; });
       if (!node || !node.bonus) return;
@@ -390,6 +426,17 @@ export const Game = {
       if (b.eliteRate) bonuses.eliteRate += b.eliteRate;
       if (b.curseReduce) bonuses.curseReduce += b.curseReduce;
       if (b.startRelic) bonuses.startRelic = true;
+      // v0.51: 非数值型bonus收集
+      if (b.skillCDR) bonuses.skillCDR = true;
+      if (b.keystone_break) bonuses.keystone_break = true;
+      if (b.keystone_immortal) bonuses.keystone_immortal = true;
+      if (b.keystone_doubleChest) bonuses.keystone_doubleChest = true;
+      if (b.keystone_startRareRelic) bonuses.keystone_startRareRelic = true;
+      if (b.startShield) bonuses.startShield += b.startShield;
+      if (b.regenPct) bonuses.regenPct += b.regenPct;
+      if (b.relicSlots) bonuses.relicSlots += b.relicSlots;
+      if (b.chestBonus) bonuses.chestBonus += b.chestBonus;
+      if (b.relicChoice) bonuses.relicChoice += b.relicChoice;
     });
     return bonuses;
   },
@@ -452,10 +499,11 @@ export const Game = {
     // v0.50 天赋树加成衰减：休闲/标准15%，炼狱35%，无尽60%
     // 无尽挑战/BossRush/地下城 使用100%加成（不衰减）
     var decay = 1.0;
+    var diff = s.difficulty || 'standard';
     if (s.mode === 'daily') decay = 0.10;
-    else if (s.difficulty && s.difficulty.startsWith('casual')) decay = 0.15;
-    else if (s.difficulty === 'standard' || (s.difficulty && s.difficulty.startsWith('standard'))) decay = 0.15;
-    else if (s.difficulty === 'hell' || (s.difficulty && s.difficulty.startsWith('hell'))) decay = 0.35;
+    else if (diff.startsWith('casual')) decay = 0.15;
+    else if (diff === 'standard' || diff.startsWith('standard')) decay = 0.15;
+    else if (diff === 'hell' || diff.startsWith('hell')) decay = 0.35;
     else if (s.endless) decay = 0.60;
     // 无尽挑战/BossRush/地下城 使用100%加成（不衰减）
 
@@ -502,7 +550,24 @@ export const Game = {
     if (tb.dodge) p.dodge = Math.min(0.75, (p.dodge || 0) + tb.dodge * decay);
     if (tb.dmgReduce) p.dmgReduce = (p.dmgReduce || 0) + tb.dmgReduce * decay;
     if (tb.goldMul) p.goldMul = (p.goldMul || 1) * (1 + tb.goldMul * decay);
-    // 非数值型bonus（relicRate, shopDiscount, eventGood等）在对应系统中读取
+    // v0.51: 非数值型bonus写入player对象（对应系统读取）
+    if (tb.skillCDR) p.skillCDR = true;
+    if (tb.keystone_break) p._keystoneBreak = true;
+    if (tb.keystone_immortal) p._keystoneImmortal = true;
+    if (tb.keystone_doubleChest) p._keystoneDoubleChest = true;
+    if (tb.keystone_startRareRelic) p._keystoneStartRareRelic = true;
+    if (tb.startShield) p._talentStartShield = (p._talentStartShield || 0) + tb.startShield;
+    if (tb.regenPct) p._talentRegenPct = (p._talentRegenPct || 0) + tb.regenPct;
+    if (tb.relicSlots) p._talentRelicSlots = (p._talentRelicSlots || 0) + tb.relicSlots;
+    if (tb.chestBonus) p._talentChestBonus = (p._talentChestBonus || 0) + tb.chestBonus;
+    if (tb.relicChoice) p._talentRelicChoice = (p._talentRelicChoice || 0) + tb.relicChoice;
+    // 概率型bonus写入player供各系统读取
+    if (tb.relicRate) p._talentRelicRate = (p._talentRelicRate || 0) + tb.relicRate;
+    if (tb.shopDiscount) p._talentShopDiscount = (p._talentShopDiscount || 0) + tb.shopDiscount;
+    if (tb.eventGood) p._talentEventGood = (p._talentEventGood || 0) + tb.eventGood;
+    if (tb.rareWeight) p._talentRareWeight = (p._talentRareWeight || 0) + tb.rareWeight;
+    if (tb.eliteRate) p._talentEliteRate = (p._talentEliteRate || 0) + tb.eliteRate;
+    if (tb.curseReduce) p._talentCurseReduce = (p._talentCurseReduce || 0) + tb.curseReduce;
 
     // 城镇装饰加成（应用衰减）
     var decs = this.meta.decorations || [];
@@ -533,7 +598,7 @@ export const Game = {
     var upgradeCount = this.meta.upgrades?.startPotion || 0;
     const count = Math.min(upgradeCount + achBonus, 3); // 上限3瓶
     if (count <= 0) return [];
-    const potionPool = R.get('potions').filter(p => p.id !== 'cleanse');
+    const potionPool = (R.get('potions') || []).filter(p => p.id !== 'cleanse');
     const result = [];
     for (let i = 0; i < count; i++) {
       var src = potionPool[i % potionPool.length];
@@ -757,21 +822,52 @@ export const Game = {
   },
   applyBrandBonuses(p) {
     var equipped = this.meta.equippedBrands || [];
+    var self = this;
     equipped.forEach(function(brandId) {
       if (!brandId) return;
       var brand = R.get('fateBrands').find(function(b){return b.id===brandId;});
       if (!brand) return;
-      var lv = this.getBrandLevel(brandId);
+      var lv = self.getBrandLevel(brandId);
       for (var i = 0; i < lv; i++) {
-        var effect = brand.levels[i].effect;
-        if (effect.indexOf('燃烧伤害') >= 0) p._brandBurnDmg = (p._brandBurnDmg||0) + 0.08;
-        if (effect.indexOf('闪避率') >= 0) p.dodge = Math.min(0.75, (p.dodge||0) + 0.05);
-        if (effect.indexOf('暴击率') >= 0) p.critRate += 0.05;
-        if (effect.indexOf('治疗') >= 0) p._brandHealMul = (p._brandHealMul||1) * 1.20;
-        if (effect.indexOf('吸血') >= 0) p.lifeSteal = (p.lifeSteal||0) + 0.10;
-        if (effect.indexOf('ATK') >= 0 && effect.indexOf('30%') >= 0) p._brandShadowAtk = true;
+        var level = brand.levels[i];
+        var et = level.effectType, ev = level.effectValue;
+        if (!et) continue;
+        switch (et) {
+          // === brand_burn ===
+          case 'burnDmg': p._brandBurnDmg = (p._brandBurnDmg || 0) + ev; break;
+          case 'burnCap': p._brandBurnCap = (p._brandBurnCap || 0) + ev; break;
+          case 'burnKillEnergy': p._brandBurnKillEnergy = true; break;
+          // === brand_ice ===
+          case 'slowChance': p._brandSlowChance = (p._brandSlowChance || 0) + ev; break;
+          case 'slowDefPenalty': p._brandSlowDefPenalty = (p._brandSlowDefPenalty || 0) + ev; break;
+          case 'freezeKillCDReset': p._brandFreezeKillCDReset = true; break;
+          // === brand_shadow ===
+          case 'dodge': p.dodge = Math.min(0.75, (p.dodge || 0) + ev); break;
+          case 'dodgeAtkBoost': p._brandDodgeAtkBoost = ev; break;
+          case 'dodgeKillReset': p._brandDodgeKillReset = true; break;
+          // === brand_thunder ===
+          case 'critRate': p.critRate += ev; break;
+          case 'critChainBounce': p._brandCritChainBounce = (p._brandCritChainBounce || 0) + ev; break;
+          case 'critKillEnergy': p._brandCritKillEnergy = true; break;
+          // === brand_light ===
+          case 'healMul': p._brandHealMul = (p._brandHealMul || 1) * (1 + ev); break;
+          case 'healDmgProc': p._brandHealDmgProc = ev; break;
+          case 'overhealPermHP': p._brandOverhealPermHP = (p._brandOverhealPermHP || 0) + ev; break;
+          // === brand_curse ===
+          case 'curseDownsideReduce': p._brandCurseDownsideReduce = (p._brandCurseDownsideReduce || 0) + ev; break;
+          case 'curseCapExtra': p._brandCurseCapExtra = (p._brandCurseCapExtra || 0) + ev; break;
+          case 'atkPerCurse': p._brandAtkPerCurse = (p._brandAtkPerCurse || 0) + ev; break;
+          // === brand_vampire ===
+          case 'lifeSteal': p.lifeSteal = (p.lifeSteal || 0) + ev; break;
+          case 'vampOverflowShield': p._brandVampOverflowShield = ev; break;
+          case 'shieldAtkBoost': p._brandShieldAtkBoost = ev; break;
+          // === brand_curse_lord ===
+          case 'curseUpsideBoost': p._brandCurseUpsideBoost = (p._brandCurseUpsideBoost || 0) + ev; break;
+          case 'enemyHpDrain': p._brandEnemyHpDrain = (p._brandEnemyHpDrain || 0) + ev; break;
+          case 'startCurseChoice': p._brandStartCurseChoice = true; break;
+        }
       }
-    }.bind(this));
+    });
   },
 
   // ---- 图鉴 ----
@@ -797,17 +893,18 @@ export const Game = {
   },
 
   // ---- 排行榜 ----
-  addLeaderboard(entry) {
+  addLeaderboard(entry, type) {
     try {
-      const list = JSON.parse(localStorage.getItem(LB_KEY) || "[]");
+      var key = type === 'cultivate' ? LB_CULTIVATE_KEY : LB_PURE_KEY;
+      const list = JSON.parse(localStorage.getItem(key) || "[]");
       const d = new Date(); const dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
       list.push({ ...entry, date: dateStr });
       list.sort((a, b) => b.floor - a.floor);
-      localStorage.setItem(LB_KEY, JSON.stringify(list.slice(0, 20)));
+      localStorage.setItem(key, JSON.stringify(list.slice(0, 20)));
     } catch (e) { console.error("妖塔3.0: 排行榜保存失败", e); }
   },
-  getLeaderboard() {
-    try { return JSON.parse(localStorage.getItem(LB_KEY) || "[]"); }
+  getLeaderboard(type) {
+    try { var key = type === 'cultivate' ? LB_CULTIVATE_KEY : LB_PURE_KEY; return JSON.parse(localStorage.getItem(key) || "[]"); }
     catch (e) { return []; }
   },
 

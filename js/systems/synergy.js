@@ -2,6 +2,7 @@
 import { Game } from '../core/state.js';
 import { R } from '../core/registry.js';
 import { E, Events } from '../core/event-bus.js';
+import { bigFloat } from '../ui/effects.js';
 
 // 检查玩家当前遗物是否激活了某个联动
 export function checkSynergies() {
@@ -17,7 +18,7 @@ export function checkSynergies() {
     // 已激活的跳过
     if (s._activeSynergies.includes(syn.id)) continue;
     // 检查是否拥有所有需要的遗物
-    if (syn.relics.every(rid => relicIds.includes(rid))) {
+    if (syn.relics.length > 0 && syn.relics.every(rid => relicIds.includes(rid))) {
       syn.apply(s.player);
       s._activeSynergies.push(syn.id);
       activated.push(syn);

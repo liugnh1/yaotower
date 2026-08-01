@@ -48,7 +48,6 @@ export function float(txt, cls) {
   setTimeout(() => el.remove(), 1000);
 }
 
-var _bigFloatCount = 0;
 export function bigFloat(txt, cls, dur = 1200) {
   const fc = document.getElementById("float-container");
   if (!fc) return;

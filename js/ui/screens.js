@@ -13,8 +13,6 @@ export function switchScreen(id) {
     if (el) el.classList.toggle("hidden", s !== id);
     else console.warn("[screens] switchScreen: element not found:", s);
   });
-  if (id === "main") { const m = document.getElementById("main"); if (m) m.classList.remove("hidden"); }
-  if (id === "gameover") { const g = document.getElementById("gameover"); if (g) g.style.display = "block"; }
   // 返回主界面时恢复菜单音乐
   if (id === "start" || id === "city-hub") { playMusic('menu'); }
 }

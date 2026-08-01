@@ -103,7 +103,7 @@ R.registerAll('enemies', {
     { name: "深渊祭司",hp: 100,atk: 28, def: 4, exp: "深渊咒术", icon: "🕯️" },
     { name: "混沌魔像",hp: 180,atk: 18, def: 10,exp: "混沌之力", icon: "🗽" },
     { name: "血族公爵",hp: 120,atk: 30, def: 5, exp: "血之盛宴", icon: "🧛" },
-    { name: "虚空行者",hp: 90, atk: 32, def: 2, exp: "虚空穿梭", icon: "🌌" },
+    { name: "虚空行者·精英",hp: 90, atk: 32, def: 2, exp: "虚空穿梭", icon: "🌌" },
     { name: "上层守护者",hp:200,atk: 22, def: 8, exp: "终极防线", icon: "🛡️" }
   ]
 });

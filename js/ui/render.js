@@ -1,7 +1,6 @@
 // ===================== 主渲染函数 =====================
 import { Game } from '../core/state.js';
 import { R } from '../core/registry.js';
-import { E, Events } from '../core/event-bus.js';
 import { log, toast, float, updateArena } from './effects.js';
 import { switchScreen, showModal, hideModal, hideAllModals } from './screens.js';
 import { RARITY_COLOR } from '../content/relics.js';
@@ -62,7 +61,8 @@ export function render(s) {
     relProgress.textContent = '📚 遗物 ' + discovered + '/' + total;
     relProgress.style.color = discovered >= total ? '#ffa502' : '#667788';
   }
-  document.getElementById("gold-text").textContent = s.gold || 0;
+  var goldEl = document.getElementById("gold-text");
+  if (goldEl) goldEl.textContent = s.gold || 0;
   // v0.50 局外货币栏
   var mcb = document.getElementById("meta-currency-bar");
   if (mcb && Game.meta) {
@@ -98,38 +98,35 @@ export function render(s) {
     // 低血量红屏效果
     const mainEl = document.getElementById("main");
     if (mainEl) { if (hpPct < 25 && s.enemy) mainEl.classList.add("low-hp"); else mainEl.classList.remove("low-hp"); }
-    document.getElementById("pl-hp").textContent = `${Math.max(0, s.player.hp)}/${s.player.maxHp}`;
-    document.getElementById("hp-fill").style.width = hpPct + "%";
-    document.getElementById("pl-atk").textContent = s.player.atk;
-    document.getElementById("pl-def").textContent = s.player.def;
+    var plHp = document.getElementById("pl-hp");
+    if (plHp) plHp.textContent = `${Math.max(0, s.player.hp)}/${s.player.maxHp}`;
+    var hpFill = document.getElementById("hp-fill");
+    if (hpFill) hpFill.style.width = hpPct + "%";
+    var plAtk = document.getElementById("pl-atk");
+    if (plAtk) plAtk.textContent = s.player.atk;
+    var plDef = document.getElementById("pl-def");
+    if (plDef) plDef.textContent = s.player.def;
     // 技能按钮状态（CD系统 + 能量消耗显示）
     var skills = s.activeSkills || [];
     var skillBtn = document.getElementById("btn-skill");
-    var allReady = true, totalCD = 0, maxCD = 0;
+    var allReady = true;
     if (s.skillCooldowns) {
-      Object.values(s.skillCooldowns).forEach(function(v) { totalCD += v; if (v > 0) allReady = false; if (v > maxCD) maxCD = v; });
+      Object.values(s.skillCooldowns).forEach(function(v) { if (v > 0) allReady = false; });
     }
     if (skillBtn) {
       if (skills.length === 0) {
-        skillBtn.textContent = "⚡ 无技能";
-        skillBtn.classList.remove("on-cd");
-        skillBtn.disabled = true;
+        skillBtn.textContent = "⚡ 无技能"; skillBtn.disabled = true;
       } else if (allReady) {
-        // v0.50 全部就绪：显示各技能名+能量消耗
         var skillNames = skills.map(function(sk) { return sk.icon + sk.name + '(' + (sk.energyCost||1) + '⚡)'; }).join(" ");
         skillBtn.innerHTML = "⚡ " + skillNames;
-        skillBtn.classList.remove("on-cd");
         skillBtn.disabled = (s.player.energy <= 0);
       } else {
-        // 显示每个技能的CD（就绪+冷却混合）
         var cdTexts = skills.map(function(sk, i) {
           var cdKey = sk.id || ('skill_' + i);
           var cd = s.skillCooldowns[cdKey] || 0;
-          return cd > 0 ? sk.icon + ' <b style="font-size:13px;color:#ff6644">⏳' + cd + '</b>' : sk.icon + ' <span style="color:#89e894">✓</span>';
+          return cd > 0 ? sk.icon + ' ⏳' + cd : sk.icon + ' ✓';
         });
         skillBtn.innerHTML = "⚡ " + cdTexts.join(" ");
-        skillBtn.classList.add("on-cd");
-        // 所有技能都在CD中 → 禁用按钮
         var allOnCD = skills.every(function(sk, i) {
           var cdKey = sk.id || ('skill_' + i);
           return (s.skillCooldowns && s.skillCooldowns[cdKey]) ? s.skillCooldowns[cdKey] > 0 : false;
@@ -137,15 +134,12 @@ export function render(s) {
         skillBtn.disabled = allOnCD;
       }
     }
-    // v0.50 显示技能基础CD + 当前剩余CD（若在冷却中）
     var skillEl = document.getElementById("pl-skill-name");
-    if (skillEl) skillEl.innerHTML = skills.length > 0 ? skills.map(function(sk) {
-      var cdKey = sk.id || 'skill_0';
-      var remaining = s.skillCooldowns && s.skillCooldowns[cdKey] ? s.skillCooldowns[cdKey] : 0;
-      var cdInfo = remaining > 0 ? '<b style="color:#ff6644">🔒' + remaining + '/' + (sk.cooldown || 1) + '</b>' : 'CD' + (sk.cooldown || 1);
-      return sk.icon + sk.name + '(' + cdInfo + ' ⚡' + (sk.energyCost||1) + ')';
-    }).join(' ') : '无技能';
-    // 自动战斗指示器
+    if (skillEl && s.activeSkill) {
+      var cdKey2 = s.activeSkill.id;
+      var cd2 = s.skillCooldowns ? (s.skillCooldowns[cdKey2] || 0) : 0;
+      skillEl.textContent = s.activeSkill.icon + ' ' + s.activeSkill.name + ' Lv' + (s.skillLevels ? (s.skillLevels[s.activeSkill.id]||1) : 1) + (cd2 > 0 ? ' ⏳' + cd2 : '');
+    }
     var ai = document.getElementById("auto-indicator");
     if (ai) ai.textContent = s._turboMode ? "💨 ×4极速中..." : (s._speedMode ? "⚡ ×2加速中..." : (s.auto ? "🤖 自动中..." : ""));
   }
@@ -276,17 +270,20 @@ export function render(s) {
     }
   }
 
-  // 更新战斗竞技场角色形象
-  if (s.enemy && s.player) {
+  // 更新战斗竞技场角色形象（支持多敌人）
+  var activeEnemy = (s.enemies && s.enemies.length > 0)
+    ? (s.enemies[s.selectedTarget] || s.enemies[0])
+    : s.enemy;
+  if (activeEnemy && s.player) {
     const pIcon = s.playerClass?.icon || "⚔️";
     const pLabel = s.playerClass?.name || "勇者";
-    const eIcon = s.enemy.icon || (s._currentRoomType === "boss" ? "💀" : "👹");
-    const eLabel = s.enemy.name || "妖兽";
+    const eIcon = activeEnemy.icon || (s._currentRoomType === "boss" ? "💀" : "👹");
+    const eLabel = activeEnemy.name || "妖兽";
     updateArena(pIcon, pLabel, eIcon, eLabel);
   }
 
   // 低血量心跳音效（血量恢复后自动停止）
-  if (s.player && s.enemy && s.player.hp > 0 && s.player.hp < s.player.maxHp * 0.25) {
+  if (s.player && activeEnemy && s.player.hp > 0 && s.player.hp < s.player.maxHp * 0.25) {
     startHeartbeat();
   } else {
     stopHeartbeat();
@@ -294,8 +291,10 @@ export function render(s) {
 
   // 回合与楼层
   const lim = s.totalFloor <= 10 ? 15 : (s.totalFloor === 99 ? 30 : 20);
-  document.getElementById("turn-limit").textContent = `回合: ${s.turnInFloor || 0}/${lim}`;
-  document.getElementById("floor").textContent = `第 ${s.totalFloor} 层`;
+  var turnLimitEl = document.getElementById("turn-limit");
+  if (turnLimitEl) turnLimitEl.textContent = `回合: ${s.turnInFloor || 0}/${lim}`;
+  var floorEl = document.getElementById("floor");
+  if (floorEl) floorEl.textContent = `第 ${s.totalFloor} 层`;
   const zn = document.getElementById("zone-name"); if (zn && s.zone) zn.textContent = s.zone.name;
 
   var anyAlive = (s.enemies || []).some(function(e) { return e.hp > 0; });
@@ -303,8 +302,10 @@ export function render(s) {
   var actionsTaken = s._actionsThisTurn || 0;
   var actionsLeft = 2 - actionsTaken;
   var canAct = !s.gameOver && anyAlive && actionsLeft > 0;
-  document.getElementById("btn-atk").disabled = !canAct || !hasEnergy;
-  document.getElementById("btn-def").disabled = !canAct || s._defendedThisTurn;
+  var btnAtk = document.getElementById("btn-atk");
+  if (btnAtk) btnAtk.disabled = !canAct || !hasEnergy;
+  var btnDef = document.getElementById("btn-def");
+  if (btnDef) btnDef.disabled = !canAct || s._defendedThisTurn;
   var btnEnd = document.getElementById("btn-endturn");
   if (btnEnd) {
     btnEnd.disabled = !anyAlive || s.gameOver;

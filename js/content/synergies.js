@@ -80,7 +80,7 @@ R.registerAll('synergies', [
   // ===== v0.50 诅咒正向构筑 =====
   { id: "curse_lord", relics: [], name: "咒缚之王", desc: "持有3+诅咒时每个诅咒+20%全伤害", icon: "💀",
     apply: (p) => { p._curseLord = true; p.skillMul += 0.6; },
-    onRemove: (p) => { p._curseLord = false; p.skillMul = Math.max(1.0, (p.skillMul||1.5) - 0.6); } },
+    onRemove: (p) => { p._curseLord = false; p.skillMul -= 0.6; } },
   { id: "curse_plague", relics: [], name: "行走的天灾", desc: "持有5诅咒时敌人每回合-3%HP", icon: "☠️",
     apply: (p) => { p._cursePlague = true; },
     onRemove: (p) => { p._cursePlague = false; } },

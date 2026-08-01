@@ -67,10 +67,10 @@ R.registerAll('classes', {
   shadow: {
     id: "shadow", name: "影卫", icon: "🗡️",
     hp: 75, maxHp: 75, mp: 0, maxMp: 0,
-    atk: 22, def: 1, critRate: 0.28, critMul: 2.0,
+    atk: 19, def: 1, critRate: 0.24, critMul: 2.0,
     skillMul: 1.8, mpCost: 0, pen: 0.3,
     dodge: 0.10, lifesteal: 0,
-    desc: "高速刺客·暴击28%·CD极短",
+    desc: "高速刺客·暴击24%·CD极短",
     skills: [
       { id: "assassinate", name: "暗杀",   icon: "💀", desc: "伤害×3.5+扣12%当前生命 ⚡2", mul: 3.5, effect: null, cooldown: 2, selfDmg: 0.12, energyCost: 2,
         upgrades: [
@@ -98,7 +98,7 @@ R.registerAll('classes', {
   archer: {
     id: "archer", name: "弓手", icon: "🏹",
     hp: 90, maxHp: 90, mp: 0, maxMp: 0,
-    atk: 22, def: 2, critRate: 0.20, critMul: 2.5,
+    atk: 20, def: 2, critRate: 0.20, critMul: 2.5,
     skillMul: 1.6, mpCost: 0, pen: 0.3,
     dodge: 0.10, lifesteal: 0,
     desc: "远程狙击·超高暴伤·先手优势",
@@ -117,11 +117,11 @@ R.registerAll('classes', {
           { name: "箭雨·穿心", desc: "伤害×2.0+燃烧2回合+暴击率+10% ⚡2", mul: 2.0, effect: "burn", cd: 2, critUp: 0.10, energyCost: 2 }
         ]
       },
-      { id: "snipe",       name: "狙击",     icon: "🔭", desc: "伤害×4.0+穿透50% ⚡3", mul: 4.0, effect: null, cooldown: 3, extraPen: 0.5, energyCost: 3,
+      { id: "snipe",       name: "狙击",     icon: "🔭", desc: "伤害×3.5+穿透50% ⚡3", mul: 3.5, effect: null, cooldown: 3, extraPen: 0.5, energyCost: 3,
         upgrades: [
-          { name: "狙击·死神", desc: "伤害×6.0+穿透60% ⚡3", mul: 6.0, effect: null, cd: 4, extraPen: 0.6, energyCost: 3 },
-          { name: "狙击·弱点", desc: "伤害×4.5+穿透50%+下回合必暴 ⚡3", mul: 4.5, effect: null, cd: 3, extraPen: 0.5, nextCrit: true, energyCost: 3 },
-          { name: "狙击·速射", desc: "伤害×3.5+穿透40%+CD-1 ⚡2", mul: 3.5, effect: null, cd: 2, extraPen: 0.4, energyCost: 2 }
+          { name: "狙击·死神", desc: "伤害×5.0+穿透60% ⚡3", mul: 5.0, effect: null, cd: 4, extraPen: 0.6, energyCost: 3 },
+          { name: "狙击·弱点", desc: "伤害×4.0+穿透50%+下回合必暴 ⚡3", mul: 4.0, effect: null, cd: 3, extraPen: 0.5, nextCrit: true, energyCost: 3 },
+          { name: "狙击·速射", desc: "伤害×3.0+穿透40%+CD-1 ⚡2", mul: 3.0, effect: null, cd: 2, extraPen: 0.4, energyCost: 2 }
         ]
       }
     ]
@@ -166,19 +166,19 @@ R.registerAll('classMasterySkills', {
     { id: "war_godforce",  name: "战神降临", icon: "⚡", desc: "本回合ATK×3+免疫 ⚡3", mul: 3.0, cooldown: 8, energyCost: 3, selfImmune: true, masteryLv: 10 }
   ],
   mage: [
-    { id: "mage_icenova",  name: "冰霜新星", icon: "❄️", desc: "AOE+全体迟缓2回合 ⚡2", mul: 2.0, effect: "slow", aoe: true, cooldown: 5, energyCost: 2, masteryLv: 3 },
+    { id: "mage_icenova",  name: "冰霜新星·极", icon: "❄️", desc: "AOE+全体迟缓2回合 ⚡2", mul: 2.0, effect: "slow", aoe: true, cooldown: 5, energyCost: 2, masteryLv: 3 },
     { id: "mage_meteor",   name: "陨石风暴", icon: "☄️", desc: "AOE 200%+燃烧3层 ⚡3", mul: 2.0, effect: "burn", aoe: true, cooldown: 7, energyCost: 3, masteryLv: 10 }
   ],
   shadow: [
-    { id: "shd_assault",   name: "暗杀", icon: "🗡️", desc: "单体300%，击杀返还1⚡ ⚡2", mul: 3.0, cooldown: 4, energyCost: 2, killRefund: 1, masteryLv: 3 },
+    { id: "shd_assault",   name: "暗杀·极", icon: "🗡️", desc: "单体300%，击杀返还1⚡ ⚡2", mul: 3.0, cooldown: 4, energyCost: 2, killRefund: 1, masteryLv: 3 },
     { id: "shd_clone",     name: "影分身", icon: "👥", desc: "本回合行动次数+2 ⚡3", mul: 1.0, cooldown: 8, energyCost: 3, extraActions: 2, masteryLv: 10 }
   ],
   archer: [
-    { id: "arc_rain",      name: "箭雨", icon: "🏹", desc: "AOE 120%+暴击率+30% ⚡2", mul: 1.2, aoe: true, cooldown: 4, energyCost: 2, critUp: 0.30, masteryLv: 3 },
-    { id: "arc_snipe",     name: "狙击", icon: "🎯", desc: "单体500%+必暴+无视防 ⚡3", mul: 5.0, cooldown: 7, energyCost: 3, forceCrit: true, ignoreDef: true, masteryLv: 10 }
+    { id: "arc_rain",      name: "箭雨·暴风", icon: "🏹", desc: "AOE 120%+暴击率+30% ⚡2", mul: 1.2, aoe: true, cooldown: 4, energyCost: 2, critUp: 0.30, masteryLv: 3 },
+    { id: "arc_snipe",     name: "狙击·穿心", icon: "🎯", desc: "单体500%+必暴+无视防 ⚡3", mul: 5.0, cooldown: 7, energyCost: 3, forceCrit: true, ignoreDef: true, masteryLv: 10 }
   ],
   monk: [
-    { id: "monk_palm",     name: "金刚掌", icon: "✋", desc: "单体150%+回复等量HP ⚡2", mul: 1.5, cooldown: 3, energyCost: 2, lifeSteal: 1.0, masteryLv: 3 },
+    { id: "monk_palm",     name: "金刚掌·奥义", icon: "✋", desc: "单体150%+回复等量HP ⚡2", mul: 1.5, cooldown: 3, energyCost: 2, lifeSteal: 1.0, masteryLv: 3 },
     { id: "monk_nirvana",  name: "涅槃", icon: "🕉️", desc: "满血复活+全属性+30%(3回合) ⚡3", mul: 1.0, cooldown: 10, energyCost: 3, rebirth: true, allBuff: 0.3, masteryLv: 10 }
   ]
 });

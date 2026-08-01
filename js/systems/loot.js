@@ -23,7 +23,7 @@ export function genEquip(zoneId) {
   const prefixes = R.get('equipPrefixes');
   if (!qualities.length || !types.length) {
     console.warn("[妖塔] 装备注册表为空，返回保底装备");
-    return { icon: "🗡️", name: "破剑", prefix: "", fullName: "破剑", stat: "atk", val: 3, color: "#8899bb", qualityName: "普通", type: "weapon" };
+    return { icon: "🗡️", name: "破剑", prefix: "", fullName: "破剑", stat: "atk", val: 3, color: "#8899bb", qualityName: "普通", type: "weapon", _combatEffect: null, _zoneSet: null };
   }
 
   // 深度缩放：随总层数提高品质权重
@@ -102,10 +102,14 @@ export function genRelic() {
   const legendRate = diff.legendRate || 0.02;
   // 诅咒"恐惧"/"贫困"：遗物掉率翻倍（提高稀有度分布）
   const luckyMul = (s?.player?._fearLucky || s?.player?._poorLucky || s?.player?._luckyCharm) ? 1.8 : 1;
+  // v0.51: 天赋树遗物加成
+  var relicRateBonus = (s && s.player && s.player._talentRelicRate) ? s.player._talentRelicRate : 0;
+  var rareWtBonus = (s && s.player && s.player._talentRareWeight) ? s.player._talentRareWeight : 0;
+  var totalMul = luckyMul + relicRateBonus + rareWtBonus;
   const weights = {
-    common: Math.floor(40 / luckyMul), rare: Math.floor(30 * luckyMul),
-    epic: Math.floor(20 * luckyMul),
-    legendary: Math.floor(10 * (legendRate / 0.02) * luckyMul)
+    common: Math.floor(40 / totalMul), rare: Math.floor(30 * totalMul),
+    epic: Math.floor(20 * totalMul),
+    legendary: Math.floor(10 * (legendRate / 0.02) * totalMul)
   };
 
   // Zone 专属遗物池：50% 概率从当前区域池中抽取

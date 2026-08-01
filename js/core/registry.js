@@ -18,7 +18,8 @@ class Registry {
       forgeRecipes: [], bossMaterials: {}, extraMaterials: [],
       skillRecipes: [], talentTree: [],  // v0.50 天赋树
       classMasterySkills: {}, classMasteryRelics: {}, classAdvancements: {}, awakeningPassives: {},  // v0.50
-      hiddenLegendaries: [], fateBrands: []  // v0.50
+      hiddenLegendaries: [], fateBrands: [],  // v0.50
+      dungeons: {}, dungeonEnchants: {}, dungeonRunes: [], towerMods: []  // v0.60 深渊裂隙
     };
   }
 
@@ -50,9 +51,8 @@ class Registry {
       });
     } else {
       // 对象类型：检查key冲突
-      var dupKeys = [];
       Object.keys(items).forEach(function(k) {
-        if (store.hasOwnProperty(k)) { dupKeys.push(k); console.warn('Registry: 重复key [' + category + '] ' + k + ' — 将被覆盖'); }
+        if (store.hasOwnProperty(k)) { console.warn('Registry: 重复key [' + category + '] ' + k + ' — 将被覆盖'); }
       });
       Object.assign(store, items);
     }

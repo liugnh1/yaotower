@@ -143,14 +143,6 @@ function _fadeOut(audio, cb, dur = 500) {
   }, step);
 }
 
-// 用户首次交互后尝试恢复待播放的音乐
-export function _tryResumeMusic() {
-  if (_pendingPlay && !_musicMuted) {
-    var track = _pendingPlay; _pendingPlay = null;
-    playMusic(track);
-  }
-}
-
 // ===================== 程序化音效 =====================
 function osc(type, freq, start, dur, gain = 0.1, dest = null) {
   if (!ctx) return;

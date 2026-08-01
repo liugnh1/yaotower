@@ -5,6 +5,7 @@ const isTap = typeof tap !== 'undefined';
 const LEADERBOARD_IDS = {
   daily: 'daily_challenge_01',    // 每日挑战排行
   total: 'total_floor_01',        // 最高层数排行
+  total_culti: 'total_culti_01',  // 修行模式排行
 };
 
 export const TapLeaderboard = {

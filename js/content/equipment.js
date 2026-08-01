@@ -12,11 +12,14 @@ R.registerAll('equipQualities', [
 ]);
 
 R.registerAll('equipTypes', [
-  { type: "weapon", name: "长剑", stat: "atk",      icon: "⚔️", base: 4 },
-  { type: "armor",  name: "铠甲", stat: "def",      icon: "🛡️", base: 2 },
-  { type: "helm",   name: "头盔", stat: "maxHp",    icon: "⛑️", base: 15 },
-  { type: "ring",   name: "戒指", stat: "critRate", icon: "💍", base: 5 },
-  { type: "amulet", name: "护符", stat: "dodge",   icon: "📿", base: 0.05 }
+  { type: "weapon",    name: "长剑", stat: "atk",      icon: "⚔️", base: 4 },
+  { type: "armor",     name: "铠甲", stat: "def",      icon: "🛡️", base: 2 },
+  { type: "helm",      name: "头盔", stat: "maxHp",    icon: "🪖", base: 15 },
+  { type: "ring",      name: "戒指", stat: "critRate", icon: "💍", base: 5 },
+  { type: "amulet",    name: "护符", stat: "dodge",   icon: "📿", base: 5 },
+  { type: "bracelet",  name: "手镯", stat: "atk",     icon: "⛓️", base: 3 },
+  { type: "belt",      name: "腰带", stat: "maxHp",   icon: "🎗️", base: 10 },
+  { type: "medal",     name: "勋章", stat: "atk",     icon: "🏅", base: 5 }
 ]);
 
 // 前缀现在支持 combatEffect: { type, value } 用于战斗中的特效触发

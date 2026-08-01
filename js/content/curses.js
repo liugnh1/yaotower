@@ -36,8 +36,8 @@ R.registerAll('curses', [
   { id: "greed",  name: "贪婪", desc: "金币获取+50%，商店价格翻倍",
     apply: p => { p.goldMul = (p.goldMul || 1) * 1.5; p._greedCurse = true; },
     remove: p => { p.goldMul = (p.goldMul || 1) / 1.5; p._greedCurse = false; } },
-  // v0.50 P2: 厄运 — 持有3+诅咒时每回合损失2%最大生命
-  { id: "doom",   name: "厄运", desc: "持有3个以上诅咒时，每回合损失2%最大生命",
-    apply: p => { p._doomCurse = true; },
-    remove: p => { p._doomCurse = false; } }
+  // v0.51: 厄运 — 双刃剑：损失HP但获得暴伤增幅
+  { id: "doom",   name: "厄运", desc: "持有3+诅咒时每回合损失2%HP，每个诅咒+15%暴伤",
+    apply: p => { p._doomCurse = true; p._doomCritBonus = true; },
+    remove: p => { p._doomCurse = false; p._doomCritBonus = false; } }
 ]);

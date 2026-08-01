@@ -58,7 +58,8 @@ export function initZone(zoneId) {
   var allTemplates = R.get('roomTemplates');
   var templates = allTemplates[templateKey] || allTemplates.simple;
   let template = s.rng.pick(templates).slice();
-  if (s.extraElite) {
+  // v0.51: 天赋树精英房率加成
+  if (s.extraElite || (s.player && s.player._talentEliteRate && s.rng.chance(s.player._talentEliteRate))) {
     const bi = template.findIndex(r => r === "battle");
     if (bi >= 0) template[bi] = "elite";
   }

@@ -11,7 +11,8 @@ export function openChest(onResult) {
   const roll = s.rng.next();
   if (roll < 0.5) {
     const eq = genEquip();
-    window._addEquip(eq);
+    if (typeof window._addEquip === 'function') { window._addEquip(eq); }
+    else { s.equip.push(eq); }
     Events.emit(E.EQUIP_GAINED, { equip: eq });
     onResult('equip', eq);
   } else if (roll < 0.8) {

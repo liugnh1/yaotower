@@ -49,7 +49,9 @@ export function getShopItems() {
 export function buyItem(item) {
   const s = Game.state;
   var diffCfg = R.get('difficulties', s.difficulty) || {};
-  let mul = (s.adDiscount ? 0.5 : 1) * (diffCfg.shopMul || 1);
+  // v0.51: 天赋树商店折扣
+  var talentDiscount = (s.player && s.player._talentShopDiscount) ? s.player._talentShopDiscount : 0;
+  let mul = (s.adDiscount ? 0.5 : 1) * (diffCfg.shopMul || 1) * (1 - talentDiscount);
   if (s.player?._greedCurse) mul *= 2; // 贪婪诅咒：商店价格翻倍
   const cost = Math.floor(item.cost * mul);
   if ((s.gold || 0) < cost) return false;
@@ -82,8 +84,9 @@ export function acquireRelic(rel) {
     Game.sync();
     return;
   }
-  // 满6件时弹出选择面板（不再自动丢弃）
-  if (s.relics.length >= 6) {
+  // v0.51: 天赋树遗物槽+1
+  var maxRelics = 6 + (s.player && s.player._talentRelicSlots ? s.player._talentRelicSlots : 0);
+  if (s.relics.length >= maxRelics) {
     // 如果主界面有选择回调，触发选择面板；否则Fallback自动丢弃最旧的
     if (typeof window._onRelicFull === 'function') {
       window._onRelicFull(rel);

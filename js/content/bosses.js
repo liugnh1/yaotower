@@ -4,6 +4,7 @@ import { R } from '../core/registry.js';
 R.registerAll('bosses', {
   plains: {
     name: "平原领主·裂地者", hp: 150, atk: 18, def: 5, exp: "大地颤抖", icon: "🦏",
+    weakness: "火焰", weaknessDesc: "被点燃时攻击减半",
     intro: ["迷雾散开，大地开始震动……","一头如山丘般大小的巨兽，","从裂开的地面中缓缓爬出。","—— 平原领主 · 裂地者"],
     phase2Intro: ["裂地者的眼中燃起怒火！","大地在它脚下崩裂，岩浆喷涌……","它已不再只是野兽——","—— 平原领主 · 崩山者"],
     skill: { name: "地震", desc: "对玩家造成2倍攻击力伤害", fn: (e, p) => { const d = Math.max(1, e.atk * 2 - p.def); p.hp -= d; return { dmg: d, msg: '🌍 裂地者释放地震！' }; } },
@@ -12,6 +13,7 @@ R.registerAll('bosses', {
   },
   forest: {
     name: "森林之王·苍古树精", hp: 220, atk: 22, def: 7, exp: "万木臣服", icon: "🌲",
+    weakness: "冰霜", weaknessDesc: "被冻结时停止回血",
     intro: ["幽暗的森林深处，万木忽然静默……","一棵参天古树睁开了眼睛。","千百年的根须即是它的手足，","整片森林，都是它的领域。","—— 森林之王 · 苍古树精"],
     phase2Intro: ["树精发出震耳欲聋的咆哮！","无数藤蔓从地底破土而出，","每一根都带着千年的怨念……","—— 森林之王 · 万木之怒"],
     skill: { name: "缠绕", desc: "造成1.5倍伤害并降低玩家攻击2回合", fn: (e, p) => { const d = Math.max(1, Math.floor(e.atk * 1.5) - p.def); p.hp -= d; p.debuffAtk = { turns: 3, value: 3 }; return { dmg: d, msg: '🌿 苍古树精释放缠绕！攻击力降低' }; } },
@@ -20,6 +22,7 @@ R.registerAll('bosses', {
   },
   cave: {
     name: "矿洞主宰·晶石巨像", hp: 300, atk: 26, def: 10, exp: "坚不可摧", icon: "💎",
+    weakness: "暗影", weaknessDesc: "暗影步可无视防御斩杀",
     intro: ["矿洞深处传来水晶碰撞的脆响……","无数晶石自行聚合，拼成一尊巨像。","它没有生命，却散发着远古的意志。","—— 矿洞主宰 · 晶石巨像"],
     phase2Intro: ["巨像体内的晶核开始狂暴地跳动！","晶刺如暴雨般从四面八方射来，","这尊古老的守卫，已不再克制自己。","—— 矿洞主宰 · 晶核暴走"],
     skill: { name: "晶化", desc: "本回合防御翻倍并反弹伤害", fn: (e, p) => { if (!e._crystalDoubled) { e._crystalDoubled = true; e.def *= 2; } return { msg: '💎 晶石巨像晶化了！防御翻倍', crystal: true }; } },
@@ -44,6 +47,7 @@ R.registerAll('bosses', {
   },
   voidgate: {
     name: "虚空守门人", hp: 450, atk: 34, def: 12, exp: "魔塔在前", icon: "🌀",
+    weakness: "圣光", weaknessDesc: "被圣光击中后吸血无效",
     intro: ["现实在此处撕裂……","一道裂隙中，站着一个没有面孔的身影。","它身后，魔塔的轮廓已隐约可见。","—— 虚空守门人"],
     phase2Intro: ["守门人的身影开始扭曲、膨胀——","虚空中伸出无数触手般的裂缝，","贪婪地吞噬着周围的一切。","—— 虚空守门人 · 终焉"],
     skill: { name: "虚空裂隙", desc: "造成伤害并回复自身10%最大生命", fn: (e, p) => { const d = Math.max(1, e.atk - p.def + 5); p.hp -= d; const heal = Math.floor(e.maxHp * 0.1); e.hp = Math.min(e.maxHp, e.hp + heal); return { dmg: d, heal: heal, msg: '🌀 虚空守门人撕裂空间！回复了生命' }; } },

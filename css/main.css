@@ -333,6 +333,7 @@ body{background:var(--bg-deep);color:var(--t1);display:flex;justify-content:cent
 .big-btn:active{transform:scale(.92)}
 #btn-atk{background:linear-gradient(180deg,rgba(200,32,32,.8),rgba(139,0,0,.9)),url('../img/btn_bg.jpg') center/cover;box-shadow:0 4px 16px rgba(200,32,32,.35)}
 #btn-skill{background:linear-gradient(180deg,rgba(106,59,200,.8),rgba(58,26,106,.9)),url('../img/btn_bg.jpg') center/cover;box-shadow:0 4px 16px rgba(106,59,200,.35)}
+/* v0.60 蓄力/核心技能小按钮 */
 #btn-def{background:linear-gradient(180deg,rgba(42,139,75,.8),rgba(26,90,43,.9)),url('../img/btn_bg.jpg') center/cover;box-shadow:0 4px 16px rgba(42,139,75,.35)}
 #btn-endturn{background:linear-gradient(180deg,rgba(200,150,30,.7),rgba(120,80,10,.9)),url('../img/btn_bg.jpg') center/cover;box-shadow:0 4px 16px rgba(200,150,30,.3);color:var(--c-gold-dim)}
 #btn-endturn:disabled{background:#2a2a35!important;color:#555!important;box-shadow:none!important}
