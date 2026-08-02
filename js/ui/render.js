@@ -8,6 +8,30 @@ import { startHeartbeat, stopHeartbeat } from '../core/audio.js';
 import { TIPS } from '../content/tips.js';
 
 var _lastTipFloor = -1;
+
+// v0.60 实时刷新资源条
+function refreshMetaBar() {
+  var bar = document.getElementById("meta-bar");
+  if (!bar || !Game.meta) return;
+  bar.textContent = '🌟' + (Game.meta.essence||0) + '灵蕴 · 💎' + (Game.meta.stones||0) + '灵石 · 👻' + (Game.meta.souls||0) + '魂晶 · ⚒️' + (Game.meta.forgeStones||0) + '锻石 · 📦' + (Game.meta.materials||0) + '素材';
+}
+function refreshCityResources() {
+  var res = document.getElementById("city-resources");
+  if (!res || !Game.meta) return;
+  var lv = Game.meta.cityLevel || 1;
+  var upBtn = document.getElementById("btn-upgrade-city");
+  // 如果已有升级按钮则保留，只刷新文字部分
+  if (upBtn) {
+    res.childNodes[0] && (res.childNodes[0].textContent = '🏰 主城 Lv.' + lv + '/5 · 💎灵石:' + (Game.meta.stones||0) + ' · 🌟灵蕴:' + (Game.meta.essence||0) + ' · 👻魂晶:' + (Game.meta.souls||0) + ' · ⚒️锻石:' + (Game.meta.forgeStones||0) + ' · 📦素材:' + (Game.meta.materials||0) + ' ');
+  } else {
+    res.innerHTML = '🏰 主城 Lv.' + lv + '/5 · 💎灵石:' + (Game.meta.stones||0) + ' · 🌟灵蕴:' + (Game.meta.essence||0) + ' · 👻魂晶:' + (Game.meta.souls||0) + ' · ⚒️锻石:' + (Game.meta.forgeStones||0) + ' · 📦素材:' + (Game.meta.materials||0) + '';
+  }
+}
+// 每2秒自动刷新资源条
+setInterval(function() {
+  refreshMetaBar();
+  refreshCityResources();
+}, 2000);
 export function render(s) {
   // v0.51: 房间切换时显示随机提示
   if (s && s.totalFloor !== _lastTipFloor && TIPS && TIPS.length > 0) {
@@ -16,11 +40,9 @@ export function render(s) {
     var tipEl = document.getElementById("loading-tip");
     if (tipEl) { tipEl.textContent = '💡 ' + tip; tipEl.style.display = 'block'; setTimeout(function() { tipEl.style.display = 'none'; }, 4000); }
   }
-  // v0.51 主界面资源条实时刷新（每次 render 都更新）
-  var metaBar = document.getElementById("meta-bar");
-  if (metaBar && Game.meta) {
-    metaBar.textContent = '🌟' + (Game.meta.essence||0) + '灵蕴 · 💎' + (Game.meta.souls||0) + '魂晶 · ⚒️' + (Game.meta.forgeStones||0) + '锻石 · 📦' + (Game.meta.materials||0) + '素材';
-  }
+  // v0.60 资源条实时刷新
+  refreshMetaBar();
+  refreshCityResources();
   var loginBtn = document.getElementById("btn-login");
   if (loginBtn && Game.meta) {
     var todayStr = new Date().getFullYear() + '-' + (new Date().getMonth()+1) + '-' + new Date().getDate();
@@ -146,7 +168,7 @@ export function render(s) {
 
   // 装备列表（可点击丢弃）+ 套装进度
   const eqList = document.getElementById("equip-list");
-  const STAT_LABEL = { atk: '⚔️攻击', def: '🛡️防御', maxHp: '❤️生命', critRate: '💥暴击', maxEnergy: '⚡能量' };
+  const STAT_LABEL = { atk: '⚔️攻击', def: '🛡️防御', maxHp: '❤️生命', critRate: '💥暴击', dodge: '🍃闪避', maxEnergy: '⚡能量' };
   if (s.equip.length === 0) eqList.innerHTML = '<span style="color:#445566">暂无</span>';
   else {
     eqList.innerHTML = '';

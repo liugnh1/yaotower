@@ -43,7 +43,7 @@ R.registerAll('talentTree', [
     desc: "闪避率 +2%" },
   { id: "sur_block",   name: "铁壁",   icon: "🛡️", branch: "survival", layer: 2, cost: 2,
     bonus: { dmgReduce: 0.06 }, requires: ["sur_dodge"],
-    desc: "受击时20%概率减伤30%" },
+    desc: "受到所有伤害减少6%" },
   { id: "sur_shield",  name: "护体",   icon: "💎", branch: "survival", layer: 3, cost: 3,
     bonus: { startShield: 30 }, requires: ["sur_block"],
     desc: "每场战斗开始获得30点护盾" },

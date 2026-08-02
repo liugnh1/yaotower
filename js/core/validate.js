@@ -19,7 +19,6 @@ const REQUIRED = {
   dailyGlobalMods: ['id', 'name', 'desc', 'apply'],
   dailyPlayerMods: ['id', 'name', 'desc', 'apply'],
   dailyEnemyMods: ['id', 'name', 'desc', 'apply'],
-  metaLimits: ['max', 'step', 'cost', 'name'],
   roomTypes: ['id', 'icon', 'name', 'desc'],
 };
 

@@ -12,14 +12,15 @@ class Registry {
       monsterTags: [], equipQualities: [], equipTypes: [],
       equipPrefixes: [], potions: [], difficulties: {},
       dailyGlobalMods: [], dailyPlayerMods: [], dailyEnemyMods: [],
-      metaLimits: {}, roomTypes: {}, roomTemplates: {},
+      roomTypes: {}, roomTemplates: {},
       simpleRoute: {}, synergies: [], achievements: [],
       dailyQuests: [], weeklyQuests: [],
       forgeRecipes: [], bossMaterials: {}, extraMaterials: [],
       skillRecipes: [], talentTree: [],  // v0.50 天赋树
       classMasterySkills: {}, classMasteryRelics: {}, classAdvancements: {}, awakeningPassives: {},  // v0.50
       hiddenLegendaries: [], fateBrands: [],  // v0.50
-      dungeons: {}, dungeonEnchants: {}, dungeonRunes: [], towerMods: []  // v0.60 深渊裂隙
+      dungeons: {}, dungeonEnchants: {}, dungeonRunes: [], towerMods: [],  // v0.60 深渊裂隙
+      bossRushT1: [], bossRushT2: [], bossRushT3: [], bossRushT4: []  // v0.70 Boss Rush专属
     };
   }
 

@@ -80,23 +80,32 @@ export function startBattle(type) {
   s._bossPhase2 = false; s._bossDamaged = false;
   s._desperationUsed = false; s._despAtkDoubled = false;
   s._acting = false; s._winning = false;
-  if (s.player) { s.player._drumAtk = 0; s.player._tempHp = 0; }
+  if (s.player) { s.player._drumAtk = 0; s.player._tempHp = 0; s.player._mageNextAtk = false; s.player._desertNext = false; s.player._brandDodgeAtkNext = false; s.player._crystalStacks = 0; s.player._extraTurn = false; delete s.player._stoneGaze; }
+  s._attackedThisTurn = false; s._voidRifts = []; // v0.51: boss遗物/羁绊追踪
   // v0.51 天赋·护体：每场战斗开始获得护盾
   if (s.player && s.player._talentStartShield) { s.player._tempHp = (s.player._tempHp || 0) + s.player._talentStartShield; bigFloat('🛡️ 护体+' + s.player._talentStartShield, 'float-heal', 600); }
   // 天使之翼：每场战斗重置
   if (s.player && s.relics.some(function(r){return r.id==='angel_wings';})) s.player._angelWings = true;
-  s._shadowUsed = false; s._deathGamble = false;
+  s._shadowUsed = false; s._deathGamble = false; s._shadowDmgMul = 0;
   s._enemyIntent = null; s._eliteMod = null; s._eliteVenom = 0;
   s.adDiscount = false; s.adRefreshCount = 0;
-  s._healOnKill = 0;
+  s._healOnKill = 0; s._healOnKillTracked = false; s._equipLifesteal = 0;
+  // v0.60 防止混沌词条跨战斗泄漏
+  s.enemyHpMul = undefined; s.enemyAtkMul = undefined; s.enemyDefMul = undefined;
+  s._chaosCdPenalty = undefined; s._chaosCdrBonus = undefined; // v0.70 混沌CD运行时标记
+  // v0.70 防止亡灵天灾队列跨战斗泄漏（上一场战斗的敌人不应在新战斗中复活）
+  s._undeadQueue = [];
+  // v0.60 无尽模式显示见好就收按钮
+  var retreatBtn = document.getElementById('btn-retreat');
+  if (retreatBtn) retreatBtn.style.display = (s.endless || s.mode === 'endless_challenge') ? 'inline-block' : 'none';
   // 清除临时药剂效果
   s.potionAtk = 0; s.potionDef = 0;
-  // 清除临时状态标记
-  s._deathGamble = false;
   // 清理金盾临时防御
   if (s.player && s.player._gsDefBonus) { s.player.def -= s.player._gsDefBonus; delete s.player._gsDefBonus; }
   if (s.player && s.player._tempDefBonus) { s.player.def -= s.player._tempDefBonus; s.player._tempDefBonus = 0; }
   if (s.player && s.player._tempDmgRed) { s.player.dmgReduce = (s.player.dmgReduce || 0) - s.player._tempDmgRed; s.player._tempDmgRed = 0; }
+  // v0.60 七罪暴怒：战斗开始时恢复被扣的防御
+  if (s.player && s.player._sinWrathDef) { s.player.def += s.player._sinWrathDef; s.player._sinWrathDef = 0; }
   // 如果调用方已预设了敌人（如心魔镜像/困兽斗），跳过生成，仅做难度缩放
   const hasPreset = s.enemy && s.enemy.hp > 0 && s.enemy.atk > 0;
   if (!hasPreset) s.enemy = null;
@@ -215,6 +224,7 @@ export function startBattle(type) {
     if (s.player._set_critMul) s.player.critMul -= s.player._set_critMul;
     if (s.player._set_pen) s.player.pen = (s.player.pen||0) - s.player._set_pen;
     if (s.player._set_dmgReduce) s.player.dmgReduce = (s.player.dmgReduce||0) - s.player._set_dmgReduce;
+    if (s.player._set_maxMp) { s.player.maxMp -= s.player._set_maxMp; s.player.mp = Math.min(s.player.mp, s.player.maxMp); }
     // 清零追踪变量
     ['_set_atk','_set_def','_set_maxHp','_set_dodge','_set_lifeSteal','_set_critRate','_set_critMul','_set_pen','_set_maxMp','_set_dmgReduce'].forEach(function(k){ s.player[k]=0; });
     s.player._setActive2 = null; s.player._setActive4 = null;
@@ -229,15 +239,16 @@ export function startBattle(type) {
       if (!bonus) return;
       s.player._setActive2 = (count >= 2) ? setName : null;
       s.player._setActive4 = (count >= 4) ? setName : null;
-      if (bonus.atk) s.player.atk += bonus.atk;
-      if (bonus.def) s.player.def += bonus.def;
-      if (bonus.maxHp) { s.player.maxHp += bonus.maxHp; s.player.hp += bonus.maxHp; }
-      if (bonus.dodge) s.player.dodge = (s.player.dodge||0) + bonus.dodge;
-      if (bonus.lifeSteal) s.player.lifeSteal = (s.player.lifeSteal||0) + bonus.lifeSteal;
-      if (bonus.critRate) s.player.critRate += bonus.critRate;
-      if (bonus.critMul) s.player.critMul += bonus.critMul;
-      if (bonus.pen) s.player.pen = (s.player.pen||0) + bonus.pen;
-      if (bonus.dmgReduce) s.player.dmgReduce = (s.player.dmgReduce||0) + bonus.dmgReduce;
+      if (bonus.atk) { s.player.atk += bonus.atk; s.player._set_atk = bonus.atk; }
+      if (bonus.def) { s.player.def += bonus.def; s.player._set_def = bonus.def; }
+      if (bonus.maxHp) { s.player.maxHp += bonus.maxHp; s.player.hp += bonus.maxHp; s.player._set_maxHp = bonus.maxHp; }
+      if (bonus.dodge) { s.player.dodge = (s.player.dodge||0) + bonus.dodge; s.player._set_dodge = bonus.dodge; }
+      if (bonus.lifeSteal) { s.player.lifeSteal = (s.player.lifeSteal||0) + bonus.lifeSteal; s.player._set_lifeSteal = bonus.lifeSteal; }
+      if (bonus.critRate) { s.player.critRate += bonus.critRate; s.player._set_critRate = bonus.critRate; }
+      if (bonus.critMul) { s.player.critMul += bonus.critMul; s.player._set_critMul = bonus.critMul; }
+      if (bonus.pen) { s.player.pen = (s.player.pen||0) + bonus.pen; s.player._set_pen = bonus.pen; }
+      if (bonus.dmgReduce) { s.player.dmgReduce = (s.player.dmgReduce||0) + bonus.dmgReduce; s.player._set_dmgReduce = bonus.dmgReduce; }
+      if (bonus.maxMp) { s.player.maxMp += bonus.maxMp; s.player.mp += bonus.maxMp; s.player._set_maxMp = bonus.maxMp; }
     });
     // 套装激活日志
     if (s.player._setActive4) { setTimeout(function(){ log('<span class="win">🏷️ 套装激活：' + s.player._setActive4 + ' 4件套！</span>'); }, 200); }
@@ -268,6 +279,11 @@ export function startBattle(type) {
         if (e.hp > 0) e._buffs.push({ id:'poison', name:'中毒', turns:3, data:{dmg:5},
           onTick: function(em,b){ em.hp -= b.data.dmg; if (em.hp <= 0) return 'dead'; } });
       });
+    }
+    // v0.60 混沌_chaosExtraEnemy：额外生成1个敌人
+    if (s._chaosExtraEnemy && s.enemies && s.enemies.length > 0) {
+      var extra = { ...s.enemies[0], name: (s.enemies[0].name || '敌人') + '(混沌)', hp: Math.floor(s.enemies[0].hp * 0.7), maxHp: Math.floor(s.enemies[0].hp * 0.7) };
+      s.enemies.push(extra);
     }
     Game.sync();
   }
@@ -359,8 +375,16 @@ export function doAttack() {
   if (!t) {
     var anyAlive = (s.enemies || []).some(function(e) { return e.hp > 0; });
     if (!anyAlive) { win(); return; }
-    return;
   }
+  // v0.60 混沌_chaosDrain：每回合扣血（放在敌人检测之后，避免无敌人时白扣）
+  if (s._chaosDrain && s.player && s.player.hp > 0) {
+    var drainPct = s._chaosDrainPct || 0.03;
+    var drainDmg = Math.max(1, Math.floor(s.player.maxHp * drainPct));
+    s.player.hp = Math.max(1, s.player.hp - drainDmg);
+    Events.emit(E.PLAYER_DAMAGED, { dmg: drainDmg, source: 'chaosDrain' });
+  }
+  // v0.60 石化检测提前到消耗资源之前
+  if (s.player._stoneGaze) { delete s.player._stoneGaze; bigFloat('🗿 石化！', 'float-dmg', 600); afterAction(s); return; }
   // 能量和行动次数检查（含NaN防护）
   var attackCost = Math.max(1, s.player._forgetfulCurse ? 2 : 1);
   if (typeof s.player.energy !== 'number' || isNaN(s.player.energy) || s.player.energy < attackCost) { s.player.energy = 0; return; }
@@ -369,9 +393,13 @@ export function doAttack() {
   s._actionsThisTurn = (s._actionsThisTurn || 0) + 1;
   s.defending = false;
   s._skillUseStreak = 0; // 重置技能疲劳
+  s._attackedThisTurn = true; // v0.51: 用于boss_forest判定
   animPlayerAttack();
-  if (s.player._stoneGaze) { delete s.player._stoneGaze; afterAction(s); return; }
+  // 【暗影之魂】闪避后攻击→3倍伤害（必须在calcDmg之前应用）
+  if (s.player._coreShadow && s._shadowCounter) { s._shadowCounter = false; s._shadowDmgMul = 3; }
   let dmg = calcDmg(null, t);
+  // 应用暗影3倍
+  if (s._shadowDmgMul) { dmg = Math.floor(dmg * s._shadowDmgMul); s._shadowDmgMul = 0; bigFloat('🌑 暗杀！', 'big-crit', 900); }
   var fc2 = s._smokeNext; if (fc2) s._smokeNext = false;
   applyDmg(dmg, false, t, fc2);
   // ====== 攻击联动 + 核心遗物 ======
@@ -385,8 +413,6 @@ export function doAttack() {
   }
   // 【极寒之心】防御后普攻→施加迟缓
   if (p._coreIce && s._iceNext) { addBuff(t, { id:'slow', name:'迟缓', turns:2, onRemove: function(){} }); s._iceNext = false; bigFloat('❄️ 极寒', 'float-dmg', 400); }
-  // 【暗影之魂】闪避后攻击→3倍伤害
-  if (p._coreShadow && s._shadowCounter) { dmg = Math.floor(dmg * 3); s._shadowCounter = false; bigFloat('🌑 暗杀！', 'big-crit', 900); }
   // 1) 对燃烧目标 → 立即结算1跳 + 延长1回合
   var burnB = tbuffs.find(function(b) { return b.id === 'burn'; });
   if (burnB && burnB.data && burnB.data.dmg) {
@@ -432,20 +458,25 @@ export function doSkill(skillIdx) {
   if (s.player._overload) { energyReduction = 99; s.player._overload = false; } // 过载：一次性免费
   if (s.player._forgetfulCurse) baseCost++; // 健忘诅咒：+1消耗
   if (s.player._masteryDownside === 'energy') baseCost++; // 战士精通Lv15负面：技能能量+1
-  // v0.50 P3: 技能疲劳 — 连续3回合使用技能后，第3回合额外+1能量消耗
+  // v0.50 P3: 技能疲劳 — 连续3回合使用技能后触发，然后重置计数
   s._skillUseStreak = (s._skillUseStreak || 0) + 1;
-  if (s._skillUseStreak >= 3) { baseCost++; bigFloat('😫 疲劳！', 'float-dmg', 500); }
+  if (s._skillUseStreak >= 3) { baseCost++; s._skillUseStreak = 0; bigFloat('😫 疲劳！', 'float-dmg', 500); }
   var cost = Math.max(1, baseCost - energyReduction);
   if (s.player.energy < cost) return;
+  var p = s.player;
   // 没有活着的敌人→胜利
   var anyAlive = (s.enemies || []).some(function(e) { return e.hp > 0; });
   if (!anyAlive) { win(); return; }
+  // v0.60: 石化检测提前到消耗资源之前
+  if (s.player._stoneGaze) { delete s.player._stoneGaze; bigFloat('🗿 石化！', 'float-dmg', 600); afterAction(s); return; }
   s.player.energy -= cost;
   s._actionsThisTurn = (s._actionsThisTurn || 0) + 1;
   s.defending = false;
   s._interrupted = true; // 技能也能打断敌人蓄力
+  s._attackedThisTurn = true; // v0.51: 用于boss_forest判定
+  // v0.51: mastery_mage — 使用技能后下次普攻+30%伤害
+  if (p._mastery_mage) { p._mageNextAtk = true; }
   animPlayerAttack();
-  if (s.player._stoneGaze) { delete s.player._stoneGaze; afterAction(s); return; }
   // v0.50 P1: 应用CD减免（天赋树"疾风" + 精通Lv4 + 无限法力遗物），最低CD=2
   var baseCD = (sk.cooldown != null ? sk.cooldown : 2);
   var cdReduction = 0;
@@ -454,14 +485,17 @@ export function doSkill(skillIdx) {
   if (s.player._infMana) cdReduction++;        // 无限法力遗物
   if (s.player._blessingSwift) cdReduction++;  // 迅捷赐福
   if (s.player._talentMage) cdReduction++;     // 元素亲和
+  if (s._chaosCdrBonus) cdReduction += s._chaosCdrBonus; // v0.70 混沌词条[技能狂欢]运行时CDR
   baseCD = Math.max(0, baseCD - cdReduction);
+  // v0.70 混沌词条[灵力压制]运行时CD惩罚
+  if (s._chaosCdPenalty) baseCD += s._chaosCdPenalty;
   s.skillCooldowns[cdKey] = Math.max(1, baseCD);
   // 遗物：回音石（20%概率技能不进入冷却）
   if (s.player._echoStone && s.rng && s.rng.chance(0.20)) {
     s.skillCooldowns[cdKey] = 0;
     bigFloat("🪨 回音！", "float-dmg", 600);
   }
-  if (sk.selfDmg) { const cost = Math.max(1, Math.floor(s.player.hp * sk.selfDmg)); s.player.hp -= cost; if (s.player.hp <= 0) { s.player.hp = 0; Game.sync(); setTimeout(() => gameOver(), 500); return; } }
+  if (sk.selfDmg) { const cost = Math.max(1, Math.floor(s.player.hp * sk.selfDmg)); s.player.hp -= cost; if (s.player.hp <= 0) { s.player.hp = 0; gameOver(); if (s.gameOver) return; } }
   if (sk.effect === "smoke") { s._smokeNext = true; }
   if (sk.heal) { const h = Math.floor(s.player.maxHp * sk.heal); s.player.hp = Math.min(s.player.maxHp, s.player.hp + h); }
   if (sk.reduceCD) {
@@ -507,6 +541,8 @@ export function doSkill(skillIdx) {
       var dmg = calcDmg(sk, e);
       dmg = Math.floor(dmg * 0.7);
       applyDmg(dmg, true, e, fcAoe);
+      // v0.51: boss_frozen — 技能命中必定迟缓
+      if (p._bossFrozen && e.hp > 0) applyBossFrozen(e);
       if (sk.effect && sk.effect !== "smoke" && sk.effect !== "pen") applySkillEffectTo(sk.effect, e, s);
     });
   } else {
@@ -517,8 +553,15 @@ export function doSkill(skillIdx) {
     var fc = s._smokeNext; if (fc) s._smokeNext = false;
     applyDmg(dmg, true, t, fc);
     if (sk.doubleHit && t.hp > 0) { var d2 = calcDmg(sk, t); applyDmg(d2, true, t); }
+    // v0.51: boss_frozen — 技能命中必定迟缓
+    if (p._bossFrozen && t.hp > 0) applyBossFrozen(t);
     if (sk.effect && t.hp > 0 && sk.effect !== "smoke" && sk.effect !== "pen") applySkillEffectTo(sk.effect, t, s);
     if (t.hp > 0) checkElementalReaction(sk, t, s); // v0.50 元素联动
+    // v0.51: boss_plains — 技能释放时相邻敌人受50%溅射伤害
+    if (p._bossPlains && s.enemies && s.enemies.length > 1) {
+      var splashDmg = Math.floor(dmg * 0.5);
+      s.enemies.forEach(function(oe) { if (oe !== t && oe.hp > 0) { oe.hp -= splashDmg; bigFloat('🦏 溅射！-' + splashDmg, 'float-dmg', 400); } });
+    }
     // v0.50 P3: Boss反制 — 炼狱难度Boss/精英被技能命中后下次攻击+20%（叠3层）
     if (t.hp > 0 && (s._currentRoomType === 'boss' || s._currentRoomType === 'elite')) {
       var isHell2 = s.difficulty && s.difficulty.startsWith('hell');
@@ -537,44 +580,68 @@ function checkElementalReaction(skill, enemy, s) {
   if (!skill || !enemy || enemy.hp <= 0) return;
   var p = s.player;
   var effect = skill.effect;
-  // 蒸发：燃烧目标被冰霜技能命中 → 额外15%当前HP伤害
-  if (effect === 'slow' && enemy._buffs && enemy._buffs.some(function(b){return b.id==='burn';})) {
+  var hasBurn = enemy._buffs && enemy._buffs.some(function(b){return b.id==='burn';});
+  var hasSlow = enemy._buffs && enemy._buffs.some(function(b){return b.id==='slow';});
+  var hasPoison = enemy._buffs && enemy._buffs.some(function(b){return b.id==='poison';});
+  var isIceSkill = effect === 'slow' || (skill.id && (skill.id.indexOf('ice') >= 0 || skill.id.indexOf('frost') >= 0 || skill.id.indexOf('nova') >= 0));
+  var isThunderSkill = skill.id && (skill.id.indexOf('thunder') >= 0 || skill.id.indexOf('lightning') >= 0);
+  var isShadowSkill = skill.id && (skill.id.indexOf('shd') >= 0 || skill.id.indexOf('shadow') >= 0 || skill.id.indexOf('poison') >= 0);
+  var isPoisonSkill = effect === 'poison' || (skill.id && skill.id.indexOf('poison') >= 0);
+  // 蒸发：冰技命中灼烧目标 → 额外15%当前HP伤害
+  if (isIceSkill && hasBurn) {
     var extra = Math.floor(enemy.hp * 0.15);
     if (extra > 0) { enemy.hp -= extra; bigFloat('🔥蒸发！-' + extra, 'big-fire', 600); log('<span class="warn">🔥 蒸发！冰霜命中燃烧目标，额外' + extra + '伤害</span>'); }
   }
-  // 超导：迟缓目标被闪电技能命中 → 闪电链弹射+2
-  if (skill.id && skill.id.indexOf('thunder') >= 0 && enemy._buffs && enemy._buffs.some(function(b){return b.id==='slow';})) {
+  // 超导：雷技命中减速目标 → 连锁闪电弹射+2
+  if (isThunderSkill && hasSlow) {
     p._superconduct = true; bigFloat('⚡超导！弹射+2', 'big-thunder', 500); log('<span class="win">⚡ 超导！迟缓传导闪电，弹射+2</span>');
   }
-  // 过载：闪电技能暴击 → 下次技能免费
-  if (s._lastCrit && (skill.id && (skill.id.indexOf('thunder') >= 0 || skill.id.indexOf('lightning') >= 0)) && p._coreThunder) {
+  // 过载：雷技暴击(有雷霆之怒) → 下个技能0能量消耗
+  if (s._lastCrit && isThunderSkill && p._coreThunder) {
     p._overload = true; bigFloat('⚡过载！下次技能免费', 'big-thunder', 500); log('<span class="win">⚡ 过载！下次技能免费</span>');
   }
-  // 侵蚀：中毒目标被暗影技能命中 → 中毒立即结算3回合
-  if ((effect === 'poison' || (skill.id && skill.id.indexOf('shd') >= 0)) && enemy._buffs) {
+  // 侵蚀：暗影/毒技命中中毒目标 → 中毒立即结算3回合
+  if ((isShadowSkill || isPoisonSkill) && hasPoison) {
     var pois = enemy._buffs.filter(function(b){return b.id==='poison';});
     pois.forEach(function(pb){ if(pb.data&&pb.data.dmg){ var d=pb.data.dmg*Math.min(3,pb.turns||1); enemy.hp-=d; pb.turns=Math.max(0,(pb.turns||0)-3); bigFloat('☠️侵蚀！-' + d, 'big-shadow', 500); log('<span class="warn">☠️ 侵蚀！暗影引爆中毒，' + d + '伤害</span>'); } });
   }
-  // 净化：诅咒持有者被圣光技能命中 → 移除1诅咒永久HP+5
+  // 净化：光技(有圣光之佑)+持有诅咒 → 移除1诅咒，永久HP+5
   if (p._coreLight && s.curses.length > 0 && (skill.id && (skill.id.indexOf('light') >= 0 || skill.id.indexOf('heal') >= 0))) {
     var removed = s.curses.shift();
+    if (removed && removed.remove) removed.remove(p);
     p.maxHp += 5; p.hp += 5;
     bigFloat('✨净化！-' + (removed?removed.name:'诅咒') + ' HP+5', 'big-light', 700); log('<span class="heal">✨ 净化！移除' + (removed?removed.name:'诅咒') + '，HP+5</span>');
   }
-  // 共鸣：持有2个同元素遗物+使用该元素技能 → 免费协同攻击50%ATK
-  var eleFlags = [{k:'_coreFlame',e:'burn'},{k:'_coreIce',e:'slow'},{k:'_coreShadow',e:'poison'},{k:'_coreThunder',e:'stun'}];
-  eleFlags.forEach(function(ef){
-    if (p[ef.k] && p._coreCurse && skill.effect === ef.e && s.rng.chance(0.3)) {
-      var extraDmg = Math.floor(p.atk * 0.5);
-      enemy.hp -= extraDmg;
-      bigFloat('🌀共鸣！-' + extraDmg, 'big-crit', 500); log('<span class="win">🌀 元素共鸣！协同攻击-' + extraDmg + '</span>');
-    }
-  });
+  // 共鸣：持有2+元素核心+诅咒核心 → 30%概率触发50%ATK协同攻击
+  var coreCount = 0;
+  if (p._coreFlame) coreCount++;
+  if (p._coreIce) coreCount++;
+  if (p._coreShadow) coreCount++;
+  if (p._coreThunder) coreCount++;
+  if (p._coreLight) coreCount++;
+  if (coreCount >= 2 && p._coreCurse && s.rng.chance(0.3)) {
+    var extraDmg = Math.floor(p.atk * 0.5);
+    enemy.hp -= extraDmg;
+    bigFloat('🌀共鸣！-' + extraDmg, 'big-crit', 500); log('<span class="win">🌀 元素共鸣！协同攻击-' + extraDmg + '</span>');
+  }
+}
+
+// v0.51: boss_frozen helper — 技能命中必定迟缓，已迟缓则冻结
+function applyBossFrozen(enemy) {
+  if (!enemy || enemy.hp <= 0) return;
+  if (enemy._buffs && enemy._buffs.some(function(b){return b.id==='slow';})) {
+    enemy._buffs.push({ id:'stun', name:'冻结', turns:1, onTick:function(){return'stunned';} });
+    bigFloat('❄️ 永冻！', 'big-dodge', 600);
+  } else {
+    enemy._buffs.push({ id:'slow', name:'迟缓', turns:2, onRemove:function(){} });
+  }
 }
 
 // 技能效果应用（作用于特定敌人）
 function applySkillEffectTo(effect, enemy, s) {
   if (!enemy || enemy.hp <= 0) return;
+  var p = s.player;
+  // v0.51: boss_frozen — 由外部applyBossFrozen调用，此处不重复处理
   switch (effect) {
     case 'burn':
       enemy._buffs.push({ id:'burn', name:'燃烧', turns:2, data:{dmg:4+Math.floor(s.totalFloor/5)}, onTick:function(e,b){e.hp-=b.data.dmg;if(e.hp<=0)return'dead';} });
@@ -599,6 +666,8 @@ export function doDefend() {
   var anyAlive = (s.enemies || []).some(function(e) { return e.hp > 0; });
   if (s.gameOver) return;
   if (!anyAlive) { win(); return; }
+  // v0.70: 石化检测（与doAttack/doSkill保持一致）
+  if (s.player._stoneGaze) { delete s.player._stoneGaze; bigFloat('🗿 石化！', 'float-dmg', 600); afterAction(s); return; }
   // 每回合只能防御1次（免费动作），受行动次数限制
   if (s._defendedThisTurn) return;
   if ((s._actionsThisTurn || 0) >= MAX_ACTIONS) return;
@@ -615,25 +684,40 @@ export function doDefend() {
   } finally { s._acting = false; }
 }
 
-// ---- 手动结束回合 ----
-export function doEndTurn() {
-  const s = Game.state;
-  if (s.gameOver || s._acting) return;
-  s._acting = true;
-  try {
-  var wasAuto = s.auto, wasSpeed = s._speedMode, wasTurbo = s._turboMode;
-  clearAuto();
-  if (s.player && s.player.energy > 0 && s.player.hp < s.player.maxHp) {
-    var healAmt = s.player.energy;
-    s.player.hp = Math.min(s.player.maxHp, s.player.hp + healAmt);
+// ---- 回合结束治疗（doEndTurn和autoLoop共用，避免autoLoop绕过治疗）----
+function endTurnHeal(s) {
+  var p = s.player;
+  if (!p) return;
+  if (p.energy > 0 && p.hp < p.maxHp) {
+    var healAmt = p.energy;
+    // v0.51: heal multiplier
+    if (p._lightChain >= 1) healAmt = Math.floor(healAmt * 1.25);
+    if (p._brandHealMul) healAmt = Math.floor(healAmt * p._brandHealMul);
+    if (p._sinGluttony) healAmt = Math.floor(healAmt * 2.2); // v0.70 暴食 +120%
+    var over2 = p.hp + healAmt - p.maxHp;
+    p.hp = Math.min(p.maxHp, p.hp + healAmt);
+    // v0.51: light_chain_2 overflow → perm HP
+    if (p._lightChain >= 2 && over2 > 0) { p._lightOverflow = (p._lightOverflow || 0) + Math.floor(over2 * 0.5); if (p._lightOverflow > 30) p._lightOverflow = 30; }
+    if (p._brandOverhealPermHP && over2 > 0) { p._brandOverflow = (p._brandOverflow || 0) + Math.floor(over2 * 0.5); if (p._brandOverflow > p._brandOverhealPermHP) p._brandOverflow = p._brandOverhealPermHP; }
+    // v0.51: brand — 治疗时对随机敌人造成30%ATK伤害
+    if (p._brandHealDmgProc && healAmt > 0 && s.enemies && s.enemies.length > 0) {
+      var alive2 = s.enemies.filter(function(ee){return ee && ee.hp > 0;});
+      if (alive2.length > 0) { var target2 = alive2[Math.floor(Math.random()*alive2.length)]; target2.hp -= Math.floor(p.atk * p._brandHealDmgProc); }
+    }
     if (healAmt > 0) log('<span class="heal">💤 剩余能量转化为' + healAmt + '点治疗</span>');
   }
   // v0.50 圣光之佑：每回合回复6%HP，治疗时对敌人造成50%等量伤害
-  if (s.player && s.player._coreLight && s.player.hp < s.player.maxHp) {
-    var p2 = s.player;
-    var lightHeal = Math.floor(p2.maxHp * 0.06);
-    var actualHeal = Math.min(lightHeal, p2.maxHp - p2.hp);
-    p2.hp = Math.min(p2.maxHp, p2.hp + lightHeal);
+  if (p._coreLight && p.hp < p.maxHp) {
+    var lightHeal = Math.floor(p.maxHp * 0.06);
+    // v0.51: heal multiplier
+    if (p._lightChain >= 1) lightHeal = Math.floor(lightHeal * 1.25);
+    if (p._brandHealMul) lightHeal = Math.floor(lightHeal * p._brandHealMul);
+    if (p._sinGluttony) lightHeal *= 2; // v0.60 暴食
+    var actualHeal = Math.min(lightHeal, p.maxHp - p.hp);
+    var overLight = p.hp + lightHeal - p.maxHp;
+    p.hp = Math.min(p.maxHp, p.hp + lightHeal);
+    if (p._lightChain >= 2 && overLight > 0) { p._lightOverflow = (p._lightOverflow || 0) + Math.floor(overLight * 0.5); if (p._lightOverflow > 30) p._lightOverflow = 30; }
+    if (p._brandOverhealPermHP && overLight > 0) { p._brandOverflow = (p._brandOverflow || 0) + Math.floor(overLight * 0.5); if (p._brandOverflow > p._brandOverhealPermHP) p._brandOverflow = p._brandOverhealPermHP; }
     if (actualHeal > 0 && s.enemies && s.enemies.length > 0) {
       var alive = s.enemies.filter(function(ee){return ee && ee.hp > 0;});
       if (alive.length > 0) {
@@ -642,7 +726,24 @@ export function doEndTurn() {
         bigFloat('-' + Math.floor(actualHeal * 0.5) + '✨', 'float-heal', 400);
       }
     }
+    // v0.51: brand — 治疗时对随机敌人造成30%ATK伤害
+    if (p._brandHealDmgProc && lightHeal > 0 && s.enemies && s.enemies.length > 0) {
+      var alive2b = s.enemies.filter(function(ee){return ee && ee.hp > 0;});
+      if (alive2b.length > 0) { var target2b = alive2b[Math.floor(Math.random()*alive2b.length)]; target2b.hp -= Math.floor(p.atk * p._brandHealDmgProc); }
+    }
   }
+}
+
+// ---- 手动结束回合 ----
+export function doEndTurn() {
+  const s = Game.state;
+  if (s.gameOver || s._acting) return;
+  s._acting = true;
+  try {
+  var p = s.player;
+  var wasAuto = s.auto, wasSpeed = s._speedMode, wasTurbo = s._turboMode;
+  clearAuto();
+  endTurnHeal(s);
   enemyTurn();
   Game.sync();
   } finally { s._acting = false; }
@@ -663,11 +764,10 @@ function calcDmg(sk, targetEnemy) {
   // 【战鼓】每5回合+10攻击（在enemyTurn中累加）— 这里读取累加值
   if (p._warDrum && p._drumAtk) atk += p._drumAtk;
   const isSkill = sk && sk.mul;
-  let def = e.def;
-  if (isSkill) {
-    const pen = (p.pen || 0) + (sk.extraPen || 0) + (sk.pen || 0);
-    def = Math.floor(def * (1 - pen));
-  }
+  // v0.51: pen对普攻和技能都生效
+  // v0.60: 穿透改为加法叠加（全局穿透 + 技能穿透），上限80%
+  var totalPen = Math.min(0.8, (p.pen || 0) + (isSkill ? ((sk.extraPen || 0) + (sk.pen || 0)) : 0));
+  let def = Math.floor(e.def * (1 - totalPen));
   // v0.50 P2: 护甲减伤公式 — def越高收益越递减
   let dmg = Math.floor(atk * (1 - def / (def + 100)));
   dmg = Math.max(1, dmg);
@@ -691,6 +791,38 @@ function calcDmg(sk, targetEnemy) {
   if (execEq && e.hp < e.maxHp * 0.3) dmg = Math.floor(dmg * (1 + execEq._combatEffect.value));
   // 遗物：死亡标记（对低血+50%伤害）
   if (p._deathMark && e.hp < e.maxHp * 0.35) dmg = Math.floor(dmg * 1.5);
+  // v0.51: reaper羁绊 — 对低血敌人+80%
+  if (p._synReaper && e.hp < e.maxHp * 0.35) dmg = Math.floor(dmg * 1.8);
+  // v0.51: glass_god羁绊 — 满血+50%，低血+150%
+  if (p._synGlassGod) {
+    if (p.hp >= p.maxHp) dmg = Math.floor(dmg * 1.5);
+    else if (p.hp < p.maxHp * 0.3) dmg = Math.floor(dmg * 2.5);
+  }
+  // v0.51: ice_chain_3 — 冰冻敌人伤害翻倍
+  if (p._iceChain >= 3 && e._buffs && e._buffs.some(function(b){return b.id==='stun';})) dmg = Math.floor(dmg * 2);
+  // v0.51: mastery_shadow — 对满血敌人+50%伤害
+  if (p._mastery_shadow && e.hp >= e.maxHp) dmg = Math.floor(dmg * 1.5);
+  // v0.70: 暗影弱点 — 持有核心暗影时对暗影弱点敌人穿透+30%
+  if (e.weakness === '暗影' && p._coreShadow) { totalPen = Math.min(0.8, totalPen + 0.3); def = Math.floor(e.def * (1 - totalPen)); var shadowDmgBonus = Math.floor(atk * (1 - def / (def + 100))); dmg = Math.max(dmg, shadowDmgBonus); }
+  // v0.51: boss_tower — Boss战伤害+40%
+  if (p._bossTower && s._currentRoomType === 'boss') dmg = Math.floor(dmg * 1.4);
+  // v0.51: brand — 有护盾时ATK+20%
+  if (p._brandShieldAtkBoost && (p._tempHp || 0) > 0) dmg = Math.floor(dmg * (1 + p._brandShieldAtkBoost));
+  // v0.51: brand — 每诅咒+ATK
+  if (p._brandAtkPerCurse) { dmg += Math.floor((s.curses||[]).length * p._brandAtkPerCurse * (sk ? (sk.mul||p.skillMul) : 1)); }
+  // v0.51: brand/boss — 迟缓敌人额外减防
+  if ((p._brandSlowDefPenalty || p._bossDesert) && e._buffs && e._buffs.some(function(b){return b.id==='slow';})) {
+    def = Math.max(0, def - (p._brandSlowDefPenalty||0));
+    var dmg2 = Math.floor(atk * (1 - def / (def + 100))); dmg = Math.max(dmg, dmg2);
+  }
+  // v0.51: curse_lord — 每个诅咒+20%全伤害（与core_curse叠加）
+  if (p._curseLord && s.curses.length > 0) { dmg = Math.floor(dmg * (1 + s.curses.length * 0.20)); }
+  // v0.51: mastery_mage — 技能后下次普攻+30%伤害
+  if (p._mageNextAtk && !isSkill) { dmg = Math.floor(dmg * 1.3); p._mageNextAtk = false; }
+  // v0.51: boss_desert — 闪避后下次攻击+50%伤害
+  if (p._desertNext && !isSkill) { dmg = Math.floor(dmg * 1.5); p._desertNext = false; }
+  // v0.51: brand — 闪避后下次攻击ATK+30%（直接乘算dmg，避免丢失前置加成）
+  if (p._brandDodgeAtkNext && !isSkill) { dmg = Math.floor(dmg * 1.3); p._brandDodgeAtkNext = false; }
   // 装备前缀：混沌（30%概率+50%）
   const chaosEq = s.equip.find(q => q._combatEffect && q._combatEffect.type === "chaos");
   if (chaosEq && s.rng.chance(chaosEq._combatEffect.value)) dmg = Math.floor(dmg * 1.5);
@@ -724,15 +856,26 @@ function applyDmg(dmg, skill, targetEnemy, forceCrit) {
     });
   }
   // v0.50 雷霆之怒：暴击时释放闪电链
-  if (crit && p._coreThunder && s.enemies && s.enemies.length > 1) {
-    var chainDmg = Math.floor(dmg * 0.3); // 闪电伤害+30%
-    var chainTargets = s.enemies.filter(function(te) { return te !== e && te.hp > 0; });
-    var chainCount = Math.min(p._thunderChain >= 1 ? 3 : 2, chainTargets.length);
+  // v0.51: thunder_chain>=2 also triggers chain lightning
+  if (crit && (p._coreThunder || p._thunderChain >= 2) && s.enemies && s.enemies.length >= 1) {
+    var chainDmg = Math.floor(dmg * (p._coreThunder ? 0.3 : 0.25));
+    var chainTargets;
+    // thunder_chain_3: 可弹回同一目标
+    if (p._thunderChain >= 3) {
+      chainTargets = s.enemies.filter(function(te) { return te.hp > 0; });
+    } else {
+      chainTargets = s.enemies.filter(function(te) { return te !== e && te.hp > 0; });
+    }
+    var baseBounce = 2 + (p._thunderChain >= 1 ? 1 : 0) + (p._brandCritChainBounce || 0);
+    var chainCount = Math.min(baseBounce, chainTargets.length > 0 ? baseBounce : chainTargets.length);
     bigFloat('⚡ 闪电链！×' + chainCount, 'float-gold', 500);
     for (var ci = 0; ci < chainCount; ci++) {
       var target = chainTargets[ci % chainTargets.length];
       if (target && target.hp > 0) {
-        var bounceDmg = Math.floor(chainDmg * Math.pow(0.7, ci));
+        // thunder_chain_3: 每次弹射+20%伤害 instead of -30%
+        var bounceDmg = p._thunderChain >= 3
+          ? Math.floor(chainDmg * (1 + ci * 0.2))
+          : Math.floor(chainDmg * Math.pow(0.7, ci));
         target.hp -= bounceDmg;
         bigFloat('-' + bounceDmg + '⚡', 'big-crit', 300 + ci * 100);
       }
@@ -758,7 +901,7 @@ function applyDmg(dmg, skill, targetEnemy, forceCrit) {
     if (s._runCrits >= 50) checkAchievement(s, "crit_master");
     Events.emit(E.PLAYER_DAMAGED, { dmg, crit: true, skill });
     playSound("crit");
-  } else if (s.nextBoost > 0 && s.nextBoost !== 0.35) {
+  } else if (s.nextBoost > 0 && s.nextBoost === 0.35) { // 防御反击
     Events.emit(E.PLAYER_DAMAGED, { dmg, crit: false, counter: true });
     playSound("attack");
   } else {
@@ -774,22 +917,50 @@ function applyDmg(dmg, skill, targetEnemy, forceCrit) {
 
   s.stats.totalDmg += dmg; e.hp -= dmg;
   if (dmg > 25) playSound("heavyHit");
-  if (!skill) applyEquipCombatEffects(s);
+  if (!skill) applyEquipCombatEffects(s, e);
   if (p.lifeSteal > 0) {
     var ls = Math.min(p.lifeSteal, 0.5);
-    const h = Math.floor(dmg * ls);
+    var h = Math.floor(dmg * ls);
+    // v0.51: heal multiplier (light chain + brand)
+    if (p._lightChain >= 1) h = Math.floor(h * 1.25);
+    if (p._brandHealMul) h = Math.floor(h * p._brandHealMul);
     var over = p.hp + h - p.maxHp;
     p.hp = Math.min(p.maxHp, p.hp + h);
+    // v0.51: light_chain_2 — 溢出治疗50%转永久HP（上限30/局）
+    if (p._lightChain >= 2 && over > 0) { p._lightOverflow = (p._lightOverflow || 0) + Math.floor(over * 0.5); if (p._lightOverflow > 30) p._lightOverflow = 30; }
+    // v0.51: brand — 溢出治疗转永久HP
+    if (p._brandOverhealPermHP && over > 0) { p._brandOverflow = (p._brandOverflow || 0) + Math.floor(over * 0.5); var bpCap = p._brandOverhealPermHP; if (p._brandOverflow > bpCap) p._brandOverflow = bpCap; }
     if (p._vampLord && over > 0) { p._tempHp = (p._tempHp||0) + over; bigFloat("🧛 +"+over+" 临时HP", "float-heal", 500); }
+    // v0.51: brand — 吸血溢出50%转护盾
+    if (p._brandVampOverflowShield && over > 0) { p._tempHp = (p._tempHp||0) + Math.floor(over * p._brandVampOverflowShield); }
     Events.emit(E.PLAYER_HEALED, { amount: h, hp: p.hp, maxHp: p.maxHp, source: 'lifeSteal' });
   }
+  // v0.51: 装备吸血（基于实际伤害）
+  if (s._equipLifesteal) {
+    var eqHeal = Math.floor(dmg * s._equipLifesteal);
+    p.hp = Math.min(p.maxHp, p.hp + eqHeal);
+  }
 
-  s.relics.forEach(r => { if (r.onAttack) r.onAttack(p, dmg, s); });
+  s.relics.forEach(r => { if (r.onAttack) r.onAttack(p, dmg, s, e); });
+  // v0.51: mastery_archer — 暴击时额外造成30%ATK伤害
+  if (crit && p._mastery_archer) { e.hp -= Math.floor(p.atk * 0.3); bigFloat('🏹 +' + Math.floor(p.atk*0.3), 'float-crit', 400); }
+  // v0.51: boss_ruins — 攻击附加随机debuff（燃烧/迟缓/中毒）
+  if (p._bossRuins && e.hp > 0 && s.rng) {
+    var debuffs = [
+      {id:'burn',name:'燃烧',turns:2,data:{dmg:4+Math.floor(s.totalFloor/5)},onTick:function(em,b){em.hp-=b.data.dmg;if(em.hp<=0)return'dead';}},
+      {id:'slow',name:'迟缓',turns:2,onRemove:function(){}},
+      {id:'poison',name:'中毒',turns:3,data:{dmg:4+Math.floor(s.totalFloor/5)},onTick:function(em,b){em.hp-=b.data.dmg;if(em.hp<=0)return'dead';}}
+    ];
+    var pick = debuffs[Math.floor(s.rng.next()*debuffs.length)];
+    e._buffs.push(pick);
+    bigFloat('📜 ' + pick.name + '！', 'float-dmg', 500);
+  }
   // 遗物特效反馈
-  // 【避雷针】暴击时释放闪电链弹射2次
+  // 【避雷针】暴击时释放闪电链弹射2次（雷神之怒: 4次）
   if (p._lightningRod && crit && s.enemies) {
     var others = s.enemies.filter(function(x){return x!==e && x.hp>0;});
-    for (var z=0; z<2 && others.length>0; z++) {
+    var bounceCount = p._synThunderGod ? 4 : 2;
+    for (var z=0; z<bounceCount && others.length>0; z++) {
       var target = others[Math.floor(s.rng.next()*others.length)];
       var boltDmg = Math.floor(dmg * 0.4);
       target.hp -= boltDmg;
@@ -800,6 +971,63 @@ function applyDmg(dmg, skill, targetEnemy, forceCrit) {
   if (p._medusaHead && !skill && s.rng.chance(0.1) && e && e.hp > 0) { e.hp = 0; bigFloat("🗿 石化！", "big-crit", 1000); playSound("crit"); }
   if (p._gamblersDice && !crit && dmg > 0) { bigFloat("🎲", "float-dmg", 500); }
   if (dmg >= 200) checkAchievement(s, "one_shot_200");
+  // v0.51: 击杀敌人时触发onKill回调（战斗中即时触发，而非等全部死亡）
+  if (e.hp <= 0 && e._justKilled !== true) {
+    e._justKilled = true;
+    s.relics.forEach(function(r) { if (r.onKill) r.onKill(s.player, s); });
+    // 影卫被动：击杀回复20%HP
+    if (p._shadowBorn) { var shadowHeal = Math.floor(p.maxHp * 0.20); if (p._lightChain>=1) shadowHeal=Math.floor(shadowHeal*1.25); if (p._brandHealMul) shadowHeal=Math.floor(shadowHeal*p._brandHealMul); p.hp = Math.min(p.maxHp, p.hp + shadowHeal); }
+    // v0.51: reaper羁绊 — 击杀回复30%HP
+    if (p._synReaper) { var repHeal = Math.floor(p.maxHp * 0.30); if (p._lightChain>=1) repHeal=Math.floor(repHeal*1.25); if (p._brandHealMul) repHeal=Math.floor(repHeal*p._brandHealMul); p.hp = Math.min(p.maxHp, p.hp + repHeal); bigFloat('💀 死神收割！+' + repHeal, 'float-heal', 600); }
+    // v0.51: fire_chain_2/3 — 灼烧敌人死亡爆炸50%ATK + 传播灼烧
+    if (p._fireChain >= 2 && e._buffs && e._buffs.some(function(b){return b.id==='burn';})) {
+      var fireDmg = Math.floor(p.atk * 0.5);
+      s.enemies.forEach(function(oe) { if (oe !== e && oe.hp > 0) { oe.hp -= fireDmg; bigFloat('💥 爆炸！-' + fireDmg, 'big-fire', 500); } });
+      // fire_chain_3: 传播灼烧至全体
+      if (p._fireChain >= 3 && s.enemies) {
+        s.enemies.forEach(function(oe) { if (oe !== e && oe.hp > 0) {
+          oe._buffs.push({ id:'burn', name:'燃烧', turns:2, data:{dmg: Math.floor(p.atk*0.15)+2},
+            onTick: function(em,b){ em.hp -= b.data.dmg; if (em.hp <= 0) return 'dead'; } });
+        }});
+        bigFloat('🌟 焚天·传播！', 'big-crit', 700);
+      }
+    }
+    // v0.51: shadow_chain_3 — 反击击杀重置暗影闪避
+    if (p._shadowChain >= 3) s._shadowUsed = false;
+    // v0.51: boss_void — 击杀生成虚空裂隙
+    if (p._bossVoid && e.hp <= 0) {
+      if (!s._voidRifts) s._voidRifts = [];
+      s._voidRifts.push({ turns: 2, dmg: Math.floor(p.atk * 1.0) });
+      bigFloat('🌀 虚空裂隙！', 'big-crit', 700);
+    }
+    // v0.51: boss_swamp — 中毒敌人死亡回复10%最大HP
+    if (p._bossSwamp && e._buffs && e._buffs.some(function(b){return b.id==='poison';})) {
+      var swampHeal = Math.floor(p.maxHp * 0.10); p.hp = Math.min(p.maxHp, p.hp + swampHeal);
+      bigFloat('🌿 +' + swampHeal + 'HP', 'float-heal', 500);
+    }
+    // v0.51: mastery_warrior — 击杀后ATK+3永久叠加
+    if (p._mastery_warrior) { p.atk += 3; bigFloat('🛡️ ATK+3！', 'float-gold', 500); }
+    // v0.51: brand — 灼烧击杀+1能量
+    if (p._brandBurnKillEnergy && e._buffs && e._buffs.some(function(b){return b.id==='burn';})) {
+      p.energy = Math.min(p.maxEnergy + 2, p.energy + 1);
+    }
+    // v0.51: brand — 暴击击杀+1能量
+    if (p._brandCritKillEnergy && crit) { p.energy = Math.min(p.maxEnergy + 2, p.energy + 1); }
+    // v0.51: brand — 冰冻击杀重置冰技CD
+    if (p._brandFreezeKillCDReset && e._buffs && e._buffs.some(function(b){return b.id==='stun';})) {
+      Object.keys(s.skillCooldowns).forEach(function(k) { s.skillCooldowns[k] = 0; });
+      bigFloat('❄️ 冰技重置！', 'big-dodge', 600);
+    }
+    // v0.51: brand — 闪避击杀重置闪避
+    if (p._brandDodgeKillReset) { s._shadowUsed = false; }
+    // v0.70: 亡灵天灾 — 击杀时即时入队
+    if (s._mutationUndead) {
+      if (!s._undeadQueue) s._undeadQueue = [];
+      s._undeadQueue.push({ enemy: e, turns: 3 });
+    }
+    // v0.70: 七罪诅咒每击杀触发（嫉妒回血12%，无永久属性叠加）
+    if (p._sinEnvy) { var envyHeal = Math.floor(p.maxHp * 0.12); if (p._sinGluttony) envyHeal = Math.floor(envyHeal * 2.2); p.hp = Math.min(p.maxHp, p.hp + envyHeal); }
+  }
   if (e.thorn) {
     const th = Math.floor(dmg * e.thorn);
     p.hp = Math.max(0, p.hp - th);
@@ -810,27 +1038,23 @@ function applyDmg(dmg, skill, targetEnemy, forceCrit) {
     var p2Threshold = Math.floor(e.maxHp * 0.3);
     if (e.hp <= p2Threshold && e.hp > 0) {
       s._bossPhase2 = true;
-      clearAuto(); // 强制切换手动
+      clearAuto();
       var p2 = e.phase2;
-      // 二阶段数值强化
+      // 先应用数值变化（防后续代码判定Boss已死）
       e.atk = Math.floor((e.atk || 10) * (p2.atkMul || 1.0));
       e.def = Math.max(0, (e.def || 0) + (p2.defBonus || 0));
       e.skill = p2.skill;
       e._buffs = [];
       e.name = p2.name || e.name;
-      // HP恢复
       var newMaxHp = Math.floor((e.maxHp || e.hp * 2) * 1.2);
       e.maxHp = newMaxHp; e.hp = newMaxHp;
-      // Boss狂暴状态
       s._bossRage = true;
       s._bossRageAttacks = 1;
       s._bossRageIgnoreDodge = 0.5;
       s._furyActive = false;
-      // 重置玩家临时增益
       if (s._despAtkDoubled) { s.player.atk = Math.floor(s.player.atk / 2); }
       s._desperationUsed = false; s._despAtkDoubled = false;
       s.potionAtk = 0; s.potionDef = 0;
-      // 喘息回合：恢复玩家30%HP + 50%能量
       var healAmt = Math.floor(s.player.maxHp * 0.30);
       s.player.hp = Math.min(s.player.maxHp, s.player.hp + healAmt);
       s.player.energy = Math.min(s.player.maxEnergy || 3, s.player.energy + Math.ceil((s.player.maxEnergy || 3) * 0.5));
@@ -838,53 +1062,58 @@ function applyDmg(dmg, skill, targetEnemy, forceCrit) {
       bigFloat('💢 Boss暴怒！', 'big-crit', 1500);
       Events.emit(E.BATTLE_START, { type: 'bossPhase2', name: p2.name || e.name });
       Game.sync();
+      // 再播放叙事动画（纯视觉效果，不阻塞战斗）
+      if (s._bossPhase2Intro) {
+        showBossNarrative(s._bossPhase2Intro, function() {});
+      }
     }
   }
   s.nextBoost = 0;
 }
 
 // ---- 装备前缀战斗效果 ----
-function applyEquipCombatEffects(s) {
+function applyEquipCombatEffects(s, targetEnemy) {
+  var t = targetEnemy || s.enemy;
   s.equip.forEach(q => {
     const fx = q._combatEffect; if (!fx) return;
     switch (fx.type) {
       case "burn":
         if (s.rng.chance(0.5)) {
           const bdmg = (fx.value || 4) + Math.floor(s.totalFloor / 5);
-          addBuff(s.enemy, { id: 'burn', name: '燃烧', turns: 2, data: { dmg: bdmg },
+          addBuff(t, { id: 'burn', name: '燃烧', turns: 2, data: { dmg: bdmg },
             onTick: (e, b) => { e.hp -= b.data.dmg; Events.emit(E.PLAYER_DAMAGED, { dmg: b.data.dmg, source: 'burn', target: 'enemy' }); if (e.hp <= 0) return 'dead'; } });
           Events.emit(E.BATTLE_START, { type: 'burn', turns: 2, dmg: bdmg });
         }
         break;
       case "slow":
         if (s.rng.chance(0.4)) {
-          addBuff(s.enemy, { id: 'slow', name: '迟缓', turns: 1, onRemove: () => {} });
+          addBuff(t, { id: 'slow', name: '迟缓', turns: 1, onRemove: () => {} });
           Events.emit(E.BATTLE_START, { type: 'slow' });
         }
         break;
       case "stun":
         if (s.rng.chance(fx.value || 0.3)) {
-          addBuff(s.enemy, { id: 'stun', name: '眩晕', turns: 1, onTick: () => 'stunned' });
-          Events.emit(E.BATTLE_START, { type: 'stun', name: s.enemy.name });
+          addBuff(t, { id: 'stun', name: '眩晕', turns: 1, onTick: () => 'stunned' });
+          Events.emit(E.BATTLE_START, { type: 'stun', name: t.name });
         }
         break;
       case "lifesteal":
-        const h = Math.floor((s.player.atk * (fx.value || 0.08)));
-        s.player.hp = Math.min(s.player.maxHp, s.player.hp + h);
+        // 改为在applyDmg中基于实际伤害计算（此处仅标记）
+        s._equipLifesteal = (s._equipLifesteal || 0) + (fx.value || 0.08);
         break;
-      case "heal_on_kill":
-        // 多件装备累加
-        s._healOnKill = (s._healOnKill || 0) + (fx.value || 0.1);
-        break;
+	      case "heal_on_kill":
+	        if (!s._healOnKillTracked) {
+	          s._healOnKill = (s._healOnKill || 0) + (fx.value || 0.1);
+	          s._healOnKillTracked = true;
+	        }
+	        break;
       case "chaos":
-        // 30%概率伤害+50%
         if (s.rng.chance(fx.value || 0.3)) {
           s._chaosBoost = true;
           bigFloat("🌀 混沌！", "big-crit", 500);
         }
         break;
       case "executioner":
-        // 对低血敌人+25%伤害（在calcDmg中读取）
         s._executioner = (s._executioner || 0) + (fx.value || 0.25);
         break;
     }
@@ -915,8 +1144,8 @@ function applySkillEffect(effect, s) {
     case 'poison': {
       const poisonDmg = 4 + Math.floor(floor / 5);
       addBuff(s.enemy, { id: 'poison', name: '中毒', turns: 3, data: { dmg: poisonDmg },
-        onTick: (e, b) => { e.hp -= b.data.dmg; Events.emit(E.PLAYER_DAMAGED, { dmg: b.data.dmg, source: 'burn', target: 'enemy' }); if (e.hp <= 0) return 'dead'; } });
-      Events.emit(E.BATTLE_START, { type: 'burn', turns: 3, dmg: poisonDmg });
+        onTick: (e, b) => { e.hp -= b.data.dmg; Events.emit(E.PLAYER_DAMAGED, { dmg: b.data.dmg, source: 'poison', target: 'enemy' }); if (e.hp <= 0) return 'dead'; } });
+      Events.emit(E.BATTLE_START, { type: 'poison', turns: 3, dmg: poisonDmg });
       break;
     }
   }
@@ -930,8 +1159,11 @@ function enemyTurn() {
   checkCurseSynergies();
   // v0.50 转职被动：圣骑士每回合回复3%HP
   if (p._advancementId === 'war_paladin') { var palHeal = Math.floor(p.maxHp * 0.03); p.hp = Math.min(p.maxHp, p.hp + palHeal); }
-  // v0.50 转职被动：悟道者治疗+50%
-  if (p._advancementId === 'monk_enlightened') p._brandHealMul = (p._brandHealMul || 1) * 1.5;
+  // v0.50 转职被动：悟道者治疗+50%（仅应用一次，避免每回合累乘）
+  if (p._advancementId === 'monk_enlightened' && !p._enlightenedHealApplied) {
+    p._brandHealMul = (p._brandHealMul || 1) * 1.5;
+    p._enlightenedHealApplied = true;
+  }
   // v0.60 雷霆之怒：过载≥5层 → 雷暴全体50伤害
   if (p._coreThunder && (p._overloadStacks || 0) >= 5) {
     p._overloadStacks = 0;
@@ -946,7 +1178,7 @@ function enemyTurn() {
   if (p._doomCurse && s.curses.length >= 3) {
     var doomDmg = Math.max(1, Math.floor(p.maxHp * 0.02));
     p.hp = Math.max(0, p.hp - doomDmg);
-    if (p.hp <= 0) { p.hp = 0; Game.sync(); setTimeout(function() { gameOver(); }, 500); return; }
+    if (p.hp <= 0) { p.hp = 0; gameOver(); if (s.gameOver) return; }
   }
   // 过滤已死亡敌人，防止空对象访问
   s.enemies = (s.enemies || []).filter(function(e) { return e && e.hp > 0; });
@@ -958,12 +1190,7 @@ function enemyTurn() {
     hasLiveTarget = true;
     var status = tickBuffs(e, true);
     if (status === 'dead') { return; }
-    if (status === 'stunned') return;
-    // 打断检查
-    if (s._interrupted && (e.aiCharge || (e._intent && (e._intent.type === 'skill' || e._intent.type === 'heavy')))) {
-      e._intent = null; e.chargeTurns = 0;
-      setTimeout(function() { bigFloat("🛡️ 打断！", "big-crit", 800); screenShake(1); }, 50);
-    }
+    if (status === 'stunned') { e._intent = null; return; }
     // v0.51: 怪物词缀[诅咒] — 概率施加随机诅咒
     if (e.aiCurse && s.rng && s.rng.chance(0.20)) {
       var curses = R.get('curses') || [];
@@ -974,13 +1201,103 @@ function enemyTurn() {
         bigFloat('☠️ 诅咒！' + curse.name, 'float-dmg', 500);
       }
     }
+    // 打断检查（必须在捕获intent之前，确保打断后intent为null）
+    if (s._interrupted && (e.aiCharge || (e._intent && (e._intent.type === 'skill' || e._intent.type === 'heavy')))) {
+      e._intent = null; e.chargeTurns = 0;
+      setTimeout(function() { bigFloat("🛡️ 打断！", "big-crit", 800); screenShake(1); }, 50);
+    }
+    // ====== v0.70 Boss/精英 意图驱动行动系统 ======
+    var intent = e._intent;
+    // === 防御姿态：提升防御，不攻击 ===
+    if (intent && intent.type === 'defend') {
+      e.def = Math.floor((e.def || 0) * 1.5);
+      e._defendedThisTurn = true;
+      bigFloat('🛡️ 防御！', 'float-heal', 500);
+      log('<span class="info">🛡️ ' + (e.name || '敌人') + '进入防御姿态</span>');
+      e._intent = null;
+      return;
+    }
+    // === 蓄力：攻击力+50%，不攻击 ===
+    if (intent && intent.type === 'charge') {
+      e.atk = Math.floor((e.atk || 10) * 1.5);
+      e._charged = true;
+      bigFloat('⚡ 蓄力！', 'big-crit', 600);
+      log('<span class="warn">⚡ ' + (e.name || '敌人') + '正在蓄力！</span>');
+      e._intent = null;
+      return;
+    }
+    // === Boss技能：调用技能函数 ===
+    if (intent && intent.type === 'skill' && e.skill && typeof e.skill.fn === 'function') {
+      // 暗影弱点：暗影步可无视防御斩杀（对晶石巨像等暗影弱点Boss）
+      if (e.weakness === '暗影' && p._coreShadow) {
+        var shadowDmg = Math.floor(p.atk * 1.5);
+        e.hp -= shadowDmg;
+        bigFloat('🌑 暗影步·弱点！-' + shadowDmg, 'big-dodge', 900);
+        log('<span class="win">🌑 暗影步触发弱点：无视防御！</span>');
+      }
+      // 闪避判定（Boss技能也可闪避）
+      if (p.dodge && s.rng.chance(p.dodge)) {
+        dmg = 0; Events.emit(E.BATTLE_START, { type: 'dodge' });
+        s._runDodges = (s._runDodges || 0) + 1;
+        if (s._runDodges >= 10) checkAchievement(s, "dodge_lucky");
+        if (p._ninjaTabi) { s._smokeNext = true; }
+        if (p._coreShadow) { s._shadowCounter = true; bigFloat('🌑 暗影反击！', 'big-dodge', 700); }
+        if (p._shadowChain >= 2 && e && e.hp > 0) { var counterDmg2 = Math.floor(p.atk * 1.5); e.hp -= counterDmg2; bigFloat('🗡️ 反击！-' + counterDmg2, 'big-crit', 600); }
+        if (p._bossDesert) { s._smokeNext = true; p._desertNext = true; bigFloat('🏜️ 流沙！', 'float-gold', 500); }
+        if (p._brandDodgeAtkBoost) { p._brandDodgeAtkNext = true; }
+        bigFloat('🌑 闪避技能！', 'big-dodge', 700);
+        e._intent = null;
+      } else {
+        // 执行Boss技能（fn内部直接修改p.hp，不调用strike避免双重伤害）
+        var result = e.skill.fn(e, p);
+        if (result) {
+          if (result.dmg) {
+            // 应用减伤修正（fn内部的伤害已直接扣血，此处仅记录+修正）
+            if (p.dmgReduce > 0) {
+              var overDmg = Math.floor(result.dmg * Math.min(p.dmgReduce, 0.8));
+              p.hp = Math.min(p.hp + overDmg, p.maxHp); // 回退部分已扣的伤害
+            }
+            if (s.defending) {
+              var defRefund = Math.floor(result.dmg * 0.5);
+              p.hp = Math.min(p.hp + defRefund, p.maxHp); // 回退防御减免
+            }
+            // Boss技能命中后触发onHit/thorn/闪避计数器等
+            if (e.lifeSteal) { var h = Math.floor(result.dmg * e.lifeSteal); e.hp = Math.min(e.maxHp, e.hp + h); }
+            s.relics.forEach(function(r) { if (r.onHit) r.onHit(p, e, result.dmg, s); });
+            if (p.thorn) { var thDmg = Math.floor(result.dmg * p.thorn); e.hp -= thDmg; Events.emit(E.PLAYER_DAMAGED, { dmg: thDmg, source: 'thorn', target: 'enemy' }); }
+            Events.emit(E.PLAYER_DAMAGED, { dmg: result.dmg, hp: p.hp, maxHp: p.maxHp, source: e.name });
+            if (s._currentRoomType === "boss") s._bossDamaged = true;
+            playSound("hit");
+          }
+          if (result.heal) {
+            e.hp = Math.min(e.maxHp, e.hp + result.heal);
+            bigFloat('+' + result.heal + '💚', 'float-heal', 500);
+          }
+          if (result.msg) {
+            log('<span class="warn">' + result.msg + '</span>');
+          }
+        }
+        e._intent = null;
+      }
+      if (p.hp <= 0) return;
+      return;
+    }
+    // === 重击：伤害×1.5 ===
+    if (intent && intent.type === 'heavy') {
+      e._intent = null;
+      // 继续到下方攻击流程，伤害会在后续×1.5
+    }
+    // ====== 常规攻击流程 ======
     // v0.60 Boss弱点系统
     var bossAtk = e.atk;
     if (e.weakness === '火焰' && hasBuff(e, 'burn')) { bossAtk = Math.floor(bossAtk * 0.5); bigFloat('🔥弱点！', 'float-dmg', 400); }
-    if (e.weakness === '冰霜' && hasBuff(e, 'frozen')) { e.lifeSteal = 0; }
+    if (e.weakness === '冰霜' && hasBuff(e, 'stun')) { e.lifeSteal = 0; bigFloat('❄️弱点！', 'float-dmg', 400); }
     if (e.weakness === '圣光' && p._coreLight) { e.lifeSteal = 0; bigFloat('🌟弱点！', 'float-dmg', 400); }
+    if (e.weakness === '暗影' && p._coreShadow) { bossAtk = Math.floor(bossAtk * 0.7); bigFloat('🌑弱点！', 'float-dmg', 400); }
     var dmg = Math.floor(bossAtk * (1 - p.def / (p.def + 100)));
     dmg = Math.max(1, dmg);
+    // 重击：伤害×1.5
+    if (intent && intent.type === 'heavy') { dmg = Math.floor(dmg * 1.5); }
     // v0.51: 怪物词缀[迅捷] — 首回合双动
     if (e.doubleFirst && s.turnInFloor === 0) {
       var swiftDmg = Math.floor(dmg * 0.6);
@@ -1009,6 +1326,12 @@ function enemyTurn() {
       // 【忍者足袋】闪避后下回合必暴
       if (p._ninjaTabi) { s._smokeNext = true; }
       if (p._coreShadow) { s._shadowCounter = true; bigFloat('🌑 暗影反击！', 'big-dodge', 700); }
+      // v0.51: shadow_chain_2 — 闪避后反击150%ATK伤害
+      if (p._shadowChain >= 2 && e && e.hp > 0) { var counterDmg = Math.floor(p.atk * 1.5); e.hp -= counterDmg; bigFloat('🗡️ 反击！-' + counterDmg, 'big-crit', 600); }
+      // v0.51: boss_desert — 闪避后下次攻击必暴+50%伤害
+      if (p._bossDesert) { s._smokeNext = true; p._desertNext = true; bigFloat('🏜️ 流沙！', 'float-gold', 500); }
+      // v0.51: brand — 闪避后ATK+30%
+      if (p._brandDodgeAtkBoost) { p._brandDodgeAtkNext = true; }
       return;
     }
     // 镜盾格挡
@@ -1020,6 +1343,11 @@ function enemyTurn() {
     }
     strike(dmg, e);
     if (p.hp <= 0) return;
+  });
+
+  // ====== v0.70 每回合更新敌人意图 ======
+  s.enemies.forEach(function(em) {
+    if (em.hp > 0) updateIntentFor(em, s);
   });
 
   // v0.50 P1: Boss Rage — 二阶段Boss额外攻击一次，无视50%闪避
@@ -1045,7 +1373,7 @@ function enemyTurn() {
     });
   }
 
-  if (p.hp <= 0) { p.hp = 0; Game.sync(); setTimeout(() => gameOver(), 500); return; }
+  if (p.hp <= 0) { p.hp = 0; gameOver(); if (s.gameOver) return; }
   s._interrupted = false;
   var realAlive = (s.enemies || []).some(function(e) { return e.hp > 0; });
   if (!realAlive) {
@@ -1054,6 +1382,8 @@ function enemyTurn() {
       p._extraTurn = false;
       p.hp = Math.min(p.maxHp, p.hp + Math.floor(p.maxHp * 0.15));
       Object.keys(s.skillCooldowns).forEach(function(k) { if (s.skillCooldowns[k] > 0) s.skillCooldowns[k]--; });
+      // v0.51: time_master — 额外再-1CD
+      if (p._synTimeMaster) { Object.keys(s.skillCooldowns).forEach(function(k) { if (s.skillCooldowns[k] > 0) s.skillCooldowns[k]--; }); }
       bigFloat("⏳ 额外行动！", "big-crit", 1000);
     }
     win(); return;
@@ -1120,12 +1450,58 @@ function enemyTurn() {
   if (s.player._warDrum && s.turnInFloor % 5 === 0) { s.player._drumAtk = (s.player._drumAtk||0) + 10; }
   // v0.51 天赋·再生：每回合回复X%最大生命
   if (s.player._talentRegenPct) { var regenAmt = Math.floor(s.player.maxHp * s.player._talentRegenPct); s.player.hp = Math.min(s.player.maxHp, s.player.hp + regenAmt); }
+  // v0.51: boss_forest — 未攻击回合结束回复15%HP
+  if (p._bossForest && !s._attackedThisTurn) { var forestHeal = Math.floor(p.maxHp * 0.15); if (p._lightChain>=1) forestHeal = Math.floor(forestHeal*1.25); if (p._brandHealMul) forestHeal = Math.floor(forestHeal*p._brandHealMul); p.hp = Math.min(p.maxHp, p.hp + forestHeal); bigFloat('🌲 +' + forestHeal + 'HP', 'float-heal', 500); }
+  // v0.51: boss_tower — Boss战每回合回复5%HP
+  if (p._bossTower && s._currentRoomType === 'boss') { var towerHeal = Math.floor(p.maxHp * 0.05); if (p._lightChain>=1) towerHeal = Math.floor(towerHeal*1.25); if (p._brandHealMul) towerHeal = Math.floor(towerHeal*p._brandHealMul); p.hp = Math.min(p.maxHp, p.hp + towerHeal); }
+  // v0.51: mastery_monk — 每回合回复5%最大HP
+  if (p._mastery_monk) { var monkHeal = Math.floor(p.maxHp * 0.05); if (p._lightChain>=1) monkHeal = Math.floor(monkHeal*1.25); if (p._brandHealMul) monkHeal = Math.floor(monkHeal*p._brandHealMul); p.hp = Math.min(p.maxHp, p.hp + monkHeal); }
+  // v0.51: apply accumulated overflow HP
+  if (p._lightOverflow > 0 || p._brandOverflow > 0) {
+    var totalOverflow = (p._lightOverflow || 0) + (p._brandOverflow || 0);
+    var applyOverflow = Math.min(totalOverflow, 5); // 每回合最多+5
+    if (applyOverflow > 0) { p.maxHp += applyOverflow; p.hp += applyOverflow; p._lightOverflow = Math.max(0, (p._lightOverflow||0) - applyOverflow); p._brandOverflow = Math.max(0, (p._brandOverflow||0) - applyOverflow); }
+  }
+  // v0.51: boss_void — 虚空裂隙爆炸
+  if (p._bossVoid && s._voidRifts && s._voidRifts.length > 0) {
+    s._voidRifts = s._voidRifts.filter(function(r){ r.turns--; if (r.turns <= 0) { s.enemies.forEach(function(oe){ if(oe.hp>0) oe.hp -= r.dmg; }); bigFloat('🌀 裂隙爆炸！-' + r.dmg, 'big-crit', 800); return false; } return true; });
+  }
+  // v0.70: debuffAtk回合递减（Boss技能施加的ATK降低效果）
+  if (p.debuffAtk && p.debuffAtk.turns > 0) {
+    p.debuffAtk.turns--;
+    if (p.debuffAtk.turns <= 0) p.debuffAtk = null;
+  }
+  // v0.70: 流血伤害应用（Boss技能/诅咒施加的每回合流血）
+  if (p.bleed && p.bleed > 0) {
+    p.hp = Math.max(0, p.hp - p.bleed);
+    Events.emit(E.PLAYER_DAMAGED, { dmg: p.bleed, source: 'bleed' });
+    if (p.hp <= 0) { p.hp = 0; gameOver(); if (s.gameOver) return; }
+  }
+  // v0.51: brand — 敌人每回合额外-2%HP
+  if (p._brandEnemyHpDrain) { s.enemies.forEach(function(e) { if (e && e.hp > 0) { e.hp -= Math.max(1, Math.floor(e.maxHp * (p._brandEnemyHpDrain||0.02))); } }); }
+  // v0.51: ice_chain_2 — 冰冻敌人时相邻敌人也被冻结
+  if (p._iceChain >= 2 && s.enemies) {
+    s.enemies.forEach(function(ee, i) {
+      if (ee.hp > 0 && ee._buffs && ee._buffs.some(function(b){return b.id==='stun';})) {
+        if (i > 0 && s.enemies[i-1].hp > 0 && !s.enemies[i-1]._buffs.some(function(b){return b.id==='stun';}))
+          s.enemies[i-1]._buffs.push({ id:'stun', name:'冻结', turns:1, onTick:function(){return'stunned';} });
+        if (i < s.enemies.length-1 && s.enemies[i+1].hp > 0 && !s.enemies[i+1]._buffs.some(function(b){return b.id==='stun';}))
+          s.enemies[i+1]._buffs.push({ id:'stun', name:'冻结', turns:1, onTick:function(){return'stunned';} });
+      }
+    });
+  }
+  // v0.51: light_chain_3 — 治疗净化诅咒（在回合结束时检查）
+  if (p._lightChain >= 3 && s.curses.length > 0 && s.rng && s.rng.chance(0.3)) {
+    var removed = s.curses.shift(); if (removed && removed.remove) removed.remove(p);
+    bigFloat('✨ 净化诅咒！', 'float-heal', 600);
+  }
+  s._attackedThisTurn = false; // 重置攻击标记
   s.turn++; s.turnInFloor++;
   s._weakSpotShown = false;
   // 能量回满，重置行动计数
   refillEnergy(s);
   // 遗物回合效果（烈焰光环、末日时钟、贤者之石等）
-  s.relics.forEach(function(r) { if (r.onTurn) r.onTurn(s.player, s.enemy, s); });
+  s.relics.forEach(function(r) { if (r.onTurn) r.onTurn(s.player, s.enemy, s, s.enemies); });
   Events.emit(E.TURN_END, { turn: s.turn, turnInFloor: s.turnInFloor });
 }
 
@@ -1148,7 +1524,22 @@ function strike(dmg, e) {
   if (p._fragileFlag) dmg = Math.floor(dmg * 1.3);
   // 临时HP缓冲
   if (p._tempHp > 0) { var absorbed = Math.min(p._tempHp, dmg); p._tempHp -= absorbed; dmg -= absorbed; }
+  // v0.60 七罪诅咒：受击效果（注：无敌人暴击系统，傲慢改为通用增伤）
+  if (p._sinPride && dmg > 0) dmg = Math.floor(dmg * 1.3); // 傲慢：受伤害+30%
+  if (p._sinLust) dmg = Math.floor(dmg * 1.25); // 色欲：受伤害+25%
   p.hp = Math.max(0, p.hp - dmg);
+  if (p._sinWrath && dmg > 0) { p.def = Math.max(0, p.def - 1); p._sinWrathDef = (p._sinWrathDef||0) + 1; } // 暴怒：受击-1防
+  // v0.51: frost_king — 受击必减速敌人
+  if (p._synFrostKing && dmg > 0 && e && e.hp > 0) {
+    e._buffs.push({ id:'slow', name:'迟缓', turns:2, onRemove:function(){} });
+    bigFloat('❄️ 冰霜之王！', 'float-dmg', 400);
+  }
+  // v0.51: boss_cave — 受击获得晶化层数（DEF+2，最高3层，仅首次达到该层时加防）
+  if (p._bossCave && dmg > 0) {
+    var prevStacks = p._crystalStacks || 0;
+    p._crystalStacks = Math.min(3, prevStacks + 1);
+    if (p._crystalStacks > prevStacks) { p.def += 2; bigFloat('💎 晶化+' + p._crystalStacks, 'float-heal', 400); }
+  }
   if (s._currentRoomType === "boss" && dmg > 0) s._bossDamaged = true;
   Events.emit(E.PLAYER_DAMAGED, { dmg, hp: p.hp, maxHp: p.maxHp, source: e.name });
   playSound("hit");
@@ -1182,8 +1573,8 @@ function win() {
   if (!bossEnemy) bossEnemy = s.enemy;
 
   // 波次切换：还有下一波→生成新敌人
-  // 波次切换前触发击杀遗物
-  s.relics.forEach(function(r) { if (r.onKill) r.onKill(s.player, s); });
+  // 波次切换前触发波次遗物效果（使用 onWaveEnd 避免与 per-kill onKill 重复触发）
+  s.relics.forEach(function(r) { if (r.onWaveEnd) r.onWaveEnd(s.player, s); });
   if (s._waveIndex + 1 < s._waveTotal && s._waves && s._waves[s._waveIndex + 1]) {
     s._waveIndex++;
     var wasAuto = s.auto; var wasSpeed = s._speedMode; var wasTurbo = s._turboMode;
@@ -1216,7 +1607,7 @@ function win() {
           onTick: function(em,b){ em.hp -= b.data.dmg; if (em.hp <= 0) return 'dead'; } });
       });
     }
-    s.auto = wasAuto; s._speedMode = wasSpeed;
+    s.auto = wasAuto; s._speedMode = wasSpeed; s._turboMode = wasTurbo;
     log('<span class="win">⚔️ 第' + (s._waveIndex+1) + '/' + s._waveTotal + '波敌人来袭！</span>');
     bigFloat('⚔️ 第' + (s._waveIndex+1) + '波！', 'big-crit', 800);
     Game.sync();
@@ -1232,11 +1623,7 @@ function win() {
   Events.emit(E.ENEMY_KILLED, { name: killedName, floor: s.totalFloor });
   playSound("win");
   if (s.enemies) s.enemies.forEach(function(e) { Game.recordKill(e.name, s.totalFloor, e); });
-  // 亡灵天灾：记录待复活敌人
-  if (s._mutationUndead) {
-    if (!s._undeadQueue) s._undeadQueue = [];
-    s.enemies.forEach(function(e) { if (e.hp <= 0) s._undeadQueue.push({ enemy: e, turns: 3 }); });
-  }
+  // v0.70: 亡灵天灾队列已迁移至applyDmg中逐敌入队，此处不再重复
   if (s.totalFloor > s.highest) s.highest = s.totalFloor;
   let g = 10 + s.rng.range(0, 15) + Math.floor(s.totalFloor / 2);
   if (s.player.goldMul) g = Math.floor(g * s.player.goldMul);
@@ -1261,13 +1648,17 @@ function win() {
     s.player.energy = Math.min(s.player.energy + 1, (s.player.maxEnergy || MAX_ENERGY) + 2);
     bigFloat('⚡ +1能量', 'float-gold', 500);
   }
-  // 魂晶掉落 + v0.50 通用素材
+  // v0.60: 魂晶+灵石+素材掉落
   const roomType = s._currentRoomType || '';
-  let souls = 0, materials = 0;
-  if (roomType === 'elite') { souls = s.rng.range(1, 2); materials = s.rng.range(1, 2); }
-  else if (roomType === 'boss') { souls = 2 + s.zoneIndex; materials = s.rng.range(2, 5); }
+  let souls = 0, materials = 0, stones = 0;
+  if (roomType === 'elite') { souls = s.rng.range(1, 2); materials = s.rng.range(1, 2); stones = s.rng.range(1, 2); }
+  else if (roomType === 'boss') { souls = 2 + s.zoneIndex; materials = s.rng.range(2, 5); stones = 3 + s.zoneIndex; }
   if (souls > 0) { Game.addSouls(souls); }
   if (materials > 0) { Game.addMaterials(materials); }
+  if (stones > 0) { Game.addStones(stones); }
+  // v0.70 七罪诅咒：嫉妒/贪婪的每击杀效果已迁移至applyDmg中
+  // v0.70 贪婪：战斗结算灵石×3（此处为额外2倍，原有1倍已在上方addStones）
+  if (s.player._sinGreed && stones > 0) { Game.addStones(stones * 2); }
   // v0.50 Boss材料掉落
   if (roomType === 'boss' && s.zone) {
     var bossMats = R.get('bossMaterials');
@@ -1290,7 +1681,7 @@ function win() {
   // v0.50 狂战士击杀额外+1⚡
   if (s.player._advancementId === 'war_berserker') { s.player.energy = Math.min(s.player.maxEnergy || 3, s.player.energy + 1); }
   // 装备前缀：神圣（击杀回血）
-  if (s._healOnKill) { s.player.hp = Math.min(s.player.maxHp, s.player.hp + Math.floor(s.player.maxHp * s._healOnKill)); s._healOnKill = 0; }
+  if (s._healOnKill) { var hokHeal = Math.floor(s.player.maxHp * s._healOnKill); if (s.player._lightChain>=1) hokHeal=Math.floor(hokHeal*1.25); if (s.player._brandHealMul) hokHeal=Math.floor(hokHeal*s.player._brandHealMul); s.player.hp = Math.min(s.player.maxHp, s.player.hp + hokHeal); s._healOnKill = 0; }
   // 遗物击杀效果已在波次切换前触发
   // 影卫被动
   if (s.player._shadowBorn) { s.player.hp = Math.min(s.player.maxHp, s.player.hp + Math.floor(s.player.maxHp * 0.2)); }
@@ -1308,11 +1699,12 @@ function win() {
   s._relicPity = (s._relicPity || 0) + 1;
   s.stats.roomsCleared++;
   s.auto = false; s._speedMode = false; clearAuto();
+  Events.emit(E.BATTLE_WIN, { floor: s.totalFloor, roomType: roomType, gold: g, souls: souls, fast: fast });
   Game.sync();
   if (_onWin) {
     setTimeout(function() { _onWin(fast); }, 300);
   } else {
-    console.error("[妖塔] _onWin 回调未设置，无法弹出奖励！");
+    console.error("[妖塔勇者录] _onWin 回调未设置，无法弹出奖励！");
   }
 }
 
@@ -1332,8 +1724,13 @@ function gameOver() {
   // v0.51 天赋大点·不灭：锁1血+免疫1回合（每局1次）
   if (s.player._keystoneImmortal && s.player.hp <= 0 && !s._keystoneImmortalUsed) {
     s.player.hp = 1; s.player._immortalTriggered = true;
-    s._keystoneImmortalUsed = true;
+    s._keystoneImmortalUsed = true; s._acting = false;
     playSound("heal"); bigFloat("🔥 不灭！", "big-crit", 1200); Game.sync(); return;
+  }
+  // v0.51: frost_king羁绊 — 免疫首次致命伤害
+  if (s.player._synFrostKing && s.player.hp <= 0) {
+    s.player.hp = 1; s.player._synFrostKing = false; s._acting = false;
+    playSound("heal"); bigFloat("❄️ 冰霜之王庇护！", "big-dodge", 1000); Game.sync(); return;
   }
   // 遗物：血盾（致命伤害以1血存活，每局1次）
   if (s.player._bloodShield && s.player.hp <= 0) {
@@ -1342,18 +1739,19 @@ function gameOver() {
     playSound("heal"); bigFloat("🛡️ 血盾！", "big-dodge", 1000); Game.sync(); return;
   }
   if (s.player.rebirth && s.player.hp <= 0) {
-    s.player.hp = Math.floor(s.player.maxHp * 0.5); s.player.rebirth = false;
+    s.player.hp = Math.floor(s.player.maxHp * 0.5); s.player.rebirth = false; s._acting = false;
     Events.emit(E.PLAYER_HEALED, { amount: s.player.hp, hp: s.player.hp, maxHp: s.player.maxHp, source: 'rebirth' });
     playSound("heal"); Game.sync(); return;
   }
   // 【天使之翼】每场战斗首次死亡复活30%
   if (s.player._angelWings && s.player.hp <= 0) {
-    s.player.hp = Math.floor(s.player.maxHp * 0.3); s.player._angelWings = false;
+    s.player.hp = Math.floor(s.player.maxHp * 0.3); s.player._angelWings = false; s._acting = false;
     Events.emit(E.PLAYER_HEALED, { amount: s.player.hp, hp: s.player.hp, maxHp: s.player.maxHp, source: 'angelWings' });
     playSound("heal"); bigFloat("👼 天使之翼！", "big-heal", 1000); Game.sync(); return;
   }
   s.auto = false; s._speedMode = false; s.gameOver = true; s._acting = false; clearAuto(); stopHeartbeat(); playSound("lose"); Game.sync();
   Events.emit(E.GAME_OVER, {});
+  Events.emit(E.BATTLE_LOSE, { floor: s.totalFloor, zone: s.zone ? s.zone.id : null });
   if (_onOver) _onOver();
 }
 
@@ -1374,7 +1772,7 @@ function autoLoop() {
   if (!anyAlive || (!s.auto && !s._speedMode && !s._turboMode)) { clearAuto(); return; }
   // 能量耗尽→直接结束回合（绕过doEndTurn的_acting锁，防卡死）
   if (!s.player || s.player.energy <= 0 || (s._actionsThisTurn || 0) >= MAX_ACTIONS) {
-    s._acting = true; try { enemyTurn(); Game.sync(); } finally { s._acting = false; }
+    s._acting = true; try { endTurnHeal(s); enemyTurn(); Game.sync(); } finally { s._acting = false; }
     return;
   }
 
@@ -1394,7 +1792,7 @@ function autoLoop() {
   }
   if (s.player.energy >= 1 && (s._actionsThisTurn||0) < MAX_ACTIONS) { doAttack(); return; }
   // 兜底：无可用行动→强制结束回合
-  s._acting = true; try { enemyTurn(); Game.sync(); } finally { s._acting = false; }
+  s._acting = true; try { endTurnHeal(s); enemyTurn(); Game.sync(); } finally { s._acting = false; }
 }
 
 // ---- 药水（含炼金宗师羁绊增强）----
@@ -1404,15 +1802,10 @@ export function usePotion(idx) {
   clearAuto();
   try {
   const pot = s.potions[idx];
-  // 炼金宗师羁绊：药水额外回复30%生命+5灵力
-  if (s.player._synAlchemyGrand) {
-    s.player.hp = Math.min(s.player.maxHp, s.player.hp + Math.floor(s.player.maxHp * 0.3));
-    s.player.mp = Math.min(s.player.maxMp, s.player.mp + 5);
-  }
-  // 遗物：不灭之瓶（药水额外回复20%最大生命）
-  if (s.player._eternalVial) {
-    s.player.hp = Math.min(s.player.maxHp, s.player.hp + Math.floor(s.player.maxHp * 0.2));
-  }
+  // v0.60 FIX: _synAlchemyGrand synergy 和 _eternalVial 遗物从未被定义/设置，
+  // 这两个代码块此前永远不会触发，已标记为待实现。
+  // TODO: 如需实现，请在 synergies.js 中添加 alchemy_grand 协同定义，
+  // 并在 relics.js 中添加 eternal_vial 遗物定义，由其 passive 设置对应标记。
   pot.fn(s.player, s); s.potions.splice(idx, 1);
   if (pot.id === "cleanse" && s.curses.length > 0) {
     const removed = s.curses.pop();
@@ -1431,7 +1824,12 @@ export function usePotion(idx) {
 }
 
 // ---- 外部查询意图（给 render 用）----
-export function getIntent() { return Game.state._enemyIntent; }
+// v0.70: 返回第一个存活敌人的_intent，而非已废弃的全局_enemyIntent
+export function getIntent() {
+  var s = Game.state;
+  var alive = (s.enemies || []).filter(function(e) { return e && e.hp > 0; });
+  return alive.length > 0 ? alive[0]._intent : null;
+}
 
 // ---- 装备中途更换时重新计算套装加成（供shop/event调用）----
 export function recalcEquipSetBonus() {

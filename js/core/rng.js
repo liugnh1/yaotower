@@ -17,7 +17,7 @@ export class RNG {
   }
   range(a, b) { return Math.floor(this.next() * (b - a + 1)) + a; }
   pick(arr) {
-    if (!arr || arr.length === 0) { console.warn("[妖塔] rng.pick 空数组"); return null; }
+    if (!arr || arr.length === 0) { console.warn("[妖塔勇者录] rng.pick 空数组"); return null; }
     return arr[this.range(0, arr.length - 1)];
   }
   chance(p) { return this.next() < p; }

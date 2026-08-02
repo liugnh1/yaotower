@@ -47,7 +47,7 @@ export function recheckSynergies() {
   }
 
   s._activeSynergies = s._activeSynergies.filter(id => !toRemove.includes(id));
-  if (toRemove.length) { console.log("[妖塔] 联动已移除:", toRemove); }
+  if (toRemove.length) { console.log("[妖塔勇者录] 联动已移除:", toRemove); }
 }
 
 // 获取当前已激活的联动（用于UI展示）

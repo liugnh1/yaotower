@@ -49,7 +49,7 @@ export function initZone(zoneId) {
         showBossNarrative(["魔王的威压笼罩了整个空间……","你的每一个动作都在他的注视之下。","此路极度危险——","但也是唯一的荣光之路。"], function(){});
       }, 600);
     }
-    console.log("[妖塔] Zone环境效果:", s._zoneMod.desc);
+    console.log("[妖塔勇者录] Zone环境效果:", s._zoneMod.desc);
   }
 
   // 生成房间池：按难度前缀选模板（兼容Ascension）
@@ -185,6 +185,6 @@ export function prepareRoomEntry() {
   if (s.player && s.player._fearCurse) {
     const loss = Math.max(1, Math.floor(s.player.hp * 0.05));
     s.player.hp -= loss;
-    console.log("[妖塔] 恐惧诅咒触发，损失", loss, "生命");
+    console.log("[妖塔勇者录] 恐惧诅咒触发，损失", loss, "生命");
   }
 }

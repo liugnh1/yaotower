@@ -7,7 +7,7 @@ export function initAudio() {
   if (ctx) return;
   try {
     ctx = new (window.AudioContext || window.webkitAudioContext)();
-  } catch (e) { console.warn("[妖塔] 音频初始化失败"); }
+  } catch (e) { console.warn("[妖塔勇者录] 音频初始化失败"); }
 }
 
 // ===================== 背景音乐系统 =====================

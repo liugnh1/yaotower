@@ -34,7 +34,7 @@ export function getShopItems() {
   }
   // v0.50 P2: 高层商店概率出现传说遗物（500G+）
   if (s.totalFloor >= 30 && s.rng.chance(0.25)) {
-    var legendaries = (R.get('relics') || []).filter(function(r) { return r.rarity === 'legendary'; });
+    var legendaries = (R.get('relics') || []).filter(function(r) { return r.rarity === 'legendary' && r.category !== 'core'; });
     if (legendaries.length > 0) {
       var premiumRelic = { ...s.rng.pick(legendaries) };
       var premiumCost = 500 + Math.floor(s.totalFloor * 2);
@@ -53,6 +53,7 @@ export function buyItem(item) {
   var talentDiscount = (s.player && s.player._talentShopDiscount) ? s.player._talentShopDiscount : 0;
   let mul = (s.adDiscount ? 0.5 : 1) * (diffCfg.shopMul || 1) * (1 - talentDiscount);
   if (s.player?._greedCurse) mul *= 2; // 贪婪诅咒：商店价格翻倍
+  if (s._chaosPrice) mul *= 2; // v0.60 混沌_chaosPrice：商店价格翻倍
   const cost = Math.floor(item.cost * mul);
   if ((s.gold || 0) < cost) return false;
   s.gold -= cost;
@@ -72,7 +73,9 @@ export function acquireRelic(rel) {
     existing.stars = Math.min(existing.stars, 3); // 防御损坏数据
     if (existing.stars < 3) {
       existing.stars = Math.min(existing.stars + 1, 3);
-      if (existing.onStarUp) existing.onStarUp(s.player, existing.stars);
+      // v0.60: 所有遗物升星统一效果 — 每升1星被动效果+20%（已在 passive 中按 stars 倍率处理）
+      // 如果某遗物定义了 onStarUp，仍会调用（向后兼容）
+      if (typeof existing.onStarUp === 'function') existing.onStarUp(s.player, existing.stars);
       log('<span class="win">⭐ ' + existing.name + ' 升至' + existing.stars + '星！</span>');
       Events.emit(E.RELIC_GAINED, { relic: existing });
       Game.sync();

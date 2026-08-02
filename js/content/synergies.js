@@ -2,9 +2,9 @@
 import { R } from '../core/registry.js';
 
 R.registerAll('synergies', [
-  { id: "vamp_lord", relics: ["vamp_fang","vampire_lord"], name: "血族觉醒", desc: "吸血效率×3，溢出转为临时生命", icon: "🩸",
-    apply: (p) => { p.lifeSteal = (p.lifeSteal||0)+0.10; p._synVampLord = true; },
-    onRemove: (p) => { p.lifeSteal = Math.max(0,(p.lifeSteal||0)-0.10); p._synVampLord = false; } },
+  { id: "vamp_lord", relics: ["vamp_fang","vampire_lord"], name: "血族觉醒", desc: "吸血效率×3，溢出转为临时护盾", icon: "🩸",
+    apply: (p) => { p._vampLordOrigLS = p.lifeSteal||0; p.lifeSteal = Math.min(0.50, (p.lifeSteal||0) * 3); p._synVampLord = true; },
+    onRemove: (p) => { p.lifeSteal = p._vampLordOrigLS || 0; delete p._vampLordOrigLS; p._synVampLord = false; } },
   { id: "thunder_god", relics: ["lightning_rod","thunder_clap"], name: "雷神之怒", desc: "闪电链弹射+2次，眩晕概率翻倍", icon: "⚡",
     apply: (p) => { p._synThunderGod = true; },
     onRemove: (p) => { p._synThunderGod = false; } },
@@ -18,8 +18,8 @@ R.registerAll('synergies', [
     apply: (p) => { p._synTimeMaster = true; },
     onRemove: (p) => { p._synTimeMaster = false; } },
   { id: "glass_god", relics: ["glass_cannon","berserk_mask"], name: "玻璃战神", desc: "满血时伤害+50%，低血时伤害+150%", icon: "💔",
-    apply: (p) => { p.skillMul += 0.5; p._synGlassGod = true; },
-    onRemove: (p) => { p.skillMul -= 0.5; p._synGlassGod = false; } },
+    apply: (p) => { p._synGlassGod = true; },
+    onRemove: (p) => { p._synGlassGod = false; } },
 
   // ===== 遗物触发链（3条连锁） =====
   // 火焰链：烈焰光环→连锁反应→焚天
@@ -79,8 +79,8 @@ R.registerAll('synergies', [
 
   // ===== v0.50 诅咒正向构筑 =====
   { id: "curse_lord", relics: [], name: "咒缚之王", desc: "持有3+诅咒时每个诅咒+20%全伤害", icon: "💀",
-    apply: (p) => { p._curseLord = true; p.skillMul += 0.6; },
-    onRemove: (p) => { p._curseLord = false; p.skillMul -= 0.6; } },
+    apply: (p) => { p._curseLord = true; },
+    onRemove: (p) => { p._curseLord = false; } },
   { id: "curse_plague", relics: [], name: "行走的天灾", desc: "持有5诅咒时敌人每回合-3%HP", icon: "☠️",
     apply: (p) => { p._cursePlague = true; },
     onRemove: (p) => { p._cursePlague = false; } },

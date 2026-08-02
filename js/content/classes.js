@@ -141,11 +141,11 @@ R.registerAll('classes', {
           { name: "金刚·不坏", desc: "伤害×2.5+回复20%+防御+3永久 ⚡2", mul: 2.5, effect: null, cd: 3, heal: 0.20, permDef: 3, energyCost: 2 }
         ]
       },
-      { id: "iron_body",   name: "金钟罩",   icon: "🔔", desc: "伤害×1.5+本回合无敌 ⚡1", mul: 1.5, effect: "smoke", cooldown: 2, energyCost: 1,
+      { id: "iron_body",   name: "金钟罩",   icon: "🔔", desc: "伤害×1.5+下回合必暴 ⚡1", mul: 1.5, effect: "smoke", cooldown: 2, energyCost: 1,
         upgrades: [
-          { name: "金钟·铁壁", desc: "伤害×2.0+本回合无敌+防御+5 ⚡1", mul: 2.0, effect: "smoke", cd: 2, selfDef: 5, energyCost: 1 },
-          { name: "金钟·反震", desc: "伤害×1.5+本回合无敌+反伤30%一回合 ⚡1", mul: 1.5, effect: "smoke", cd: 2, thorns: 0.3, energyCost: 1 },
-          { name: "金钟·愈合", desc: "伤害×1.8+本回合无敌+回复25%生命 ⚡1", mul: 1.8, effect: "smoke", cd: 2, heal: 0.25, energyCost: 1 }
+          { name: "金钟·铁壁", desc: "伤害×2.0+下回合必暴+防御+5 ⚡1", mul: 2.0, effect: "smoke", cd: 2, selfDef: 5, energyCost: 1 },
+          { name: "金钟·反震", desc: "伤害×1.5+下回合必暴+反伤30%一回合 ⚡1", mul: 1.5, effect: "smoke", cd: 2, thorns: 0.3, energyCost: 1 },
+          { name: "金钟·愈合", desc: "伤害×1.8+下回合必暴+回复25%生命 ⚡1", mul: 1.8, effect: "smoke", cd: 2, heal: 0.25, energyCost: 1 }
         ]
       },
       { id: "mantra",      name: "真言咒",   icon: "📿", desc: "伤害×3.0+迟缓2回合 ⚡2", mul: 3.0, effect: "slow", cooldown: 3, energyCost: 2,

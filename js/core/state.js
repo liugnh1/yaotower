@@ -3,11 +3,11 @@ import { RNG } from "./rng.js";
 import { R } from "./registry.js";
 import { E, Events } from "./event-bus.js";
 
-const SAVE_KEY = "yaotower_v3.1_save";
-const SAVE_VERSION = 1; // 存档版本号，改数据结构时递增
-const META_KEY = "yaotower_v3.1_meta";
-const CODEX_KEY = "yaotower_v3.1_codex";
-const LB_KEY   = "yaotower_v3.1_lb";
+const SAVE_KEY = "yaotower_v3.2_save";
+const SAVE_VERSION = 2; // 存档版本号，改数据结构时递增
+const META_KEY = "yaotower_v3.2_meta";
+const CODEX_KEY = "yaotower_v3.2_codex";
+const LB_KEY   = "yaotower_v3.2_lb";
 
 let _render = null;
 export function onRender(fn) { _render = fn; }
@@ -55,13 +55,15 @@ function deserializePlayer(bp) {
     'doubleFirst','debuffAtk','dmgReduce','berserk','rebirth','regen',
     'energy','maxEnergy','buildDirection',
     '_deathGamble','_coreFlame','_coreIce','_coreShadow','_coreCurse',
-    '_coreThunder','_coreLight','_thunderChain','_lightChain',
+    '_coreThunder','_coreLight','_thunderChain','_lightChain','_fireChain','_iceChain','_shadowChain','_curseLord','_cursePlague','_cursedDoll',
     '_masteryCDR','_masteryEnergy','_masteryDownside','_advancementId',
     '_fearCurse','_fearLucky','_fragileFlag','_badLuckOrig',
     '_greedCurse','_blindCurse','_blindCritGain','_shadowBorn',
     '_luckyCharm','_shadowCloak','_lightningRod','_echoStone',
     '_bloodShield','_greedBag','_chaosBlade','_deathMark',
     '_infMana','_godHand','_glassCannon','_vampLord',
+    '_goldenApple','_mirrorShield','_bloodRuby','_toxicCloud','_ninjaTabi','_warDrum','_medusaHead','_gamblersDice',
+    '_mastery_warrior','_mastery_mage','_mastery_shadow','_mastery_archer','_mastery_monk',
     '_angelWings','_bossPlains','_bossForest','_bossCave',
     '_bossRuins','_bossFrozen','_bossVoid','_bossTower',
     '_bossDesert','_bossSwamp']);
@@ -145,7 +147,9 @@ function defState() {
     _fortuneName: '', _mutationName: '',
     _zoneStats: { battles: 0, eventsPerfect: 0, sacrifices: 0 }, // v0.50 分支结局
     _relicPity: 0, _curseTradeCount: 0, _riskRoom: false, _riskReward: false,
-    endlessFloor: 0, endlessChaosCount: 0
+    endlessFloor: 0, endlessChaosCount: 0,
+    // v0.60 构筑系统（无尽/BossRush）
+    build: { classId: null, skillIds: [], relicIds: { legendary: null, epic: null, rare: [], common: [] }, curseIds: [], sinCurseId: null, chaosModId: null }
   };
 }
 
@@ -226,8 +230,8 @@ function defMeta() {
   };
 }
 
-const LB_PURE_KEY = "yaotower_v3.1_lb_pure";
-const LB_CULTIVATE_KEY = "yaotower_v3.1_lb_culti";
+const LB_PURE_KEY = "yaotower_v3.2_lb_pure";
+const LB_CULTIVATE_KEY = "yaotower_v3.2_lb_culti";
 
 // ---- Game 对象 ----
 export const Game = {
@@ -257,10 +261,12 @@ export const Game = {
       playerClass: s.playerClass ? s.playerClass.id : null,
       activeSkill: s.activeSkill ? s.activeSkill.id : null,
       skillCooldowns: s.skillCooldowns || {}, skillLevels: s.skillLevels || {},
-      endless: s.endless, turn: s.turn, stats: s.stats,
+      endless: s.endless, turn: s.turn, stats: s.stats, build: s.build,
       dailyMods: s.dailyMods,
       basePlayer: serializePlayer(s.player),
       enemy: s.enemy ? serializeEnemy(s.enemy) : null,
+      enemies: (s.enemies || []).filter(function(e){return e&&e.hp>0;}).map(function(e){return serializeEnemy(e);}),
+      selectedTarget: s.selectedTarget || 0,
       potionAtk: s.potionAtk || 0, potionDef: s.potionDef || 0,
       adDiscount: s.adDiscount || false, adRefreshCount: s.adRefreshCount || 0,
       turnInFloor: s.turnInFloor || 0,
@@ -269,7 +275,7 @@ export const Game = {
       runKills: s._runKills || 0, runSynergies: s._runSynergies || [], runRelics: s._runRelics || [],
       fortuneName: s._fortuneName || '', mutationName: s._mutationName || ''
     };
-    try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch (e) { console.error("妖塔3.0: 存档保存失败", e); }
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch (e) { console.error("妖塔勇者录: 存档保存失败", e); }
     this._persistCodex();
   },
 
@@ -297,12 +303,14 @@ export const Game = {
       s.talent = d.talent ? R.get('talents').find(t => t.id === d.talent) : null;
       s.playerClass = d.playerClass ? R.get('classes', d.playerClass) : null;
       s.activeSkill = d.activeSkill && s.playerClass ? s.playerClass.skills.find(sk => sk.id === d.activeSkill) : null;
-      s.endless = !!d.endless; s.turn = d.turn || 0; s.stats = d.stats || { totalDmg: 0, critCount: 0, roomsCleared: 0 };
+      s.endless = !!d.endless; s.turn = d.turn || 0; s.stats = d.stats || { totalDmg: 0, critCount: 0, roomsCleared: 0 }; s.build = d.build || { classId: null, skillIds: [], relicIds: { legendary: null, epic: null, rare: [], common: [] }, curseIds: [], sinCurseId: null, chaosModId: null };
       s.dailyMods = d.dailyMods || { globalId: null, playerId: null, enemyId: null };
       s.player = d.basePlayer ? deserializePlayer(d.basePlayer) : null;
       // 注意: 遗物 passive 效果已包含在 basePlayer 数值中，读档不需要重跑 passive
       // 否则会造成属性双重叠加（如力量护腕+5攻被重复加到存档的 atk 值上）
       s.enemy = d.enemy ? deserializeEnemy(d.enemy) : null;
+      s.enemies = (d.enemies || []).map(function(ed){return deserializeEnemy(ed);});
+      s.selectedTarget = d.selectedTarget || 0;
       s.potionAtk = d.potionAtk || 0; s.potionDef = d.potionDef || 0;
       s.adDiscount = d.adDiscount || false; s.adRefreshCount = d.adRefreshCount || 0;
       s.skillCooldowns = d.skillCooldowns || {};
@@ -337,10 +345,10 @@ export const Game = {
         // 深度合并：缺失字段补默认，防御旧版本升级缺失新字段
         this.meta = deepMergeMeta(defaults, parsed);
       } else { this.meta = defMeta(); }
-    } catch (e) { console.warn("[妖塔] 元数据损坏，已重置", e); this.meta = defMeta(); }
+    } catch (e) { console.warn("[妖塔勇者录] 元数据损坏，已重置", e); this.meta = defMeta(); }
     this._checkAdReset();
   },
-  saveMeta() { try { localStorage.setItem(META_KEY, JSON.stringify(this.meta)); } catch (e) { console.error("妖塔3.0: 元数据保存失败", e); } if (_render) _render(this.state); },
+  saveMeta() { try { localStorage.setItem(META_KEY, JSON.stringify(this.meta)); } catch (e) { console.error("妖塔勇者录: 元数据保存失败", e); } if (_render) _render(this.state); },
 
   _checkAdReset() {
     if (!this.meta) return;
@@ -470,24 +478,24 @@ export const Game = {
     return -1; // 无变化
   },
   canWatchAd() {
-    if (!this.meta) { console.warn("[妖塔] canWatchAd: meta 未初始化"); return false; }
+    if (!this.meta) { console.warn("[妖塔勇者录] canWatchAd: meta 未初始化"); return false; }
     this._checkAdReset();
     const diff = R.get('difficulties', this.state.difficulty) || R.get('difficulties', 'standard');
     const watched = Number(this.meta.adWatched) || 0;
     const limit = diff ? (Number(diff.adLimit) || 10) : 10;
-    console.log("[妖塔] canWatchAd:", { watched, limit, diffId: this.state.difficulty, canWatch: watched < limit });
+    console.log("[妖塔勇者录] canWatchAd:", { watched, limit, diffId: this.state.difficulty, canWatch: watched < limit });
     return watched < limit;
   },
   watchAd() {
-    if (!this.meta) { console.warn("[妖塔] watchAd: meta 未初始化"); return false; }
+    if (!this.meta) { console.warn("[妖塔勇者录] watchAd: meta 未初始化"); return false; }
     this._checkAdReset();
     const diff = R.get('difficulties', this.state.difficulty) || R.get('difficulties', 'standard');
     const limit = diff ? (Number(diff.adLimit) || 10) : 10;
     const watched = Number(this.meta.adWatched) || 0;
-    if (watched >= limit) { console.log("[妖塔] watchAd: 已达上限", { watched, limit }); return false; }
+    if (watched >= limit) { console.log("[妖塔勇者录] watchAd: 已达上限", { watched, limit }); return false; }
     this.meta.adWatched = watched + 1;
     this.saveMeta();
-    console.log("[妖塔] watchAd: 成功, 已观看", this.meta.adWatched, "/", limit);
+    console.log("[妖塔勇者录] watchAd: 成功, 已观看", this.meta.adWatched, "/", limit);
     return true;
   },
 
@@ -580,6 +588,31 @@ export const Game = {
     // v0.50 P2: 训练场永久属性加成
     var tl = this.meta.trainingLevel || 0;
     if (tl > 0) { p.atk += tl; p.maxHp += tl * 5; p.hp += tl * 5; p.def += tl; }
+
+    // v0.60 转生飞升永久加成（不受衰减，转生清空进度的补偿）
+    var rb = this.meta.rebirthBonus;
+    if (rb) {
+      if (rb.atk) p.atk += rb.atk;
+      if (rb.hp) { p.maxHp += rb.hp; p.hp += rb.hp; }
+      if (rb.def) p.def += rb.def;
+      if (rb.luck) p._rebirthLuck = (p._rebirthLuck || 0) + rb.luck;
+      if (rb.gold) p.goldMul = (p.goldMul || 1) * (1 + rb.gold);
+      if (rb.exp) p._rebirthExp = (p._rebirthExp || 0) + rb.exp;
+    }
+
+    // v0.60 合成遗物：下局开局自动获得
+    var forgedId = this.meta.forgedRelic;
+    if (forgedId) {
+      var forgedRelic = (R.get('relics') || []).find(function(r) { return r.id === forgedId; });
+      if (forgedRelic) {
+        if (!s.relics) s.relics = [];
+        // 检查是否已有同名遗物
+        if (!s.relics.some(function(r) { return r.id === forgedRelic.id; })) {
+          s.relics.push({ ...forgedRelic });
+        }
+        // 一次性消耗，不自动清空（由玩家手动在遗物师面板重新合成）
+      }
+    }
 
     // v0.50 P0硬上限：所有局外永久加成封顶
     var MAX_ATK_BONUS = 0.35, MAX_HP_BONUS = 0.45, MAX_DEF_BONUS = 0.30, MAX_CRIT_BONUS = 0.25;
@@ -793,6 +826,24 @@ export const Game = {
     if (charId === 'monk') { p._masteryDownside = 'noOverheal'; /* 溢出不转盾 */ }
   },
 
+  // v0.60: 最终硬上限 — 在所有局外/精通/转职/觉醒/烙印应用后调用
+  applyFinalCaps(p) {
+    var s = this.state;
+    var cls = s.playerClass;
+    var baseAtk = cls ? cls.atk : 15;
+    var baseHp = cls ? cls.maxHp : 100;
+    var baseDef = cls ? cls.def : 2;
+    var baseCrit = cls ? cls.critRate : 0.2;
+    var MAX_ATK_BONUS = 0.40, MAX_HP_BONUS = 0.50, MAX_DEF_BONUS = 0.35, MAX_CRIT_BONUS = 0.30;
+    p.atk = Math.min(p.atk, Math.floor(baseAtk * (1 + MAX_ATK_BONUS)));
+    p.maxHp = Math.min(p.maxHp, Math.floor(baseHp * (1 + MAX_HP_BONUS)));
+    p.hp = Math.min(p.hp, p.maxHp);
+    p.def = Math.min(p.def, Math.floor(baseDef * (1 + MAX_DEF_BONUS)));
+    p.critRate = Math.min(p.critRate, baseCrit + MAX_CRIT_BONUS);
+    p.dodge = Math.min(0.75, p.dodge || 0);
+    p.lifeSteal = Math.min(0.40, p.lifeSteal || 0);
+  },
+
   // ---- 命运烙印 v0.50 ----
   hasBrand(brandId) { return (this.meta.unlockedBrands || []).includes(brandId); },
   unlockBrand(brandId) {
@@ -881,7 +932,7 @@ export const Game = {
     try {
       const ex = JSON.parse(localStorage.getItem(CODEX_KEY) || "{}");
       localStorage.setItem(CODEX_KEY, JSON.stringify({ ...ex, ...this.state.codex }));
-    } catch (e) { console.error("妖塔3.0: 图鉴保存失败", e); }
+    } catch (e) { console.error("妖塔勇者录: 图鉴保存失败", e); }
   },
   _loadCodex() {
     try { const raw = localStorage.getItem(CODEX_KEY); if (raw) this.state.codex = JSON.parse(raw); }
@@ -901,7 +952,7 @@ export const Game = {
       list.push({ ...entry, date: dateStr });
       list.sort((a, b) => b.floor - a.floor);
       localStorage.setItem(key, JSON.stringify(list.slice(0, 20)));
-    } catch (e) { console.error("妖塔3.0: 排行榜保存失败", e); }
+    } catch (e) { console.error("妖塔勇者录: 排行榜保存失败", e); }
   },
   getLeaderboard(type) {
     try { var key = type === 'cultivate' ? LB_CULTIVATE_KEY : LB_PURE_KEY; return JSON.parse(localStorage.getItem(key) || "[]"); }
@@ -939,10 +990,16 @@ export const Game = {
 function serializeEnemy(e) {
   return {
     name: e.name, hp: e.hp, maxHp: e.maxHp, atk: e.atk, def: e.def,
+    icon: e.icon || '', exp: e.exp || '',
+    weakness: e.weakness || null, weaknessDesc: e.weaknessDesc || null,
     tags: e.tags.map(t => ({ id: t.id, name: t.name })),
     aiTurn: e.aiTurn || 0, aiCharge: e.aiCharge || false, chargeTurns: e.chargeTurns || 0,
     aiCurse: e.aiCurse || false, doubleFirst: e.doubleFirst || false,
     lifeSteal: e.lifeSteal || 0, thorn: e.thorn || 0,
+    _shield: !!e._shield, _shieldBroken: e._shieldBroken || 0,
+    _healAllies: e._healAllies || 0, _crystalDoubled: !!e._crystalDoubled,
+    _counterStacks: e._counterStacks || 0, _charged: !!e._charged, _defendedThisTurn: !!e._defendedThisTurn,
+    _intent: e._intent ? { type: e._intent.type, icon: e._intent.icon, name: e._intent.name } : null,
     _buffs: (e._buffs || []).map(b => ({ id: b.id, name: b.name, turns: b.turns, data: b.data || {} }))
   };
 }
@@ -950,6 +1007,8 @@ function serializeEnemy(e) {
 function deserializeEnemy(d) {
   return {
     name: d.name, hp: d.hp, maxHp: d.maxHp, atk: d.atk, def: d.def,
+    icon: d.icon || '', exp: d.exp || '',
+    weakness: d.weakness || null, weaknessDesc: d.weaknessDesc || null,
     tags: (d.tags || []).map(t => {
       const tag = R.get('monsterTags').find(mt => mt.id === t.id);
       return tag ? { ...tag } : { ...t };
@@ -957,6 +1016,10 @@ function deserializeEnemy(d) {
     aiTurn: d.aiTurn || 0, aiCharge: d.aiCharge || false, chargeTurns: d.chargeTurns || 0,
     aiCurse: d.aiCurse || false, doubleFirst: d.doubleFirst || false,
     lifeSteal: d.lifeSteal || 0, thorn: d.thorn || 0,
+    _shield: !!d._shield, _shieldBroken: d._shieldBroken || 0,
+    _healAllies: d._healAllies || 0, _crystalDoubled: !!d._crystalDoubled,
+    _counterStacks: d._counterStacks || 0, _charged: !!d._charged, _defendedThisTurn: !!d._defendedThisTurn,
+    _intent: d._intent || null,
     _buffs: restoreBuffs(d._buffs || [])
   };
 }
@@ -976,7 +1039,7 @@ function restoreBuffs(saved) {
       case 'crystal':
         return { ...b, onRemove: (enemy) => { enemy.def = Math.floor(enemy.def / 2); } };
       default:
-        console.warn("[妖塔] 未知buff类型，使用默认:", b.id);
+        console.warn("[妖塔勇者录] 未知buff类型，使用默认:", b.id);
         return { ...b, onTick: b.data ? (e, bf) => { e.hp -= bf.data.dmg; if (e.hp <= 0) return 'dead'; } : undefined, onRemove: () => {} };
     }
   });

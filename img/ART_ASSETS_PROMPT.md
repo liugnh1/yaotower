@@ -1,4 +1,4 @@
-# 妖塔 · 美术资源AI生成完整指南
+# 妖塔勇者录 · 美术资源AI生成完整指南
 
 ---
 
@@ -8,11 +8,11 @@
 ### 格式：PNG 透明背景
 
 ```
-Pixel art game logo, dark fantasy theme. The Chinese characters "妖塔" in bold, jagged ancient calligraphy style, glowing with eerie purple and crimson energy. Behind the text, a silhouette of a massive dark tower with a faint crimson eye at the top. The characters have a metallic silver border with purple inner glow. Small particle effects (embers, dark sparks) floating around the text. Dark transparent background. Vertical orientation for mobile game title. 16-bit SNES RPG aesthetic, Castlevania meets Chinese dark fantasy. 800x300 pixels, PNG with transparency.
+Pixel art game logo, dark fantasy theme. The Chinese characters "妖塔勇者录" in bold, jagged ancient calligraphy style, glowing with eerie purple and crimson energy. Behind the text, a silhouette of a massive dark tower with a faint crimson eye at the top. The characters have a metallic silver border with purple inner glow. Small particle effects (embers, dark sparks) floating around the text. Dark transparent background. Vertical orientation for mobile game title. 16-bit SNES RPG aesthetic, Castlevania meets Chinese dark fantasy. 800x300 pixels, PNG with transparency.
 ```
 
 ```
-像素风游戏标题，暗黑奇幻主题。中文大字"妖塔"，粗犷锋利的古风书法体，散发诡异的紫色和深红能量光芒。文字后方是一座巨大暗黑塔的剪影，塔顶有一只微弱的深红眼睛。字体带有金属银色边框和紫色内发光。周围漂浮着小粒子效果（余烬、暗色火星）。深色透明背景。手游竖版标题。16位SNES RPG美学，《恶魔城》遇中国暗黑仙侠。800×300像素，透明PNG。
+像素风游戏标题，暗黑奇幻主题。中文大字"妖塔勇者录"，粗犷锋利的古风书法体，散发诡异的紫色和深红能量光芒。文字后方是一座巨大暗黑塔的剪影，塔顶有一只微弱的深红眼睛。字体带有金属银色边框和紫色内发光。周围漂浮着小粒子效果（余烬、暗色火星）。深色透明背景。手游竖版标题。16位SNES RPG美学，《恶魔城》遇中国暗黑仙侠。800×300像素，透明PNG。
 ```
 
 ---

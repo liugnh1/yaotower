@@ -26,7 +26,7 @@ R.registerAll('extraMaterials', [
 // 神话锻造配方（局内：在锻造石台消耗材料+金币锻造）
 R.registerAll('forgeRecipes', [
   {
-    id: "forge_blade_of_duality", name: "双界之刃", icon: "⚔️", rarity: "mythic", stat: "atk", val: 28,
+    id: "forge_blade_of_duality", name: "双界之刃", icon: "⚔️", rarity: "mythic", stat: "atk", val: 28, type: "weapon",
     desc: "冰火交织的传说之刃 · 攻击+28 · 暴击+15% · 普攻附带燃烧+迟缓",
     cost: 120,
     materials: ["mat_fire_core", "mat_ice_soul"],
@@ -34,7 +34,7 @@ R.registerAll('forgeRecipes', [
     combatEffect: { type: "burn", value: 6 }
   },
   {
-    id: "forge_verdant_heart", name: "苍翠之心", icon: "💚", rarity: "mythic", stat: "dodge", val: 0.12,
+    id: "forge_verdant_heart", name: "苍翠之心", icon: "💚", rarity: "mythic", stat: "dodge", val: 12, type: "amulet",
     desc: "森林本源凝聚的护符 · 闪避+12% · 每回合恢复5%生命",
     cost: 120,
     materials: ["mat_forest_heart", "mat_earth_core"],
@@ -42,7 +42,7 @@ R.registerAll('forgeRecipes', [
     combatEffect: null
   },
   {
-    id: "forge_void_crown", name: "虚空王冠", icon: "👑", rarity: "mythic", stat: "maxHp", val: 85,
+    id: "forge_void_crown", name: "虚空王冠", icon: "👑", rarity: "mythic", stat: "maxHp", val: 85, type: "helm",
     desc: "统御虚空的冠冕 · 生命+85 · 防御+10 · 穿透+25%",
     cost: 150,
     materials: ["mat_void_shard", "mat_ancient_seal"],
@@ -50,7 +50,7 @@ R.registerAll('forgeRecipes', [
     combatEffect: null
   },
   {
-    id: "forge_tower_breaker", name: "破塔之戟", icon: "🔱", rarity: "mythic", stat: "atk", val: 35,
+    id: "forge_tower_breaker", name: "破塔之戟", icon: "🔱", rarity: "mythic", stat: "atk", val: 35, type: "weapon",
     desc: "克制魔塔守卫的神兵 · 攻击+35 · 对Boss伤害+40%",
     cost: 200,
     materials: ["mat_tower_heart", "mat_fire_core", "mat_void_shard"],

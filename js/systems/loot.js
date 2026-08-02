@@ -22,7 +22,7 @@ export function genEquip(zoneId) {
   const types = R.get('equipTypes');
   const prefixes = R.get('equipPrefixes');
   if (!qualities.length || !types.length) {
-    console.warn("[妖塔] 装备注册表为空，返回保底装备");
+    console.warn("[妖塔勇者录] 装备注册表为空，返回保底装备");
     return { icon: "🗡️", name: "破剑", prefix: "", fullName: "破剑", stat: "atk", val: 3, color: "#8899bb", qualityName: "普通", type: "weapon", _combatEffect: null, _zoneSet: null };
   }
 
@@ -71,8 +71,13 @@ export function genEquip(zoneId) {
   const t = typePick;
   const p = prefixes.length ? prefixes[Math.floor(rng.next() * prefixes.length)] : { name: '', statBonus: {} };
   let val = Math.floor(t.base * q.mul);
-  if (p.statBonus && p.statBonus[t.stat]) {
-    val += p.statBonus[t.stat];
+  // v0.60: 收集非主属性的前缀加成（之前只应用匹配装备类型的属性）
+  var extraStats = {};
+  if (p.statBonus) {
+    Object.keys(p.statBonus).forEach(function(k) {
+      if (k === t.stat) { val += p.statBonus[k]; }
+      else { extraStats[k] = p.statBonus[k]; }
+    });
   }
   if (val <= 0) val = 1;
   // 命名：区域独有名 > 前缀+通用名
@@ -82,7 +87,8 @@ export function genEquip(zoneId) {
   return {
     icon: t.icon, name: displayName, prefix: p.name || '', fullName,
     stat: t.stat, val: val, color: q.color, qualityName: q.name, type: t.type,
-    _combatEffect: combatEffect, _zoneSet: zone?.equipSet || null
+    _combatEffect: combatEffect, _zoneSet: zone?.equipSet || null,
+    _extraStats: extraStats
   };
 }
 
@@ -131,15 +137,9 @@ export function genRelic() {
     if (pool.length === 0) pool = allRelics;
   }
 
-  // v0.51: 核心遗物在普通难度低概率出现（1%），炼狱正常概率
-  var isHell = s.difficulty && s.difficulty.startsWith('hell');
-  if (!isHell) {
-    // 1%概率保留核心遗物（让普通玩家也能体验），否则过滤掉
-    if (!rng.chance(0.01)) {
-      pool = pool.filter(function(r) { return !r.id || !r.id.startsWith('core_'); });
-      if (pool.length === 0) pool = allRelics.filter(function(r) { return r.rarity !== 'legendary'; });
-    }
-  }
+  // v0.51: 核心遗物不会直接掉落（只能通过虚空交易合成获得）
+  pool = pool.filter(function(r) { return !r.category || r.category !== 'core'; });
+  if (pool.length === 0) pool = allRelics.filter(function(r) { return (!r.category || r.category !== 'core') && r.rarity !== 'legendary'; });
 
   // 追猎目标加成：选中的遗物出现率×5
   var huntTargets = s && s.huntTargets ? s.huntTargets : [];
@@ -149,7 +149,7 @@ export function genRelic() {
     return { r, w };
   });
   if (list.length === 0) {
-    console.warn("[妖塔] 遗物池为空，返回保底遗物");
+    console.warn("[妖塔勇者录] 遗物池为空，返回保底遗物");
     return { id: "vamp_fang", name: "吸血獠牙", icon: "🦷", rarity: "common", desc: "攻击恢复12%伤害的生命", onAttack: (p, dmg) => { p.hp = Math.min(p.maxHp, p.hp + Math.floor(dmg * 0.12)); } };
   }
   const total = list.reduce((sum, x) => sum + x.w, 0);
@@ -164,6 +164,6 @@ export function genRelic() {
 }
 
 // ---- 从 Registry 随机获取一件遗物 ----
-export function randomRelic(rng) {
-  return { ...rng.pick(R.get('relics')) };
-}
+// v0.60 已废弃：被 genRelic() 取代（含权重/难度/追猎等完整逻辑）
+// 保留导出以兼容旧代码
+export function randomRelic(rng) { return { ...rng.pick(R.get('relics')) }; }

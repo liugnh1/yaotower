@@ -3,9 +3,9 @@ import { Game } from '../core/state.js';
 import { R } from '../core/registry.js';
 
 // ---- 应用局外加成（含天赋树衰减）----
-export function applyMetaBonus(p) {
-  Game.applyMetaBonus(p);
-}
+// v0.60: 此包装器已废弃，所有调用者直接使用 Game.applyMetaBonus(p)
+// 保留导出以兼容旧代码
+export function applyMetaBonus(p) { Game.applyMetaBonus(p); }
 
 // ---- 结算灵蕴（替代旧calcTP）----
 export function calcEssence(floor, isWin) {
@@ -35,8 +35,11 @@ export function calcMaterials(floor, isBoss) {
 }
 
 // ---- 结算锻造石 ----
-export function calcForgeStones(isWin, difficulty) {
-  if (!isWin) return 0;
-  if (difficulty === 'hell' || (difficulty && difficulty.startsWith('hell'))) return 15;
-  return 5;
+export function calcForgeStones(isWin, difficulty, floor) {
+  if (difficulty === 'hell' || (difficulty && difficulty.startsWith('hell'))) return isWin ? 20 : Math.max(0, Math.floor((floor||0) / 10));
+  if (isWin) return 8;
+  // v0.60: 死亡≥10层才给少量锻造石，防无限死亡刷收益
+  var f = floor || 0;
+  if (f < 10) return 0;
+  return Math.min(5, Math.floor(f / 10));
 }
