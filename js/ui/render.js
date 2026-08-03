@@ -1,11 +1,13 @@
 // ===================== 主渲染函数 =====================
 import { Game } from '../core/state.js';
 import { R } from '../core/registry.js';
+import { E, Events } from '../core/event-bus.js';
 import { log, toast, float, updateArena } from './effects.js';
 import { switchScreen, showModal, hideModal, hideAllModals } from './screens.js';
 import { RARITY_COLOR } from '../content/relics.js';
 import { startHeartbeat, stopHeartbeat } from '../core/audio.js';
 import { TIPS } from '../content/tips.js';
+import * as Combat from '../systems/combat.js'; // v0.80: 替代 window._usePotion
 
 var _lastTipFloor = -1;
 
@@ -69,7 +71,7 @@ export function render(s) {
     ];
     var t = TITLES.find(function(x) { return x.id === equippedId; }) || TITLES[0];
     titleEl.textContent = t.icon + " " + t.name;
-    titleEl.onclick = function() { if (window._showAchPanel) window._showAchPanel(); };
+    titleEl.onclick = function() { Events.emit(E.SHOW_ACH_PANEL); };
   }
 
   // 城池界面：有存档时显示"记忆之书"
@@ -198,7 +200,7 @@ export function render(s) {
       span.innerHTML = `${qTag}${e.icon}<b>${e.fullName||e.name}</b> ${STAT_LABEL[e.stat]||e.stat}+${e.val}${fxTag}`;
       span.style.cssText = `color:${e.color};cursor:pointer;margin-right:4px;display:inline-block;padding:2px 4px;border-radius:3px;transition:background .2s`;
       span.title = `点击丢弃 ${e.fullName||e.name}`;
-      span.onclick = () => { if (confirm(`确定丢弃 ${e.fullName||e.name}？`)) window._discardEquip(i); };
+      span.onclick = () => { if (confirm(`确定丢弃 ${e.fullName||e.name}？`)) Events.emit(E.EQUIP_DISCARD, { index: i }); };
       span.onmouseenter = () => { span.style.background = 'rgba(255,100,100,0.25)'; };
       span.onmouseleave = () => { span.style.background = 'transparent'; };
       eqList.appendChild(span);
@@ -210,11 +212,11 @@ export function render(s) {
   if (s.relics.length === 0) relList.innerHTML = '<span style="color:#445566">暂无</span>';
   else relList.innerHTML = s.relics.map(function(r) { var stars = r.stars > 1 ? '⭐'.repeat(r.stars - 1) : ''; return '<span style="color:' + (RARITY_COLOR[r.rarity] || '#ccc') + '" title="' + r.desc + '">' + r.icon + r.name + stars + '</span>'; }).join(" ");
 
-  // 药水列表
+  // 药水列表 v0.80: DOM构建替代 innerHTML onclick
   const potList = document.getElementById("potion-list");
   if (potList) {
-    if (s.potions.length === 0) potList.innerHTML = '<span style="color:#445566">暂无</span>';
-    else potList.innerHTML = s.potions.map((p, i) => `<span style="color:#70a1ff;cursor:pointer" onclick="window._usePotion(${i})">${p.icon}${p.name}</span>`).join(" ");
+    if (s.potions.length === 0) { potList.innerHTML = '<span style="color:#445566">暂无</span>'; }
+    else { potList.innerHTML = ''; s.potions.forEach(function(p, i) { var sp = document.createElement('span'); sp.style.cssText = 'color:#70a1ff;cursor:pointer'; sp.textContent = p.icon + p.name; sp.onclick = function() { Combat.usePotion(i); }; potList.appendChild(sp); potList.appendChild(document.createTextNode(' ')); }); }
   }
 
   // 战斗遗物栏

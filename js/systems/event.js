@@ -4,6 +4,7 @@ import { R } from '../core/registry.js';
 import { E, Events } from '../core/event-bus.js';
 import { genEquip, genRelic } from './loot.js';
 import { acquireRelic } from './shop.js';
+import { addEquip } from './equipment.js';
 
 // ---- 宝箱 ----
 export function openChest(onResult) {
@@ -13,8 +14,7 @@ export function openChest(onResult) {
   var chestBonus = (s.player && s.player._talentChestBonus) ? s.player._talentChestBonus : 0;
   if (roll < 0.5) {
     const eq = genEquip();
-    if (typeof window._addEquip === 'function') { window._addEquip(eq); }
-    else { s.equip.push(eq); }
+    addEquip(eq);
     Events.emit(E.EQUIP_GAINED, { equip: eq });
     onResult('equip', eq);
   } else if (roll < 0.8) {

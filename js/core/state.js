@@ -224,7 +224,10 @@ function defMeta() {
     },
     // 局外装备（DNF纸娃娃）
     outgameEquipped: { weapon:null, helm:null, armor:null, ringL:null, ringR:null, braceletL:null, braceletR:null, amulet:null, belt:null, medal:null },
+    outgameEquip: [],
     outgameInventory: [],
+    // v0.81: 灵玉（广告点）
+    jadeSpirits: 0,
 
     // 注意: deepMergeMeta 会将旧 tp 字段保留，需要在 _loadMeta 中做迁移
   };
@@ -612,6 +615,21 @@ export const Game = {
         }
         // 一次性消耗，不自动清空（由玩家手动在遗物师面板重新合成）
       }
+    }
+
+    // v0.81: 地下城锻造属性（附魔+精炼）— 在硬上限之前应用
+    var dg = this.meta.dungeon;
+    if (dg && dg.forge) {
+      var f = dg.forge;
+      if (f.enchantAtk) p.atk += f.enchantAtk * 8;
+      if (f.enchantHp) { p.maxHp += f.enchantHp * 25; p.hp += f.enchantHp * 25; }
+      if (f.enchantDef) p.def += f.enchantDef * 4;
+      if (f.enchantCrit) p.critRate += f.enchantCrit * 0.03;
+      if (f.enchantPen) p.pen = (p.pen || 0) + f.enchantPen * 0.05;
+      if (f.enchantVamp) p.lifeSteal = (p.lifeSteal || 0) + f.enchantVamp * 0.04;
+      if (f.refineAtk) p.atk += f.refineAtk;
+      if (f.refineHp) { p.maxHp += f.refineHp * 5; p.hp += f.refineHp * 5; }
+      if (f.refineDef) p.def += f.refineDef;
     }
 
     // v0.50 P0硬上限：所有局外永久加成封顶

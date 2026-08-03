@@ -4,6 +4,7 @@ import { R } from '../core/registry.js';
 import { E, Events } from '../core/event-bus.js';
 import { genEquip, genRelic } from './loot.js';
 import { checkSynergies, recheckSynergies } from './synergy.js';
+import { addEquip } from './equipment.js';
 import { log } from '../ui/effects.js';
 
 function checkAchievement2(s, id) {
@@ -25,7 +26,7 @@ export function getShopItems() {
     fn: () => { s.player.hp = s.player.maxHp; Events.emit(E.PLAYER_HEALED, { amount: s.player.maxHp, hp: s.player.hp, maxHp: s.player.maxHp }); } });
   const eq = genEquip(); eq.cost = 25 + Math.floor(eq.val * 3);
   items.push({ name: eq.fullName || eq.name, cost: eq.cost, icon: eq.icon, type: 'equip', data: eq,
-    fn: () => { if (typeof window._addEquip === 'function') { window._addEquip(eq); } else { Game.state.equip.push(eq); } Events.emit(E.EQUIP_GAINED, { equip: eq }); } });
+    fn: () => { addEquip(eq); Events.emit(E.EQUIP_GAINED, { equip: eq }); } });
   var relicChance = (s.blessingType === '🔮') ? 0.8 : 0.5;
   if (s.rng.chance(relicChance)) {
     const rel = genRelic();
@@ -91,10 +92,9 @@ export function acquireRelic(rel) {
   var maxRelics = 6 + (s.player && s.player._talentRelicSlots ? s.player._talentRelicSlots : 0);
   if (s.relics.length >= maxRelics) {
     // 如果主界面有选择回调，触发选择面板；否则Fallback自动丢弃最旧的
-    if (typeof window._onRelicFull === 'function') {
-      window._onRelicFull(rel);
-      return; // 暂停获取，等用户选择
-    }
+    // v0.80: 改为 EventBus 事件，不再用 window._onRelicFull 全局
+    Events.emit(E.RELICS_FULL, { relic: rel });
+    return; // 暂停获取，等用户选择
     // Fallback: 自动丢弃最旧的
     const old = s.relics[0];
     if (old && old.onRemove) old.onRemove(s.player);

@@ -105,5 +105,19 @@ R.registerAll('enemies', {
     { name: "血族公爵",hp: 120,atk: 30, def: 5, exp: "血之盛宴", icon: "🧛" },
     { name: "虚空行者·精英",hp: 90, atk: 32, def: 2, exp: "虚空穿梭", icon: "🌌" },
     { name: "上层守护者",hp:200,atk: 22, def: 8, exp: "终极防线", icon: "🛡️" }
+  ],
+
+  // v0.81: 无尽高层怪物池
+  endless: [
+    { name: "深渊潜行者", icon: "👤", hp: 180, atk: 30, def: 8, gold: 15, exp: 20,
+      skill: { name: "暗影步", desc: "每3回合隐身", fn: function(e, p) { e._buffs.push({ id:'stealth', name:'隐身', turns:1, onTick:function(){return'immune';} }); return { dmg: 0, msg: '👤 深渊潜行者消失了！' }; }, ai: function(e, s) { return s.turnInFloor % 3 === 0 ? 'skill' : 'atk'; } } },
+    { name: "虚空撕裂者", icon: "🌀", hp: 250, atk: 35, def: 12, gold: 18, exp: 25,
+      skill: { name: "虚空撕裂", desc: "攻击+30%吸血", fn: function(e, p) { var dmg = Math.max(1, Math.floor(e.atk * 1.2) - p.def); p.hp -= dmg; e.hp = Math.min(e.maxHp, e.hp + Math.floor(dmg * 0.3)); return { dmg: dmg, msg: '🌀 虚空撕裂！' }; }, ai: function(e, s) { return s.turnInFloor % 3 === 0 ? 'skill' : 'atk'; } } },
+    { name: "混沌魔像", icon: "🗿", hp: 350, atk: 28, def: 20, gold: 22, exp: 30,
+      tags: ["tough","immune_crit"] },
+    { name: "终焉使者", icon: "👻", hp: 400, atk: 42, def: 10, gold: 25, exp: 35,
+      skill: { name: "终焉宣告", desc: "每回合ATK+3(叠加)", fn: function(e, p) { e.atk += 3; var dmg = Math.max(1, e.atk - p.def); p.hp -= dmg; return { dmg: dmg, msg: '👻 终焉宣告！ATK永久+3' }; }, ai: function(e, s) { return s.turnInFloor % 4 === 0 ? 'skill' : 'atk'; } } },
+    { name: "万古之影", icon: "🌑", hp: 500, atk: 50, def: 15, gold: 30, exp: 40,
+      skill: { name: "分裂", desc: "死亡后分裂为2个半血", fn: function(e, p) { var dmg = Math.max(1, e.atk - p.def); p.hp -= dmg; return { dmg: dmg }; }, ai: function(e, s) { return 'atk'; } }, onKill: function(s) { var halfHp = Math.floor(500 / 2); for (var i = 0; i < 2; i++) { s.enemies.push({ name: '万古之影碎片', icon: '🌑', hp: halfHp, maxHp: halfHp, atk: 30, def: 8, tags: [], _buffs: [], aiTurn: 0 }); } } }
   ]
 });

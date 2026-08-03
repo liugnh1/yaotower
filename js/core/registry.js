@@ -20,7 +20,9 @@ class Registry {
       classMasterySkills: {}, classMasteryRelics: {}, classAdvancements: {}, awakeningPassives: {},  // v0.50
       hiddenLegendaries: [], fateBrands: [],  // v0.50
       dungeons: {}, dungeonEnchants: {}, dungeonRunes: [], towerMods: [],  // v0.60 深渊裂隙
-      bossRushT1: [], bossRushT2: [], bossRushT3: [], bossRushT4: []  // v0.70 Boss Rush专属
+      bossRushT1: [], bossRushT2: [], bossRushT3: [], bossRushT4: [],  // v0.70 Boss Rush专属
+      chaosMods: {},  // v0.80 混沌词条统一数据源
+      outgameEquips: {}  // v0.81 局外装备数据
     };
   }
 

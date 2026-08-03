@@ -15,7 +15,7 @@ R.registerAll('classes', {
         upgrades: [
           { name: "烈火·炎舞", desc: "伤害×2.8+燃烧3回合 ⚡2", mul: 2.8, effect: "burn", cd: 2, energyCost: 2 },
           { name: "烈火·焚天", desc: "伤害×2.5+燃烧3回合+AOE溅射 ⚡2", mul: 2.5, effect: "burn", cd: 3, energyCost: 2 },
-          { name: "烈火·涅槃", desc: "伤害×2.0+燃烧2回合+回复15%生命 ⚡2", mul: 2.0, effect: "burn", cd: 2, heal: 0.15, energyCost: 2 }
+          { name: "烈火·涅槃", desc: "伤害×2.0+燃烧2回合+回复20%生命 ⚡2", mul: 2.0, effect: "burn", cd: 2, heal: 0.20, energyCost: 2 }
         ]
       },
       { id: "ice_slash",  name: "冰霜剑诀", icon: "❄️", desc: "伤害×1.8+迟缓2回合 ⚡1", mul: 1.8, effect: "slow", cooldown: 2, energyCost: 1,
@@ -29,7 +29,7 @@ R.registerAll('classes', {
         upgrades: [
           { name: "雷霆·天罚", desc: "伤害×3.5+必定眩晕 ⚡2", mul: 3.5, effect: "stun", cd: 4, energyCost: 2 },
           { name: "雷霆·连锁", desc: "伤害×2.8+眩晕+额外攻击一次 ⚡2", mul: 2.8, effect: "stun", cd: 3, doubleHit: true, energyCost: 2 },
-          { name: "雷霆·锻体", desc: "伤害×3.0+眩晕+攻击永久+2 ⚡2", mul: 3.0, effect: "stun", cd: 3, permAtk: 2, energyCost: 2 }
+          { name: "雷霆·锻体", desc: "伤害×3.0+眩晕+攻击永久+3 ⚡2", mul: 3.0, effect: "stun", cd: 3, permAtk: 3, energyCost: 2 }
         ]
       }
     ]
@@ -58,7 +58,7 @@ R.registerAll('classes', {
       { id: "arcane",     name: "奥术飞弹", icon: "✨", desc: "伤害×2.5+穿透+25% ⚡1", mul: 2.5, effect: "pen", cooldown: 2, extraPen: 0.25, energyCost: 1,
         upgrades: [
           { name: "奥术·毁灭", desc: "伤害×3.5+穿透+35% ⚡1", mul: 3.5, effect: "pen", cd: 3, extraPen: 0.35, energyCost: 1 },
-          { name: "奥术·镜像", desc: "伤害×2.5+穿透+25%+本回合无敌 ⚡1", mul: 2.5, effect: "pen", cd: 2, extraPen: 0.25, immune: true, energyCost: 1 },
+          { name: "奥术·镜像", desc: "伤害×2.5+穿透+25%+本回合无敌 ⚡1", mul: 2.5, effect: "pen", cd: 3, extraPen: 0.25, immune: true, energyCost: 1 },
           { name: "奥术·共鸣", desc: "伤害×3.0+穿透+25%+其他技能CD-1 ⚡1", mul: 3.0, effect: "pen", cd: 2, extraPen: 0.25, reduceCD: 1, energyCost: 1 }
         ]
       }
@@ -74,8 +74,8 @@ R.registerAll('classes', {
     skills: [
       { id: "assassinate", name: "暗杀",   icon: "💀", desc: "伤害×3.5+扣12%当前生命 ⚡2", mul: 3.5, effect: null, cooldown: 2, selfDmg: 0.12, energyCost: 2,
         upgrades: [
-          { name: "暗杀·绝命", desc: "伤害×5.0+扣15%生命 ⚡3", mul: 5.0, effect: null, cd: 3, selfDmg: 0.15, energyCost: 3 },
-          { name: "暗杀·血宴", desc: "伤害×3.5+扣10%生命+吸血30% ⚡2", mul: 3.5, effect: null, cd: 2, selfDmg: 0.1, lifeSteal: 0.3, energyCost: 2 },
+          { name: "暗杀·绝命", desc: "伤害×6.0+扣10%生命 ⚡3", mul: 6.0, effect: null, cd: 3, selfDmg: 0.10, energyCost: 3 },
+          { name: "暗杀·血宴", desc: "伤害×3.5+扣10%生命+吸血40% ⚡2", mul: 3.5, effect: null, cd: 2, selfDmg: 0.1, lifeSteal: 0.4, energyCost: 2 },
           { name: "暗杀·无形", desc: "伤害×4.0+扣8%生命+本回合无敌 ⚡2", mul: 4.0, effect: null, cd: 2, selfDmg: 0.08, immune: true, energyCost: 2 }
         ]
       },
@@ -114,12 +114,12 @@ R.registerAll('classes', {
         upgrades: [
           { name: "箭雨·天罗", desc: "伤害×2.5+燃烧3回合 ⚡2", mul: 2.5, effect: "burn", cd: 2, energyCost: 2 },
           { name: "箭雨·火箭", desc: "伤害×2.8+燃烧3回合+穿透15% ⚡2", mul: 2.8, effect: "burn", cd: 3, pen: 0.15, energyCost: 2 },
-          { name: "箭雨·穿心", desc: "伤害×2.0+燃烧2回合+暴击率+10% ⚡2", mul: 2.0, effect: "burn", cd: 2, critUp: 0.10, energyCost: 2 }
+          { name: "箭雨·穿心", desc: "伤害×2.0+燃烧2回合+暴击率+15% ⚡2", mul: 2.0, effect: "burn", cd: 2, critUp: 0.15, energyCost: 2 }
         ]
       },
       { id: "snipe",       name: "狙击",     icon: "🔭", desc: "伤害×3.5+穿透50% ⚡3", mul: 3.5, effect: null, cooldown: 3, extraPen: 0.5, energyCost: 3,
         upgrades: [
-          { name: "狙击·死神", desc: "伤害×5.0+穿透60% ⚡3", mul: 5.0, effect: null, cd: 4, extraPen: 0.6, energyCost: 3 },
+          { name: "狙击·死神", desc: "伤害×5.0+穿透50% ⚡3", mul: 5.0, effect: null, cd: 4, extraPen: 0.5, energyCost: 3 },
           { name: "狙击·弱点", desc: "伤害×4.0+穿透50%+下回合必暴 ⚡3", mul: 4.0, effect: null, cd: 3, extraPen: 0.5, nextCrit: true, energyCost: 3 },
           { name: "狙击·速射", desc: "伤害×3.0+穿透40%+CD-1 ⚡2", mul: 3.0, effect: null, cd: 2, extraPen: 0.4, energyCost: 2 }
         ]
@@ -144,7 +144,7 @@ R.registerAll('classes', {
       { id: "iron_body",   name: "金钟罩",   icon: "🔔", desc: "伤害×1.5+下回合必暴 ⚡1", mul: 1.5, effect: "smoke", cooldown: 2, energyCost: 1,
         upgrades: [
           { name: "金钟·铁壁", desc: "伤害×2.0+下回合必暴+防御+5 ⚡1", mul: 2.0, effect: "smoke", cd: 2, selfDef: 5, energyCost: 1 },
-          { name: "金钟·反震", desc: "伤害×1.5+下回合必暴+反伤30%一回合 ⚡1", mul: 1.5, effect: "smoke", cd: 2, thorns: 0.3, energyCost: 1 },
+          { name: "金钟·反震", desc: "伤害×1.8+下回合必暴+反伤30%一回合 ⚡1", mul: 1.8, effect: "smoke", cd: 2, thorns: 0.3, energyCost: 1 },
           { name: "金钟·愈合", desc: "伤害×1.8+下回合必暴+回复25%生命 ⚡1", mul: 1.8, effect: "smoke", cd: 2, heal: 0.25, energyCost: 1 }
         ]
       },
@@ -167,7 +167,7 @@ R.registerAll('classMasterySkills', {
   ],
   mage: [
     { id: "mage_icenova",  name: "冰霜新星·极", icon: "❄️", desc: "AOE+全体迟缓2回合 ⚡2", mul: 2.0, effect: "slow", aoe: true, cooldown: 5, energyCost: 2, masteryLv: 3 },
-    { id: "mage_meteor",   name: "陨石风暴", icon: "☄️", desc: "AOE 200%+燃烧3层 ⚡3", mul: 2.0, effect: "burn", aoe: true, cooldown: 7, energyCost: 3, masteryLv: 10 }
+    { id: "mage_meteor",   name: "陨石风暴", icon: "☄️", desc: "AOE 250%+燃烧3层 ⚡3", mul: 2.5, effect: "burn", aoe: true, cooldown: 7, energyCost: 3, masteryLv: 10 }
   ],
   shadow: [
     { id: "shd_assault",   name: "暗杀·极", icon: "🗡️", desc: "单体300%，击杀返还1⚡ ⚡2", mul: 3.0, cooldown: 4, energyCost: 2, killRefund: 1, masteryLv: 3 },
@@ -179,7 +179,7 @@ R.registerAll('classMasterySkills', {
   ],
   monk: [
     { id: "monk_palm",     name: "金刚掌·奥义", icon: "✋", desc: "单体150%+回复等量HP ⚡2", mul: 1.5, cooldown: 3, energyCost: 2, lifeSteal: 1.0, masteryLv: 3 },
-    { id: "monk_nirvana",  name: "涅槃", icon: "🕉️", desc: "满血复活+全属性+30%(3回合) ⚡3", mul: 1.0, cooldown: 10, energyCost: 3, rebirth: true, allBuff: 0.3, masteryLv: 10 }
+    { id: "monk_nirvana",  name: "涅槃", icon: "🕉️", desc: "满血复活+全属性+30%(3回合) ⚡3", mul: 1.0, cooldown: 8, energyCost: 3, rebirth: true, allBuff: 0.3, masteryLv: 10 }
   ]
 });
 
