@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <link rel="icon" href="data:,">
-<title>妖塔勇者录 v0.60 · 肉鸽爬塔</title>
+<title>妖塔勇者录 v0.81 · 肉鸽爬塔</title>
 <link rel="stylesheet" href="css/main.css">
 </head>
 <body>
@@ -23,7 +23,7 @@
   <div class="tome-top"></div>
 
   <div class="city-sky">
-    <h1>妖塔勇者录 <span class="ver-tag">v0.60</span></h1>
+    <h1>妖塔勇者录 <span class="ver-tag">v0.81</span></h1>
     <p class="city-lore">边境城池 · 魔塔前最后的庇护所</p>
     <!-- 种子输入 -->
     <div id="daily-fortune" style="color:#ffa502;font-size:11px;margin-bottom:4px"></div>
@@ -35,6 +35,7 @@
       <button id="btn-settings" style="font-size:18px;background:none;border:none;cursor:pointer;margin-left:4px" title="设置">⚙️</button>
     </div>
   </div>
+  
 
   <!-- 书卷式左右分栏 -->
   <div class="tome-spread">
@@ -174,7 +175,7 @@
   <div id="city-decorations" style="padding:6px;font-size:10px;color:#667;text-align:center;margin-top:4px"></div>
 </div>
 
-<!-- ====== v0.60 构筑面板（无尽/BossRush） ====== -->
+<!-- ====== v0.81 构筑面板（无尽/BossRush） ====== -->
 <div id="build-panel" class="hidden" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:500;background:#080810;overflow-y:auto;padding:20px 10px">
   <button class="city-back-btn" style="position:absolute;top:10px;left:10px;z-index:10" id="btn-build-exit">← 返回城门</button>
   <div style="max-width:420px;margin:0 auto">
@@ -414,7 +415,7 @@
   <h3 id="meta-title">🔮 局外成长</h3>
   <div style="color:#ffa502;margin-bottom:10px" id="meta-subtitle">天赋点: <b id="meta-tp">0</b></div>
   <div id="meta-content" style="text-align:left;font-size:13px;max-height:50vh;overflow-y:auto"></div>
-  <button class="restart-btn" style="margin-top:10px;width:100%" id="btn-close-meta">关闭</button>
+  <button class="restart-btn" style="margin-top:10px;width:100%;display:none" id="btn-close-meta">关闭</button>
 </div>
 
 <!-- 设置面板 -->
@@ -477,7 +478,7 @@
     <div class="settings-section">
       <div class="settings-section-title">ℹ️ 关于</div>
       <div class="settings-about">
-        <div class="settings-about-row"><span>版本</span><span style="color:#ffa502">v0.50 · 天赋树时代</span></div>
+        <div class="settings-about-row"><span>版本</span><span style="color:#ffa502">v0.81 · 妖塔勇者录</span></div>
         <div class="settings-about-row"><span>制作</span><span>白夜夜白</span></div>
       </div>
     </div>

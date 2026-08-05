@@ -71,23 +71,59 @@ export function genOutgameEquip(typeBias) {
   if (!meta.outgameEquip) meta.outgameEquip = [];
 
   // 从内容池选装备模板
+  // slot type → pool key 映射（铁匠铺传入 ringL 但模板池 key 是 ring）
+  var SLOT_TO_POOL = { ringL:'ring', ringR:'ring', braceletL:'bracelet', braceletR:'bracelet' };
+
   var pool = R.get('outgameEquips');
+
   var candidates = [];
+
   if (pool) {
-    var types = typeBias ? [typeBias] : ['weapon','armor','helm','ring','amulet','belt','medal','bracelet'];
+
+    var lookupKey = SLOT_TO_POOL[typeBias] || typeBias;
+
+    var types = typeBias ? [lookupKey] : ['weapon','armor','helm','ring','amulet','belt','medal','bracelet'];
+
     types.forEach(function(t) {
+
       if (pool[t]) candidates = candidates.concat(pool[t]);
+
     });
+
   }
 
   // 选模板（随机）
+
   var template = null;
+
   if (candidates.length > 0) {
+
     template = candidates[Math.floor(Math.random() * candidates.length)];
+
   }
 
-  // 确定类型
-  var typeStr = template ? (template.type || guessType(template)) : (typeBias || 'weapon');
+  // 确定类型：模板猜类型 → 映射到具体 slot；无模板用 typeBias
+
+  var typeStr;
+
+  if (template) {
+
+    typeStr = template.type || guessType(template);
+
+    if (typeStr === 'ring') typeStr = Math.random() < 0.5 ? 'ringL' : 'ringR';
+
+    if (typeStr === 'bracelet') typeStr = Math.random() < 0.5 ? 'braceletL' : 'braceletR';
+
+  } else {
+
+    typeStr = typeBias || 'weapon';
+
+    if (typeStr === 'ring') typeStr = Math.random() < 0.5 ? 'ringL' : 'ringR';
+
+    if (typeStr === 'bracelet') typeStr = Math.random() < 0.5 ? 'braceletL' : 'braceletR';
+
+  }
+
   var typeInfo = EQUIP_TYPES.find(function(t){ return t.type === typeStr; }) || EQUIP_TYPES[0];
 
   // 选品质（加权随机）
@@ -138,18 +174,23 @@ export function genOutgameEquip(typeBias) {
     isOutgame: true
   };
 
-  // v0.81: 从模板效果池随机 1-3 个效果
+  // v0.81: 概率获得 1 个附加效果（品质越高概率越大）
   if (template && template.fx && template.fx.length > 0) {
-    var fxCount = 1 + Math.floor(Math.random() * 3); // 1-3个
-    var fxKeys = pickFx(template.fx, fxCount);
-    var effects = [];
-    fxKeys.forEach(function(k) {
-      var rolled = rollFx(k);
-      if (rolled.desc) effects.push(rolled);
-    });
-    equip._effects = effects;
-    if (effects.length > 0) {
-      equip.effect = { desc: effects.map(function(e){ return e.desc; }).join(' · ') };
+    var fxChance = { worn:0.10, common:0.20, fine:0.30, rare:0.40, epic:0.55, legendary:0.70, mythic:0.85 };
+    var chance = fxChance[quality.id] || 0.25;
+    if (Math.random() < chance) {
+      var fxKeys = pickFx(template.fx, 1);
+      var effects = [];
+      fxKeys.forEach(function(k) {
+        var rolled = rollFx(k);
+        if (rolled.desc) effects.push(rolled);
+      });
+      equip._effects = effects;
+      if (effects.length > 0) {
+        equip.effect = { desc: effects[0].desc };
+      }
+    } else {
+      equip._effects = [];
     }
   }
 
@@ -170,7 +211,13 @@ export function equipOutgameItem(equipId, slotType) {
   if (idx < 0) return false;
   var equip = meta.outgameEquip[idx];
   // 类型不匹配
-  if (equip.type !== slotType) return false;
+  // 允许左右戒指/手镯互通（兼容旧存档 ring/bracelet 类型）
+  var typeOk = equip.type === slotType;
+  if (!typeOk) {
+    if ((equip.type === "ringL" || equip.type === "ringR" || equip.type === "ring") && (slotType === "ringL" || slotType === "ringR")) typeOk = true;
+    if ((equip.type === "braceletL" || equip.type === "braceletR" || equip.type === "bracelet") && (slotType === "braceletL" || slotType === "braceletR")) typeOk = true;
+  }
+  if (!typeOk) return false;
   // 如果该槽已有装备，先卸下
   if (meta.outgameEquipped[slotType]) {
     meta.outgameEquip.push(meta.outgameEquipped[slotType]);

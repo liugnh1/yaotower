@@ -12,7 +12,13 @@ export function showEquipBag(filterType, onPick) {
   var meta = Game.meta;
   if (!meta.outgameEquip) meta.outgameEquip = [];
   var items = meta.outgameEquip;
-  if (filterType) { items = items.filter(function(e){ return e.type === filterType; }); }
+  if (filterType) {
+    // 左右戒指/手镯互通：点击任一侧都显示所有戒指/手镯
+    var filterGroup = [filterType];
+    if (filterType === "ringL" || filterType === "ringR") filterGroup = ["ringL","ringR","ring"];
+    if (filterType === "braceletL" || filterType === "braceletR") filterGroup = ["braceletL","braceletR","bracelet"];
+    items = items.filter(function(e){ return filterGroup.indexOf(e.type) >= 0; });
+  }
 
   var el = document.getElementById('meta-panel');
   el.style.display = 'block'; el.style.maxWidth = '420px';

@@ -502,6 +502,7 @@ function showTalentTree() {
     toast('🔄 天赋树已重置' + (isFree ? '（免费）' : '') + '，返还' + refund + '灵蕴');
   };
   content.innerHTML = '';
+  
   content.appendChild(summaryEl);
 
   // ===== v1.0 线性分支列表（Tab切换，降低渲染复杂度）=====
@@ -3337,7 +3338,7 @@ function showScholarPanel() {
   studyList.forEach(function(r) {
     var cost = r.rarity === 'epic' ? 12 : 6;
     var div = document.createElement("div");
-    div.style.cssText = "margin-bottom:6px;padding:8px;background:#0d1117;border-radius:4px;display:flex;align-items:center;gap:8px";
+    div.style.cssText = "margin-bottom:6px;padding:8px;background:url('img/Wanted‑hunt order card background image.png') center/cover,#0d1117;border-radius:4px;display:flex;align-items:center;gap:8px";
     div.innerHTML = '<span style="font-size:20px">' + r.icon + '</span><div style="flex:1"><b style="color:#ddccaa">' + r.name + '</b><br><span style="color:#667788;font-size:10px">' + r.desc + '</span></div>';
     var btn = document.createElement("button");
     btn.className = "modal-btn"; btn.style.cssText = "font-size:10px;padding:4px 8px;white-space:nowrap";
@@ -3408,7 +3409,7 @@ function showBountyHunterPanel() {
   var stones = Game.meta.stones || 0;
   bounties.forEach(function(b) {
     var div = document.createElement("div");
-    div.style.cssText = "margin-bottom:6px;padding:8px;background:#0d1117;border-radius:4px";
+    div.style.cssText = "margin-bottom:6px;padding:8px;background:url('img/Wanted‑hunt order card background image.png') center/cover,#0d1117;border-radius:4px";
     var isActive = activeBounty && activeBounty.boss === b.boss;
     div.innerHTML = '<b style="color:#ddccaa">🎯 ' + b.name + '</b><br>' +
       '<span style="color:#667788;font-size:10px">' + b.desc + ' · 花费' + b.cost + '💎 · 奖励' + b.reward + '💎</span>';
@@ -3646,7 +3647,7 @@ function showClassMastery() {
   }
   // 绑定关闭清理（每次重新绑定）
   var closeBtn = document.getElementById("btn-close-meta");
-  if (closeBtn) { closeBtn.onclick = function() { _cleanup(); el.style.display = "none"; }; }
+  if (closeBtn) { closeBtn.style.display = ""; closeBtn.onclick = function() { _cleanup(); el.style.display = "none"; }; }
 
   el.style.display = "block"; el.style.padding = "0";
   el.style.maxWidth = "420px"; el.style.maxHeight = "75vh";
@@ -4359,7 +4360,7 @@ function showRelicForge() {
     craftable.forEach(function(r) {
       var cost = r.rarity === 'legendary' ? 200 : r.rarity === 'epic' ? 80 : r.rarity === 'rare' ? 30 : 10;
       var div = document.createElement("div");
-      div.style.cssText = "margin-bottom:6px;padding:8px;background:#0d1117;border-radius:4px;display:flex;align-items:center;gap:8px";
+      div.style.cssText = "margin-bottom:6px;padding:8px;background:url('img/Wanted‑hunt order card background image.png') center/cover,#0d1117;border-radius:4px;display:flex;align-items:center;gap:8px";
       div.innerHTML = '<span style="font-size:20px">' + r.icon + '</span><div style="flex:1"><b style="color:#ddccaa">' + r.name + '</b><br><span style="color:#667788;font-size:10px">' + r.desc + '</span></div>';
       var btn = document.createElement("button");
       btn.className = "modal-btn"; btn.style.cssText = "font-size:10px;padding:4px 8px;white-space:nowrap";
@@ -4992,4 +4993,4 @@ try {
 } catch(e) {
   console.error("[妖塔勇者录] 初始渲染失败:", e.message, e.stack);
 }
-console.log("妖塔勇者录 v0.60 | 天赋树时代");
+console.log("妖塔勇者录 v0.81 | 妖塔勇者录");
