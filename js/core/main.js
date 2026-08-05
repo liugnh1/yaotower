@@ -3338,7 +3338,7 @@ function showScholarPanel() {
   studyList.forEach(function(r) {
     var cost = r.rarity === 'epic' ? 12 : 6;
     var div = document.createElement("div");
-    div.style.cssText = "margin-bottom:6px;padding:8px;background:url('img/Wanted‑hunt order card background image.png') center/cover,#0d1117;border-radius:4px;display:flex;align-items:center;gap:8px";
+    div.style.cssText = "margin-bottom:6px;padding:8px;background:url('img/Wanted‑hunt order card background image.webp') center/cover,#0d1117;border-radius:4px;display:flex;align-items:center;gap:8px";
     div.innerHTML = '<span style="font-size:20px">' + r.icon + '</span><div style="flex:1"><b style="color:#ddccaa">' + r.name + '</b><br><span style="color:#667788;font-size:10px">' + r.desc + '</span></div>';
     var btn = document.createElement("button");
     btn.className = "modal-btn"; btn.style.cssText = "font-size:10px;padding:4px 8px;white-space:nowrap";
@@ -3409,7 +3409,7 @@ function showBountyHunterPanel() {
   var stones = Game.meta.stones || 0;
   bounties.forEach(function(b) {
     var div = document.createElement("div");
-    div.style.cssText = "margin-bottom:6px;padding:8px;background:url('img/Wanted‑hunt order card background image.png') center/cover,#0d1117;border-radius:4px";
+    div.style.cssText = "margin-bottom:6px;padding:8px;background:url('img/Wanted‑hunt order card background image.webp') center/cover,#0d1117;border-radius:4px";
     var isActive = activeBounty && activeBounty.boss === b.boss;
     div.innerHTML = '<b style="color:#ddccaa">🎯 ' + b.name + '</b><br>' +
       '<span style="color:#667788;font-size:10px">' + b.desc + ' · 花费' + b.cost + '💎 · 奖励' + b.reward + '💎</span>';
@@ -4360,7 +4360,7 @@ function showRelicForge() {
     craftable.forEach(function(r) {
       var cost = r.rarity === 'legendary' ? 200 : r.rarity === 'epic' ? 80 : r.rarity === 'rare' ? 30 : 10;
       var div = document.createElement("div");
-      div.style.cssText = "margin-bottom:6px;padding:8px;background:url('img/Wanted‑hunt order card background image.png') center/cover,#0d1117;border-radius:4px;display:flex;align-items:center;gap:8px";
+      div.style.cssText = "margin-bottom:6px;padding:8px;background:url('img/Wanted‑hunt order card background image.webp') center/cover,#0d1117;border-radius:4px;display:flex;align-items:center;gap:8px";
       div.innerHTML = '<span style="font-size:20px">' + r.icon + '</span><div style="flex:1"><b style="color:#ddccaa">' + r.name + '</b><br><span style="color:#667788;font-size:10px">' + r.desc + '</span></div>';
       var btn = document.createElement("button");
       btn.className = "modal-btn"; btn.style.cssText = "font-size:10px;padding:4px 8px;white-space:nowrap";

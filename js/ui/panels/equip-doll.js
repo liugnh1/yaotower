@@ -42,22 +42,26 @@ export function showEquipDoll() {
 
   // === 左侧：纸娃娃 ===
   var dollArea = document.createElement('div');
-  dollArea.style.cssText = 'flex:1;display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:auto auto auto auto auto auto;gap:4px;padding:8px;background:url("img/Character base image.png") center/cover,#0d0d15;border-radius:10px;min-width:280px';
+  dollArea.style.cssText = 'flex:1;display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:auto auto auto auto auto auto;gap:4px;padding:8px;background:url("img/Character base image.webp") center/cover,#0d0d15;border-radius:10px;min-width:280px';
 
   // 角色位（中间，占 3 列 2 行）
   var charSlot = document.createElement("div");
   charSlot.style.cssText = "grid-column:2;grid-row:2/4;display:flex;align-items:center;justify-content:center;min-height:160px;min-width:100px";
   charSlot.innerHTML = '<canvas id="char-canvas" style="width:100px;height:160px;image-rendering:pixelated"></canvas>';
   dollArea.appendChild(charSlot);
-  // 像素处理：白色背景转透明
+  // 像素处理：白色背景转透明（先缩放到合理尺寸避免处理百万像素）
   var _charImg = new Image();
   _charImg.onload = function() {
     var _cv = document.getElementById("char-canvas");
     if (!_cv) return;
-    var _w = _cv.width = _charImg.naturalWidth;
-    var _h = _cv.height = _charImg.naturalHeight;
+    // 限制处理分辨率最大300px宽，原图1696×2560完全没必要逐像素处理
+    var _maxW = 300;
+    var _scale = Math.min(1, _maxW / _charImg.naturalWidth);
+    var _w = _cv.width = Math.floor(_charImg.naturalWidth * _scale);
+    var _h = _cv.height = Math.floor(_charImg.naturalHeight * _scale);
     var _ctx = _cv.getContext("2d");
-    _ctx.drawImage(_charImg, 0, 0);
+    _ctx.imageSmoothingEnabled = false;
+    _ctx.drawImage(_charImg, 0, 0, _w, _h);
     var _imgData = _ctx.getImageData(0, 0, _w, _h);
     var _d = _imgData.data;
     for (var _i = 0; _i < _d.length; _i += 4) {
@@ -109,7 +113,7 @@ export function showEquipDoll() {
 
   // === 右侧：属性面板 ===
   var statPanel = document.createElement('div');
-  statPanel.style.cssText = 'flex:0 0 140px;padding:8px;background:url("img/Character base image.png") center/cover,#0d0d15;border-radius:10px;font-size:11px;color:#ccbb99;line-height:1.8';
+  statPanel.style.cssText = 'flex:0 0 140px;padding:8px;background:url("img/Character base image.webp") center/cover,#0d0d15;border-radius:10px;font-size:11px;color:#ccbb99;line-height:1.8';
 
   var totalAtk = 0, totalDef = 0, totalHp = 0, totalCrit = 0, totalDodge = 0, totalCritDmg = 0;
   Object.values(meta.outgameEquipped||{}).forEach(function(eq) {
