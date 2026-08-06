@@ -10,7 +10,18 @@ const CODEX_KEY = "yaotower_v3.2_codex";
 const LB_KEY   = "yaotower_v3.2_lb";
 
 let _render = null;
+let _renderPending = false;
 export function onRender(fn) { _render = fn; }
+// v0.82: rAF防抖 — 同一帧内多次sync/set合并为一次渲染
+function _scheduleRender(s) {
+  if (!_render || _renderPending) return;
+  _renderPending = true;
+  requestAnimationFrame(function() {
+    _renderPending = false;
+    _render(s);
+  });
+}
+function _forceRender(s) { if (_render) { _renderPending = false; _render(s); } }
 
 function fix(v, d) { return (typeof v === "number" && !isNaN(v)) ? v : d; }
 
@@ -243,8 +254,8 @@ export const Game = {
 
   init() { this._loadMeta(); this._loadCodex(); },
 
-  set(u) { if (u) Object.assign(this.state, u); this.save(); if (_render) _render(this.state); },
-  sync() { this.save(); if (_render) _render(this.state); },
+  set(u) { if (u) Object.assign(this.state, u); this.save(); _scheduleRender(this.state); },
+  sync() { this.save(); _scheduleRender(this.state); },
 
   // ---- 存档 ----
   save() {
@@ -351,7 +362,7 @@ export const Game = {
     } catch (e) { console.warn("[妖塔勇者录] 元数据损坏，已重置", e); this.meta = defMeta(); }
     this._checkAdReset();
   },
-  saveMeta() { try { localStorage.setItem(META_KEY, JSON.stringify(this.meta)); } catch (e) { console.error("妖塔勇者录: 元数据保存失败", e); } if (_render) _render(this.state); },
+  saveMeta() { try { localStorage.setItem(META_KEY, JSON.stringify(this.meta)); } catch (e) { console.error("妖塔勇者录: 元数据保存失败", e); } _scheduleRender(this.state); },
 
   _checkAdReset() {
     if (!this.meta) return;

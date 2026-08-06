@@ -62,7 +62,7 @@ body{background:var(--bg-deep);color:var(--t1);display:flex;justify-content:cent
 @keyframes blink-cursor{0%,100%{opacity:1}50%{opacity:0}}
 
 /* ===================== 边境城池 · 主界面（书卷布局）===================== */
-#start{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;min-height:92vh;text-align:center;padding:10px 10px 16px;background:url('../img/bg-start.jpg?v=036') center/cover no-repeat,#0a0a14;position:relative}
+#start{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;min-height:92vh;text-align:center;padding:10px 10px 16px;background:url('../img/bg-start.webp?v=037') center/cover no-repeat,#0a0a14;position:relative}
 .city-sky{margin-bottom:8px}
 .city-sky h1{color:var(--c-purple);font-size:var(--fs-title);margin-bottom:2px;text-shadow:0 0 24px rgba(200,168,255,0.5);letter-spacing:8px}
 .ver-tag{font-size:var(--fs-h4);color:var(--t2);vertical-align:super;letter-spacing:2px}
@@ -329,13 +329,13 @@ body{background:var(--bg-deep);color:var(--t1);display:flex;justify-content:cent
 
 /* 行动按钮 */
 #actions{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:8px;position:sticky;bottom:0;background:linear-gradient(180deg,transparent,var(--bg-deep) 20%);padding:8px 0;z-index:100}
-.big-btn{padding:18px 4px;font-size:var(--fs-h6);border:none;border-radius:var(--r-xxl);color:#fff;cursor:pointer;font-weight:bold;transition:all .1s;min-height:56px;letter-spacing:0;background:url('../img/btn_bg.jpg') center/cover;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.big-btn{padding:18px 4px;font-size:var(--fs-h6);border:none;border-radius:var(--r-xxl);color:#fff;cursor:pointer;font-weight:bold;transition:all .1s;min-height:56px;letter-spacing:0;background:url('../img/btn_bg.webp') center/cover;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .big-btn:active{transform:scale(.92)}
-#btn-atk{background:linear-gradient(180deg,rgba(200,32,32,.8),rgba(139,0,0,.9)),url('../img/btn_bg.jpg') center/cover;box-shadow:0 4px 16px rgba(200,32,32,.35)}
-#btn-skill{background:linear-gradient(180deg,rgba(106,59,200,.8),rgba(58,26,106,.9)),url('../img/btn_bg.jpg') center/cover;box-shadow:0 4px 16px rgba(106,59,200,.35)}
+#btn-atk{background:linear-gradient(180deg,rgba(200,32,32,.8),rgba(139,0,0,.9)),url('../img/btn_bg.webp') center/cover;box-shadow:0 4px 16px rgba(200,32,32,.35)}
+#btn-skill{background:linear-gradient(180deg,rgba(106,59,200,.8),rgba(58,26,106,.9)),url('../img/btn_bg.webp') center/cover;box-shadow:0 4px 16px rgba(106,59,200,.35)}
 /* v0.60 蓄力/核心技能小按钮 */
-#btn-def{background:linear-gradient(180deg,rgba(42,139,75,.8),rgba(26,90,43,.9)),url('../img/btn_bg.jpg') center/cover;box-shadow:0 4px 16px rgba(42,139,75,.35)}
-#btn-endturn{background:linear-gradient(180deg,rgba(200,150,30,.7),rgba(120,80,10,.9)),url('../img/btn_bg.jpg') center/cover;box-shadow:0 4px 16px rgba(200,150,30,.3);color:var(--c-gold-dim)}
+#btn-def{background:linear-gradient(180deg,rgba(42,139,75,.8),rgba(26,90,43,.9)),url('../img/btn_bg.webp') center/cover;box-shadow:0 4px 16px rgba(42,139,75,.35)}
+#btn-endturn{background:linear-gradient(180deg,rgba(200,150,30,.7),rgba(120,80,10,.9)),url('../img/btn_bg.webp') center/cover;box-shadow:0 4px 16px rgba(200,150,30,.3);color:var(--c-gold-dim)}
 #btn-endturn:disabled{background:#2a2a35!important;color:#555!important;box-shadow:none!important}
 .big-btn:disabled{background:#2a2a35!important;color:#555!important;box-shadow:none!important}
 
@@ -507,7 +507,7 @@ body{background:var(--bg-deep);color:var(--t1);display:flex;justify-content:cent
 @keyframes previewPop{0%{transform:translate(-50%,-50%) scale(.5);opacity:0}50%{transform:translate(-50%,-50%) scale(1.2);opacity:1}100%{transform:translate(-50%,-50%) scale(1);opacity:1}}
 
 /* ===================== 主城NPC界面 ===================== */
-#city-hub{min-height:100vh;min-height:100dvh;background:url('../img/bg-city-hub.jpg?v=036') center/cover no-repeat,#0a0a14;padding:clamp(6px,2vw,12px);text-align:center;position:relative;overflow-y:auto}
+#city-hub{min-height:100vh;min-height:100dvh;background:url('../img/bg-city-hub.webp?v=037') center/cover no-repeat,#0a0a14;padding:clamp(6px,2vw,12px);text-align:center;position:relative;overflow-y:auto}
 #city-hub:before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background:radial-gradient(ellipse at 50% 45%,rgba(40,20,10,.12) 0%,transparent 55%);pointer-events:none;z-index:0}
 .city-hub-header{margin-bottom:clamp(8px,2vw,14px);position:relative;z-index:1;background:rgba(8,6,16,.75);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-radius:10px;padding:8px 12px;display:inline-block}
 .city-hub-header h2{color:#c8a8ff;font-size:clamp(17px,5vw,22px);margin:2px 0;text-shadow:0 0 10px rgba(200,168,255,.4)}
@@ -602,8 +602,14 @@ body{background:var(--bg-deep);color:var(--t1);display:flex;justify-content:cent
   .page-title{font-size:var(--fs-h6)}
   #compendium h3,.modal h3{font-size:var(--fs-h4)}
 }
+@media(max-width:340px){
+  .big-btn{font-size:var(--fs-md);padding:12px 0;min-height:42px}
+  .enemy-card{min-width:55px;padding:4px}
+  .enemy-card-icon{font-size:var(--fs-h3)}
+  .enemy-card-name{font-size:var(--fs-xs)}
+}
 /* ===================== 主城区 ===================== */
-.city-zones{align-items:start} /* 让各区域顶部对齐，不拉伸 */
+.city-zones{align-items:start}
 .city-zone-header{font-weight:bold;font-size:13px;margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;gap:4px}
 .city-zone-header .zone-lv{font-size:9px;color:#667;margin-left:auto}
 .city-npc{padding:6px 8px;margin-bottom:4px;border-radius:6px;font-size:11px;cursor:pointer;background:#1a1a2e;border:1px solid #2a2040;transition:all .15s;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
@@ -630,9 +636,27 @@ body{background:var(--bg-deep);color:var(--t1);display:flex;justify-content:cent
 .build-tier-title{color:#ffa502;font-size:12px;font-weight:bold;margin:8px 0 4px;padding-bottom:4px;border-bottom:1px solid #222}
 .build-tier-title .bt-count{color:#667;font-size:10px;font-weight:normal;margin-left:6px}
 
-@media(max-width:340px){
-  .big-btn{font-size:var(--fs-md);padding:12px 0;min-height:42px}
-  .enemy-card{min-width:55px;padding:4px}
-  .enemy-card-icon{font-size:var(--fs-h3)}
-  .enemy-card-name{font-size:var(--fs-xs)}
-}
+/* ===================== v0.82 GPU加速 & 布局隔离 ===================== */
+/* 将频繁动画的元素提升到独立合成层，避免重绘波及整个页面 */
+#main{contain:layout style;will-change:transform}
+#battle-arena{contain:layout style}
+.arena-unit{will-change:transform}
+.arena-sprite{will-change:transform,opacity}
+#enemy-area{contain:layout style}
+.enemy-card{will-change:transform}
+#log{contain:strict}
+#float-container{contain:strict;pointer-events:none}
+#actions{contain:layout style}
+.modal{contain:layout style;will-change:transform}
+.big-btn{will-change:transform}
+.tome-btn{will-change:transform}
+.fork-door{will-change:transform}
+.card{will-change:transform}
+/* 飘字动画GPU加速 */
+.float-text,.big-float{will-change:transform,opacity}
+/* 覆盖层GPU加速 */
+#kill-flash{will-change:opacity}
+#boss-entrance-overlay{will-change:opacity}
+#boss-narrative{will-change:opacity}
+#prologue{will-change:opacity}
+#ending-screen{will-change:opacity}

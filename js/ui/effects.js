@@ -63,20 +63,21 @@ export function bigFloat(txt, cls, dur = 1200) {
   setTimeout(() => el.remove(), dur);
 }
 
-// 屏幕震动
+// 屏幕震动 — 复用单个style标签避免DOM泄漏
+let _shakeStyle = null;
+function _getShakeStyle() {
+  if (!_shakeStyle) { _shakeStyle = document.createElement("style"); document.head.appendChild(_shakeStyle); }
+  return _shakeStyle;
+}
 export function screenShake(intensity = 1) {
   const main = document.getElementById("main");
   if (!main) return;
-  const style = document.createElement("style");
-  style.textContent = intensity > 1
-    ? `#main.screen-shake{animation:screenShake .4s ease-out}`
-    : `#main.screen-shake{animation:screenShake .3s ease-out}`;
-  document.head.appendChild(style);
+  const style = _getShakeStyle();
+  // 通过修改textContent控制动画时长，无需创建新标签
+  style.textContent = `#main.screen-shake{animation:screenShake ${intensity > 1 ? '.4' : '.3'}s ease-out}`;
+  main.classList.remove("screen-shake");
+  void main.offsetWidth; // 强制回流以重启动画
   main.classList.add("screen-shake");
-  setTimeout(() => {
-    main.classList.remove("screen-shake");
-    style.remove();
-  }, intensity > 1 ? 400 : 300);
 }
 
 // ===== 战斗竞技场动画 =====

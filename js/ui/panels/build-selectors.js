@@ -69,7 +69,7 @@ export function buildClassSelect(onPick, gridId) {
   Object.values(classes).forEach(function(c) {
     const div = document.createElement("div"); div.className = "card";
     const locked = !unlocked.includes(c.id);
-    var portraitFile = 'portrait_' + c.id + '.jpg';
+    var portraitFile = 'portrait_' + c.id + '.webp';
     div.innerHTML = '<div style="width:80px;height:80px;border-radius:50%;overflow:hidden;margin:0 auto 8px;border:2px solid ' + (locked ? '#333' : '#c8a8ff') + '"><img src="img/' + portraitFile + '" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display=\'none\'"></div><div class="icon" style="font-size:20px">' + c.icon + '</div><div class="name">' + c.name + (locked ? ' 🔒' : '') + '</div><div class="desc">' + c.desc + '</div>';
     if (!locked) div.onclick = function() { onPick(c); }; else div.style.opacity = "0.4";
     grid.appendChild(div);

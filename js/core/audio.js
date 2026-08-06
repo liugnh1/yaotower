@@ -32,7 +32,7 @@ function _loadMusic(name, loop) {
   var audio = new Audio();
   audio.loop = (loop !== false);
   audio.volume = _musicVolume;
-  audio.preload = 'auto';
+  audio.preload = 'none';
   audio.src = MUSIC_DIR + name + '.' + MUSIC_EXT;
   audio.addEventListener('error', function() {
     _musicAvailable = false;

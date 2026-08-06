@@ -11,7 +11,7 @@ import { animPlayerAttack, animPlayerCrit, animEnemyAttack, showBossNarrative, b
 
 let _onWin = null, _onOver = null, _autoTimer = null;
 export function setCB(w, o) { _onWin = w; _onOver = o; }
-export function clearAuto() { if (_autoTimer) { clearInterval(_autoTimer); _autoTimer = null; } }
+export function clearAuto() { if (_autoTimer) { clearTimeout(_autoTimer); _autoTimer = null; } }
 
 // v0.81: 符文战斗效果 — 从 Game.meta.dungeon.forge.runes 读取
 function applyRuneFlags(p) {
@@ -29,10 +29,13 @@ function startAutoLoop() {
   const s = Game.state;
   if (!s || !s.auto || s.gameOver) return;
   var spd = s._turboMode ? 175 : (s._speedMode ? 350 : 700);
-  _autoTimer = setInterval(function() {
+  // v0.82: 递归setTimeout替代setInterval，避免回调堆积
+  function tick() {
     if ((!s.auto && !s._speedMode && !s._turboMode) || s.gameOver) { clearAuto(); return; }
     try { autoLoop(); } catch(e) { console.error(e); }
-  }, spd);
+    _autoTimer = setTimeout(tick, spd);
+  }
+  _autoTimer = setTimeout(tick, spd);
 }
 
 // ---- 能量/行动管理 ----
@@ -84,6 +87,16 @@ export function startBattle(type) {
   s._interrupted = false; s._comboCount = 0; s._lastTarget = null;
   s._lastCrit = false; s._iceNext = false; s._shadowCounter = false;
   s._keystoneFiredThisBattle = false; // v0.50 天赋大点特效每战首次
+  // v0.82: 预计算装备战斗效果，避免calcDmg每次attack做O(n) equip扫描
+  if (s.player) {
+    s.player._execEquip = 0; s.player._chaosEquip = 0;
+    for (var _ei = 0; _ei < s.equip.length; _ei++) {
+      var _fx = s.equip[_ei]._combatEffect;
+      if (!_fx) continue;
+      if (_fx.type === 'executioner') s.player._execEquip = _fx.value || 0.25;
+      if (_fx.type === 'chaos') s.player._chaosEquip = _fx.value || 0.3;
+    }
+  }
   // 能量系统初始化
   if (s.player) { s.player.energy = s.player.maxEnergy || MAX_ENERGY; }
   // v0.81: 符文战斗效果 — 从 dungeon.forge.runes 读取并设置标记
@@ -823,9 +836,8 @@ function calcDmg(sk, targetEnemy) {
   else if (sk && sk.mul) dmg = Math.floor(dmg * sk.mul);
   dmg = Math.max(dmg, Math.floor(atk * 0.15));
   if (s.nextBoost > 0) { dmg = Math.floor(dmg * (1 + s.nextBoost)); }
-  // 装备前缀：处刑者（低血+25%伤害）
-  const execEq = s.equip.find(q => q._combatEffect && q._combatEffect.type === "executioner");
-  if (execEq && e.hp < e.maxHp * 0.3) dmg = Math.floor(dmg * (1 + execEq._combatEffect.value));
+  // 装备前缀：处刑者（低血+25%伤害）— v0.82: 预计算标记
+  if (p._execEquip && e.hp < e.maxHp * 0.3) dmg = Math.floor(dmg * (1 + p._execEquip));
   // 遗物：死亡标记（对低血+50%伤害）
   if (p._deathMark && e.hp < e.maxHp * 0.35) dmg = Math.floor(dmg * 1.5);
   // v0.51: reaper羁绊 — 对低血敌人+80%
@@ -859,9 +871,8 @@ function calcDmg(sk, targetEnemy) {
   if (p._desertNext && !isSkill) { dmg = Math.floor(dmg * 1.5); p._desertNext = false; }
   // v0.51: brand — 闪避后下次攻击ATK+30%（直接乘算dmg，避免丢失前置加成）
   if (p._brandDodgeAtkNext && !isSkill) { dmg = Math.floor(dmg * 1.3); p._brandDodgeAtkNext = false; }
-  // 装备前缀：混沌（30%概率+50%）
-  const chaosEq = s.equip.find(q => q._combatEffect && q._combatEffect.type === "chaos");
-  if (chaosEq && s.rng.chance(chaosEq._combatEffect.value)) dmg = Math.floor(dmg * 1.5);
+  // 装备前缀：混沌（30%概率+50%）— v0.82: 预计算标记
+  if (p._chaosEquip && s.rng.chance(p._chaosEquip)) dmg = Math.floor(dmg * 1.5);
   // 【钢盾卫士】普攻伤害-60%，被技能击中后破盾3回合
   if (e._shield) {
     if (sk) { e._shieldBroken = 3; } // 技能击碎护盾

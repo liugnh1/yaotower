@@ -1104,7 +1104,7 @@ function enterRoom() {
       var riskDoor = s.rng.chance(0.30);
       console.log("[妖塔勇者录] 岔路:", roomType, "vs", other, riskDoor ? "(风险门!)" : "");
       const rs = document.getElementById('room-select');
-      if (rs) { var _zid = s.zone ? s.zone.id : 'tower'; var _hasBg = ['plains','forest','cave','ruins','frozen','voidgate','tower','desert','swamp','tower_lower','tower_upper'].indexOf(_zid) >= 0; rs.style.backgroundImage = 'url(\'img/bg-battle-' + (_hasBg ? _zid : 'tower') + '.jpg?v=033\')'; }
+      if (rs) { var _zid = s.zone ? s.zone.id : 'tower'; var _hasBg = ['plains','forest','cave','ruins','frozen','voidgate','tower','desert','swamp','tower_lower','tower_upper'].indexOf(_zid) >= 0; rs.style.backgroundImage = 'url(\'img/bg-battle-' + (_hasBg ? _zid : 'tower') + '.webp?v=033\')'; }
       showRoomFork(roomType, other, riskDoor);
       return;
     }
@@ -1172,8 +1172,8 @@ function updateBattleBg() {
   const s = Game.state;
   const zoneId = s.zone ? s.zone.id : 'plains';
   // v0.70: boss_rush/dungeon等虚拟Zone回退到默认背景
-  var bgFile = 'img/bg-battle-' + zoneId + '.jpg?v=033';
-  var fallbackBg = 'img/bg-battle-tower.jpg?v=033';
+  var bgFile = 'img/bg-battle-' + zoneId + '.webp?v=033';
+  var fallbackBg = 'img/bg-battle-tower.webp?v=033';
   // 已知有背景的Zone列表
   var knownBgs = ['plains','forest','cave','ruins','frozen','voidgate','tower','desert','swamp','tower_lower','tower_upper'];
   if (knownBgs.indexOf(zoneId) === -1) bgFile = fallbackBg;
@@ -1759,6 +1759,17 @@ function doGameClear() {
 }
 
 // ===================== 装备属性管理 =====================
+function _recalcEquipCombatFlags(p, equip) {
+  // 重置
+  p._execEquip = 0; p._chaosEquip = 0;
+  for (var i = 0; i < equip.length; i++) {
+    var fx = equip[i]._combatEffect;
+    if (!fx) continue;
+    if (fx.type === 'executioner') p._execEquip = fx.value || 0.25;
+    if (fx.type === 'chaos') p._chaosEquip = fx.value || 0.3;
+  }
+}
+
 function applyEquipStats(p, eq) {
   switch (eq.stat) {
     case "maxHp": p.maxHp += eq.val; p.hp = Math.min(p.hp + eq.val, p.maxHp); break;
