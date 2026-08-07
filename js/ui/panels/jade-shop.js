@@ -39,8 +39,7 @@ export function showJadeShop() {
   watchBtn.disabled = !Game.canWatchAd();
   watchBtn.onclick = function() {
     if (Game.watchAd()) {
-      meta.jadeSpirits = (meta.jadeSpirits || 0) + 1;
-      Game.saveMeta();
+      Game.addJadeSpirits(1);
       toast('💎 灵玉 +1！当前: ' + meta.jadeSpirits);
       showJadeShop();
     } else {

@@ -91,17 +91,19 @@ export function acquireRelic(rel) {
   // v0.51: 天赋树遗物槽+1
   var maxRelics = 6 + (s.player && s.player._talentRelicSlots ? s.player._talentRelicSlots : 0);
   if (s.relics.length >= maxRelics) {
-    // 如果主界面有选择回调，触发选择面板；否则Fallback自动丢弃最旧的
-    // v0.80: 改为 EventBus 事件，不再用 window._onRelicFull 全局
+    // v0.80: 通知UI面板处理（同步），若面板未打开则自动丢弃最旧的
     Events.emit(E.RELICS_FULL, { relic: rel });
-    return; // 暂停获取，等用户选择
-    // Fallback: 自动丢弃最旧的
-    const old = s.relics[0];
-    if (old && old.onRemove) old.onRemove(s.player);
-    Events.emit(E.RELIC_REMOVED, { relic: old });
-    s.relics.shift();
+    if (s.relics.length >= maxRelics) {
+      // Fallback: UI面板未打开，自动丢弃最旧的遗物
+      const old = s.relics[0];
+      if (old && old.onRemove) old.onRemove(s.player);
+      Events.emit(E.RELIC_REMOVED, { relic: old });
+      s.relics.shift();
+    } else {
+      return; // UI面板已处理替换
+    }
   }
-  if (rel.onAcquire && !rel.applied) { rel.onAcquire(s.player, s); rel.applied = true; }
+  if (rel.onAcquire && !rel._acquired) { rel.onAcquire(s.player, s); rel._acquired = true; }
   if (rel.passive && !rel.applied) { rel.passive(s.player); rel.applied = true; }
   rel.stars = 1;
   s.relics.push(rel);
@@ -120,12 +122,14 @@ export function acquireRelic(rel) {
   Events.emit(E.RELIC_GAINED, { relic: rel });
   // 追踪遗物和羁绊
   var s2 = Game.state;
+  if (!s2._runRelics) s2._runRelics = [];
   if (!s2._runRelics.includes(rel.id)) { s2._runRelics.push(rel.id); }
   // relic_10: 累计发现10种（使用跨局discoveredRelics）
   var discovered = Game.meta.discoveredRelics || [];
   if (discovered.length >= 10) checkAchievement2(s2, "relic_10");
   recheckSynergies();
   const activated = checkSynergies();
+  if (!s2._runSynergies) s2._runSynergies = [];
   activated.forEach(syn => { if (!s2._runSynergies.includes(syn.id)) s2._runSynergies.push(syn.id); if (s2._runSynergies.length >= 4) checkAchievement2(s2, "full_synergy"); });
   activated.forEach(syn => Events.emit(E.BATTLE_START, { type: 'synergy', name: syn.name, desc: syn.desc }));
 }

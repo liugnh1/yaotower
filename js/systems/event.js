@@ -9,6 +9,7 @@ import { addEquip } from './equipment.js';
 // ---- 宝箱 ----
 export function openChest(onResult) {
   const s = Game.state;
+  if (!onResult) return; // v0.82: 防止空回调崩溃
   const roll = s.rng.next();
   // v0.60: 天赋树「丰收」— 宝箱额外奖励
   var chestBonus = (s.player && s.player._talentChestBonus) ? s.player._talentChestBonus : 0;

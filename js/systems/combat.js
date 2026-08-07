@@ -965,8 +965,9 @@ function applyDmg(dmg, skill, targetEnemy, forceCrit) {
   if (p._awakeningPassive === 'monk_avenger' && p._avengerAtk) dmg = Math.floor(dmg * (1 + p._avengerAtk * 0.5 / Math.max(1, p.atk)));
 
   // v0.81: Boss一阶段锁血 — 防止伤害过高直接秒杀跳过二阶段
+  // v0.82 fix: Math.max(0, ...) 确保Boss剩余1HP时不会被秒杀
   if (s._currentRoomType === "boss" && !s._bossPhase2 && e.phase2 && dmg >= e.hp) {
-    dmg = Math.max(1, e.hp - 1); // 强制锁1血
+    dmg = Math.max(0, e.hp - 1); // 强制锁1血（HP=1时不造成伤害）
   }
   s.stats.totalDmg += dmg; e.hp -= dmg;
   if (dmg > 25) playSound("heavyHit");
@@ -1610,12 +1611,7 @@ function strike(dmg, e) {
     e.hp -= th;
     Events.emit(E.PLAYER_DAMAGED, { dmg: th, source: 'thorn', target: 'enemy' });
   }
-  if (e._crystalThorns) {
-    const th = Math.floor(dmg * 0.3);
-    p.hp = Math.max(0, p.hp - th);
-    Events.emit(E.PLAYER_DAMAGED, { dmg: th, source: 'thorn', enemy: e.name });
-    delete e._crystalThorns;
-  }
+  // v0.82: _crystalThorns 由 boss_cave 晶化3层满时设置（见 strike 上方 p._bossCave 逻辑）
 }
 
 // ---- 胜利（含Boss二阶段转换）----

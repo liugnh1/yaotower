@@ -22,7 +22,8 @@ var SLOT_POSITIONS = {
   medal:      { col:2, row:6 },
 };
 
-export function showEquipDoll() {
+export function showEquipDoll(showSmithy) {
+  if (showSmithy === undefined) showSmithy = true;
   var meta = Game.meta;
   if (!meta.outgameEquipped) meta.outgameEquipped = {};
   if (!meta.outgameEquip) meta.outgameEquip = [];
@@ -153,13 +154,13 @@ export function showEquipDoll() {
   // === 底部按钮 ===
   var btnRow = document.createElement('div');
   btnRow.style.cssText = 'display:flex;gap:6px;margin-top:8px';
+  var smithyBtnHTML = showSmithy ? '<button class="modal-btn" style="flex:1;font-size:11px;background:#2a1a0a;border-color:#8a6030;color:#ffcc88" id="btn-open-smithy">🎲 铁匠铺</button>' : '';
   btnRow.innerHTML = '<button class="modal-btn" style="flex:1;font-size:11px" id="btn-open-bag">📦 背包(' + meta.outgameEquip.length + ')</button>' +
-    '<button class="modal-btn" style="flex:1;font-size:11px;background:#2a1a0a;border-color:#8a6030;color:#ffcc88" id="btn-open-smithy">🎲 铁匠铺</button>' +
+    smithyBtnHTML +
     '<button class="modal-btn" style="flex:1;font-size:11px" id="btn-close-doll">关闭</button>';
   content.appendChild(btnRow);
 
   document.getElementById('btn-open-bag').onclick = function() { showEquipBag(null, null); };
-  document.getElementById('btn-open-smithy').onclick = function() { el.style.display='none'; openSmithyPanel(); };
-  document.getElementById('btn-close-doll').onclick = function() { el.style.display = 'none'; };
+  if (showSmithy) document.getElementById('btn-open-smithy').onclick = function() { el.style.display='none'; openSmithyPanel(); };
   document.getElementById('btn-close-doll').onclick = function() { el.style.display = 'none'; };
 }

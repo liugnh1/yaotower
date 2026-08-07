@@ -62,4 +62,7 @@ export const E = {
   EQUIP_DISCARD:   'equip:discard',
   RELICS_FULL:     'relics:full',
   SHOW_ACH_PANEL:  'ui:showAchPanel',
+  // v0.83: 深渊裂隙
+  DUNGEON_ENTER:   'dungeon:enter',
+  TOWER_START:     'tower:start',
 };

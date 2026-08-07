@@ -1,6 +1,7 @@
 // ===================== 装备工具函数 v0.80 =====================
 // 从 main.js 提取，替代 window._addEquip 全局变量
 import { Game } from '../core/state.js';
+import { E, Events } from '../core/event-bus.js';
 import * as Combat from './combat.js';
 import { playSound } from '../core/audio.js';
 import { log, toast } from '../ui/effects.js';
@@ -71,14 +72,16 @@ export function getEquipLimit(s) {
 export function addEquip(eq, trackQuestFn, onFull) {
   var s = Game.state;
   if (s.equip.length >= getEquipLimit(s)) {
-    if (onFull) { onFull(eq); }
-    else { s.equip.push(eq); applyEquipStats(s.player, eq); Combat.recalcEquipSetBonus(); Game.sync(); }
-  } else {
-    s.equip.push(eq);
-    applyEquipStats(s.player, eq);
-    playSound("equip");
-    log(eq.icon + ' <span style="color:' + eq.color + '"><b>' + (eq.fullName||eq.name) + '</b></span> 已装备！' + eq.stat.toUpperCase() + '+' + eq.val, "win");
-    if (trackQuestFn) trackQuestFn('equip', 1);
-    Combat.recalcEquipSetBonus(); Game.sync();
+    if (onFull) { onFull(eq); return; }
+    // v0.82: 无回调时兜底 — 丢弃最旧装备
+    var oldest = s.equip.shift();
+    if (oldest) removeEquipStats(s.player, oldest);
+    Events.emit(E.EQUIP_DISCARD, { index: 0 });
   }
+  s.equip.push(eq);
+  applyEquipStats(s.player, eq);
+  playSound("equip");
+  Combat.recalcEquipSetBonus(); Game.sync();
+  log(eq.icon + ' <span style="color:' + eq.color + '"><b>' + (eq.fullName||eq.name) + '</b></span> 已装备！' + eq.stat.toUpperCase() + '+' + eq.val, "win");
+  if (trackQuestFn) trackQuestFn('equip', 1);
 }

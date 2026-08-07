@@ -515,6 +515,65 @@ body{background:var(--bg-deep);color:var(--t1);display:flex;justify-content:cent
 .city-back-btn:hover{background:rgba(40,30,60,.9);color:#c8a8ff}
 #city-resources{margin-top:3px;min-height:16px;position:relative;z-index:1;font-size:clamp(10px,2.5vw,12px)}
 
+/* ===================== 深渊裂隙 ===================== */
+#dungeon-hub{min-height:100vh;min-height:100dvh;background:linear-gradient(170deg,#06060f 0%,#0a0818 20%,#0c0a1e 40%,#0a0818 60%,#080618 80%,#040410 100%);padding:clamp(6px,2vw,12px);text-align:center;position:relative;overflow-y:auto}
+#dungeon-hub:before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background:
+  radial-gradient(ellipse at 20% 30%,rgba(60,20,80,.15) 0%,transparent 50%),
+  radial-gradient(ellipse at 80% 70%,rgba(100,30,140,.10) 0%,transparent 50%),
+  radial-gradient(ellipse at 50% 90%,rgba(20,180,200,.06) 0%,transparent 40%);
+  pointer-events:none;z-index:0}
+/* 裂隙粒子动画 */
+#dungeon-hub:after{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background:
+  radial-gradient(1px 1px at 15% 25%,rgba(180,140,255,.6),transparent),
+  radial-gradient(1px 1px at 35% 55%,rgba(140,180,220,.4),transparent),
+  radial-gradient(1px 1px at 55% 15%,rgba(100,200,200,.5),transparent),
+  radial-gradient(1px 1px at 70% 65%,rgba(170,140,255,.5),transparent),
+  radial-gradient(1px 1px at 85% 35%,rgba(140,200,220,.4),transparent),
+  radial-gradient(1.5px 1.5px at 25% 80%,rgba(180,160,255,.7),transparent),
+  radial-gradient(1px 1px at 60% 45%,rgba(100,200,200,.4),transparent),
+  radial-gradient(1.5px 1.5px at 90% 80%,rgba(170,150,230,.6),transparent);
+  pointer-events:none;z-index:0;animation:riftParticles 8s ease-in-out infinite alternate}
+@keyframes riftParticles{0%{opacity:.5;transform:translateY(0)}100%{opacity:1;transform:translateY(-4px)}}
+.rift-header{margin-bottom:clamp(8px,2vw,14px);position:relative;z-index:1;background:rgba(8,6,18,.8);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(100,60,180,.25);border-radius:10px;padding:8px 12px;display:inline-block}
+.rift-header h2{color:#c0a0f0;font-size:clamp(17px,5vw,22px);margin:2px 0;text-shadow:0 0 12px rgba(160,120,220,.5)}
+.rift-resources{margin-top:3px;color:#8899bb;font-size:clamp(10px,2.5vw,12px);position:relative;z-index:1}
+.rift-resources b{color:#ffa502}
+.rift-body{display:flex;gap:10px;max-width:520px;margin:0 auto;position:relative;z-index:1;flex-wrap:wrap}
+.rift-main{flex:1 1 280px;min-width:0}
+.rift-side{flex:0 0 160px;display:flex;flex-direction:column;gap:6px}
+.rift-section-title{color:#7a6aaa;font-size:11px;font-weight:bold;text-align:left;padding:4px 0;border-bottom:1px solid rgba(100,60,160,.2);letter-spacing:2px}
+/* 副本卡片网格 */
+.rift-dungeon-grid{display:flex;flex-direction:column;gap:5px}
+.rift-dungeon-card{display:flex;align-items:center;gap:8px;padding:10px 12px;background:rgba(10,8,20,.8);border:1px solid rgba(80,40,130,.2);border-radius:8px;cursor:pointer;transition:all .2s;text-align:left;position:relative;overflow:hidden}
+.rift-dungeon-card:hover{transform:translateX(2px);border-color:rgba(140,100,220,.5);box-shadow:0 2px 16px rgba(100,40,200,.15)}
+.rift-dungeon-card:active{transform:scale(.98)}
+.rift-dungeon-card.locked{opacity:.45;cursor:not-allowed;filter:grayscale(.6)}
+.rift-dungeon-card.locked:hover{transform:none;border-color:rgba(40,30,60,.3);box-shadow:none}
+.rift-dg-icon{font-size:28px;flex-shrink:0;width:36px;text-align:center}
+.rift-dg-info{flex:1;min-width:0}
+.rift-dg-name{color:#d0c0f0;font-size:13px;font-weight:bold}
+.rift-dg-material{color:#7a6aaa;font-size:10px;margin-top:1px}
+.rift-dg-meta{text-align:right;flex-shrink:0}
+.rift-dg-floors{color:#5a4a7a;font-size:10px}
+.rift-dg-clears{color:#ffa502;font-size:10px}
+.rift-dg-lock{color:#4a3a5a;font-size:10px}
+/* 已选中的副本高亮 */
+.rift-dungeon-card.selected{border-color:rgba(180,140,255,.7);box-shadow:0 0 20px rgba(100,40,200,.25);background:rgba(15,10,35,.9)}
+/* 侧边功能卡片 */
+.rift-side-cards{display:flex;flex-direction:column;gap:4px}
+.rift-func-btn{display:flex;align-items:center;gap:6px;padding:10px;background:rgba(10,8,20,.8);border:1px solid rgba(80,40,130,.2);border-radius:8px;cursor:pointer;transition:all .2s;text-align:left;color:#c0b0e0;font-size:12px;font-weight:bold}
+.rift-func-btn:hover{background:rgba(20,16,40,.9);border-color:rgba(140,100,220,.4);box-shadow:0 2px 12px rgba(100,40,200,.12)}
+.rift-func-btn .btn-icon{font-size:18px;width:24px;text-align:center}
+.rift-func-btn.forge{border-color:rgba(200,140,40,.25);color:#ffcc88}
+.rift-func-btn.forge:hover{border-color:rgba(200,140,40,.5);box-shadow:0 2px 12px rgba(200,140,40,.2)}
+.rift-func-btn.tower{border-color:rgba(160,60,200,.25);color:#c8a8ff}
+.rift-func-btn.tower:hover{border-color:rgba(160,60,200,.5);box-shadow:0 2px 12px rgba(160,60,200,.2)}
+/* Boss印记收集 */
+.rift-boss-marks{display:flex;flex-wrap:wrap;gap:4px}
+.rift-boss-mark{width:32px;height:32px;border-radius:50%;background:rgba(10,8,18,.8);border:2px solid rgba(60,40,100,.3);display:flex;align-items:center;justify-content:center;font-size:14px;transition:all .3s}
+.rift-boss-mark.earned{border-color:rgba(255,165,2,.6);background:rgba(30,20,10,.8);box-shadow:0 0 8px rgba(255,165,2,.3);animation:markEarned 2s ease-in-out infinite}
+@keyframes markEarned{0%,100%{box-shadow:0 0 6px rgba(255,165,2,.25)}50%{box-shadow:0 0 14px rgba(255,165,2,.5)}}
+
 /* ===================== 结局动画 ===================== */
 #ending-screen{display:none;position:fixed;top:0;left:0;width:100%;height:100%;z-index:12000;cursor:pointer;flex-direction:column;align-items:center;justify-content:center}
 #ending-bg{position:absolute;top:0;left:0;width:100%;height:100%;background:radial-gradient(ellipse at center,#0a0a1a 0%,#000 80%)}
@@ -601,6 +660,12 @@ body{background:var(--bg-deep);color:var(--t1);display:flex;justify-content:cent
   .tome-btn-name{font-size:var(--fs-md)}
   .page-title{font-size:var(--fs-h6)}
   #compendium h3,.modal h3{font-size:var(--fs-h4)}
+  /* 裂隙移动端：侧边栏收窄 */
+  .rift-body{flex-direction:column}
+  .rift-side{flex:1 1 auto;flex-direction:row;flex-wrap:wrap;gap:4px}
+  .rift-side-cards{flex-direction:row;flex:1}
+  .rift-func-btn{flex:1;min-width:80px;font-size:10px;justify-content:center}
+  .rift-boss-marks{flex:1;justify-content:flex-end}
 }
 @media(max-width:340px){
   .big-btn{font-size:var(--fs-md);padding:12px 0;min-height:42px}

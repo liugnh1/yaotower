@@ -1,7 +1,7 @@
 // ===================== 屏幕/弹窗切换 =====================
 import { playMusic } from '../core/audio.js';
 
-export const SCREENS = ["start","city-hub","difficulty-select","class-select","skill-select","talent-select","hunt-select","zone-select","room-select","main","gameover"];
+export const SCREENS = ["start","city-hub","dungeon-hub","difficulty-select","class-select","skill-select","talent-select","hunt-select","zone-select","room-select","main","gameover"];
 export const MODALS = ["reward","shop","event","endless-choice","potion-modal","daily-panel","daily-checkin","leaderboard","compendium","tap-lb-panel","tap-cloud-panel","skill-popup"];
 
 var _modalStack = [];

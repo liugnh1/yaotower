@@ -75,6 +75,7 @@ export function initBossRush() {
     else              pool = endPool;
     s._bossRushQueue.push(rng.pick(pool));
   }
+  s.bossRushIndex = 0; // v0.82: 初始化索引，防止 undefined 访问崩溃
   s._bossRushHP = s.player.hp;
   s.zoneIndex = 0;
   showBossNarrative([

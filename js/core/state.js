@@ -2,12 +2,87 @@
 import { RNG } from "./rng.js";
 import { R } from "./registry.js";
 import { E, Events } from "./event-bus.js";
+import { initAntiCheat, trackValue, verifyValue, integrityCheck, checkDebugger, getSessionHash } from "./anti-cheat.js";
 
 const SAVE_KEY = "yaotower_v3.2_save";
 const SAVE_VERSION = 2; // 存档版本号，改数据结构时递增
 const META_KEY = "yaotower_v3.2_meta";
 const CODEX_KEY = "yaotower_v3.2_codex";
 const LB_KEY   = "yaotower_v3.2_lb";
+
+// ===== v0.82 防作弊存档系统 =====
+const SLOT_COUNT = 3; // 手动存档槽位数
+const SLOT_PREFIX = "ytower_slot_";
+const CHECKSUM_KEY = "ytower_cs_";
+// 校验和密钥（混淆分散存储，增加篡改难度）
+function _checksumSalt() {
+  var s = "";
+  s += String.fromCharCode(0x59, 0x54, 0x6f, 0x77, 0x65, 0x72); // "YTower"
+  s += "_" + SAVE_VERSION + "_";
+  s += String.fromCharCode(0x78, 0x39, 0x6d, 0x5a, 0x32, 0x70, 0x4c); // "x9mZ2pL"
+  return s;
+}
+function computeChecksum(data) {
+  var str = JSON.stringify(data);
+  var salted = str + _checksumSalt();
+  var hash = 5381;
+  for (var i = 0; i < salted.length; i++) {
+    hash = ((hash << 5) + hash) + salted.charCodeAt(i);
+    hash = hash | 0; // 32位整数
+  }
+  // 二次混合防止碰撞
+  var hash2 = 0x811c9dc5;
+  for (var j = salted.length - 1; j >= 0; j--) {
+    hash2 = (hash2 ^ salted.charCodeAt(j)) * 0x01000193;
+    hash2 = hash2 | 0;
+  }
+  return (hash >>> 0).toString(36) + "_" + (hash2 >>> 0).toString(36);
+}
+function verifyChecksum(data, checksum) {
+  if (!checksum || typeof checksum !== 'string') return false;
+  return computeChecksum(data) === checksum;
+}
+
+// 存档槽位数据结构: { version, timestamp, floor, className, metaChecksum, meta, saveChecksum, save }
+function _packSlotData(meta, save, floor, className) {
+  var metaStr = JSON.stringify(meta);
+  var saveStr = save || "";
+  return {
+    version: SAVE_VERSION,
+    timestamp: Date.now(),
+    floor: floor || 0,
+    className: className || "",
+    meta: metaStr,
+    save: saveStr,
+    metaCS: computeChecksum(metaStr),
+    saveCS: computeChecksum(saveStr || "empty"),
+    _globalCS: computeChecksum(metaStr + "|" + (saveStr || "empty") + "|" + (floor || 0))
+  };
+}
+function _unpackSlotData(packed) {
+  if (!packed || packed.version !== SAVE_VERSION) return null;
+  // 全局校验
+  var combined = (packed.meta || "") + "|" + (packed.save || "empty") + "|" + (packed.floor || 0);
+  if (!verifyChecksum(combined, packed._globalCS)) {
+    console.warn("[妖塔勇者录] 存档校验失败 — 数据可能被篡改");
+    return null;
+  }
+  // 分段校验
+  if (!verifyChecksum(packed.meta || "", packed.metaCS)) return null;
+  if (!verifyChecksum(packed.save || "empty", packed.saveCS)) return null;
+  try {
+    return {
+      meta: JSON.parse(packed.meta),
+      save: packed.save ? JSON.parse(packed.save) : null,
+      floor: packed.floor || 0,
+      className: packed.className || "",
+      timestamp: packed.timestamp || 0
+    };
+  } catch(e) {
+    console.warn("[妖塔勇者录] 存档JSON解析失败");
+    return null;
+  }
+}
 
 let _render = null;
 let _renderPending = false;
@@ -36,6 +111,8 @@ function deepMergeMeta(defaults, parsed) {
         out[k] = deepMergeMeta(dv, pv);
       } else if (pv === undefined || pv === null || (typeof dv === 'number' && (typeof pv !== 'number' || isNaN(pv)))) {
         out[k] = dv; // 无效值回退默认
+      } else if (dv && typeof dv === 'object' && !Array.isArray(dv) && (typeof pv !== 'object' || Array.isArray(pv))) {
+        out[k] = dv; // v0.82: falsy/非对象值覆盖对象默认时，保留默认
       } else {
         out[k] = pv;
       }
@@ -251,11 +328,98 @@ const LB_CULTIVATE_KEY = "yaotower_v3.2_lb_culti";
 export const Game = {
   state: defState(),
   meta: defMeta(),
+  _cheatDetected: false,
+  _cheatViolations: 0,
 
-  init() { this._loadMeta(); this._loadCodex(); },
+  init() {
+    this._loadMeta(); this._loadCodex();
+    initAntiCheat();
+    this._trackAllMeta();
+    this._startIntegrityMonitor();
+    // v0.82: 存档签名绑定会话，防止跨会话复制存档
+    this.meta._sessionHash = getSessionHash();
+  },
 
-  set(u) { if (u) Object.assign(this.state, u); this.save(); _scheduleRender(this.state); },
-  sync() { this.save(); _scheduleRender(this.state); },
+  set(u) {
+    if (u) Object.assign(this.state, u);
+    this.save();
+    // 跟踪关键值变更
+    if (this.state.gold != null) trackValue('gold', this.state.gold);
+    if (this.state.player && this.state.player.atk != null) trackValue('player_atk', this.state.player.atk);
+    _scheduleRender(this.state);
+  },
+  sync() {
+    this.save();
+    // v0.82: 每次同步时追踪关键值（覆盖直接赋值+sync路径）
+    if (this.state.gold != null) trackValue('gold', this.state.gold);
+    if (this.state.player && this.state.player.atk != null) trackValue('player_atk', this.state.player.atk);
+    _scheduleRender(this.state);
+  },
+
+  // v0.82: 同步所有meta值到反作弊影子
+  _trackAllMeta() {
+    var m = this.meta;
+    if (!m) return;
+    trackValue('essence', m.essence || 0);
+    trackValue('souls', m.souls || 0);
+    trackValue('stones', m.stones || 0);
+    trackValue('forgeStones', m.forgeStones || 0);
+    trackValue('materials', m.materials || 0);
+    trackValue('jadeSpirits', m.jadeSpirits || 0);
+  },
+
+  // v0.82: 启动完整性巡检（每15秒）
+  _startIntegrityMonitor() {
+    var self = this;
+    this._integrityTimer = setInterval(function() {
+      var issues = integrityCheck(self.state, self.meta);
+      if (issues.length > 0) {
+        self._cheatViolations++;
+        console.warn('[反作弊] 巡检发现问题:', issues.join(', '));
+        // 自动修复：回滚被篡改的值到最近的合法值
+        if (issues.some(function(i) { return i.indexOf('shadow_mismatch') >= 0 || i.indexOf('value_mismatch') >= 0; })) {
+          self._rollbackTamperedValues();
+        }
+        // DevTools持续检测
+        if (checkDebugger()) {
+          self._cheatViolations++;
+        }
+        // 达到阈值：标记存档
+        if (self._cheatViolations >= 5) {
+          if (!self._cheatDetected) {
+            self._cheatDetected = true;
+            self.meta._cheatFlag = true;
+            self.saveMeta();
+            console.error('[反作弊] 多次违规，存档已标记');
+          }
+        }
+      }
+    }, 15000);
+  },
+
+  // v0.82: 回滚被篡改的值
+  _rollbackTamperedValues() {
+    // 简单策略：从localStorage重载meta（上次合法保存的版本）
+    try {
+      var raw = localStorage.getItem(META_KEY);
+      if (raw) {
+        var saved = JSON.parse(raw);
+        var defaults = defMeta();
+        this.meta = deepMergeMeta(defaults, saved);
+        this._trackAllMeta();
+        console.warn('[反作弊] 已回滚meta到上次合法存档');
+      }
+    } catch(e) {}
+    // 游戏状态回滚：从自动存档重载
+    try {
+      var autoSave = localStorage.getItem(SAVE_KEY);
+      if (autoSave && this.state.gameOver === false) {
+        // 只在游戏进行中时重载（避免覆盖结算）
+        // 实际回滚太复杂，标记+警告为主
+        console.warn('[反作弊] 游戏状态异常，请检查');
+      }
+    } catch(e2) {}
+  },
 
   // ---- 存档 ----
   save() {
@@ -381,7 +545,7 @@ export const Game = {
     }
   },
 
-  // v0.50 存档导出/导入
+  // v0.50 存档导出/导入（保留兼容）
   exportMeta() { try { return JSON.stringify(this.meta, null, 2); } catch(e) { return null; } },
   importMeta(json) {
     try { var d = JSON.parse(json); if (!d || typeof d !== 'object') return false; this.meta = deepMergeMeta(defMeta(), d); this.saveMeta(); return true; }
@@ -390,17 +554,84 @@ export const Game = {
   exportSave() { try { return localStorage.getItem(SAVE_KEY); } catch(e) { return null; } },
   importSave(raw) { try { localStorage.setItem(SAVE_KEY, raw); return true; } catch(e) { return false; } },
 
-  addEssence(n) { if (!this.meta) return; this.meta.essence = Math.min((this.meta.essence || 0) + n, 999); this.saveMeta(); },
+  // ===== v0.82 防作弊存档槽位系统 =====
+  /** 保存当前游戏到指定槽位 */
+  saveToSlot(slotIndex) {
+    if (slotIndex < 0 || slotIndex >= SLOT_COUNT) return false;
+    var s = this.state;
+    var metaClone = JSON.parse(JSON.stringify(this.meta)); // 深拷贝防引用
+    var saveRaw = localStorage.getItem(SAVE_KEY); // 当前自动存档数据
+    var floor = s.totalFloor || 0;
+    var className = s.playerClass ? s.playerClass.name : "";
+    var packed = _packSlotData(metaClone, saveRaw, floor, className);
+    try {
+      localStorage.setItem(SLOT_PREFIX + slotIndex, JSON.stringify(packed));
+      return true;
+    } catch(e) { console.error("[妖塔勇者录] 保存槽位失败", e); return false; }
+  },
+  /** 从指定槽位读取存档 */
+  loadFromSlot(slotIndex) {
+    if (slotIndex < 0 || slotIndex >= SLOT_COUNT) return null;
+    try {
+      var raw = localStorage.getItem(SLOT_PREFIX + slotIndex);
+      if (!raw) return null;
+      var packed = JSON.parse(raw);
+      var data = _unpackSlotData(packed);
+      if (!data) {
+        console.warn("[妖塔勇者录] 槽位" + slotIndex + "校验失败，存档已损坏或被篡改");
+        return { error: "checksum_failed" };
+      }
+      return data;
+    } catch(e) { console.error("[妖塔勇者录] 读取槽位失败", e); return null; }
+  },
+  /** 获取槽位摘要信息（不加载数据，供UI展示） */
+  getSlotInfo(slotIndex) {
+    if (slotIndex < 0 || slotIndex >= SLOT_COUNT) return null;
+    try {
+      var raw = localStorage.getItem(SLOT_PREFIX + slotIndex);
+      if (!raw) return { empty: true };
+      var packed = JSON.parse(raw);
+      return {
+        empty: false,
+        floor: packed.floor || 0,
+        className: packed.className || "",
+        timestamp: packed.timestamp || 0,
+        valid: verifyChecksum((packed.meta || "") + "|" + (packed.save || "empty") + "|" + (packed.floor || 0), packed._globalCS)
+      };
+    } catch(e) { return { empty: true, error: true }; }
+  },
+  /** 删除指定槽位 */
+  deleteSlot(slotIndex) {
+    if (slotIndex < 0 || slotIndex >= SLOT_COUNT) return;
+    localStorage.removeItem(SLOT_PREFIX + slotIndex);
+  },
+  /** 应用槽位数据到当前游戏 */
+  applySlotData(data) {
+    if (!data || !data.meta) return false;
+    // 恢复元数据
+    this.meta = deepMergeMeta(defMeta(), data.meta);
+    this.saveMeta();
+    // 恢复游戏存档
+    if (data.save) {
+      localStorage.setItem(SAVE_KEY, JSON.stringify(data.save));
+    } else {
+      localStorage.removeItem(SAVE_KEY);
+    }
+    return true;
+  },
+
+  addEssence(n) { if (!this.meta) return; this.meta.essence = Math.min((this.meta.essence || 0) + n, 999); trackValue('essence', this.meta.essence); this.saveMeta(); },
   getEssence() { return this.meta.essence || 0; },
-  addSouls(n) { if (!this.meta) return; this.meta.souls = Math.min((this.meta.souls || 0) + n, 9999); this.saveMeta(); },
-  addStones(n) { if (!this.meta) return; this.meta.stones = Math.min((this.meta.stones || 0) + n, 9999); this.saveMeta(); },
+  addSouls(n) { if (!this.meta) return; this.meta.souls = Math.min((this.meta.souls || 0) + n, 9999); trackValue('souls', this.meta.souls); this.saveMeta(); },
+  addStones(n) { if (!this.meta) return; this.meta.stones = Math.min((this.meta.stones || 0) + n, 9999); trackValue('stones', this.meta.stones); this.saveMeta(); },
   // v0.50 P2: 灵石兑换魂晶 (10:1)
   exchangeStonesForSouls() { if (!this.meta) return false; if ((this.meta.stones || 0) < 10) return false; this.meta.stones -= 10; this.meta.souls = Math.min((this.meta.souls || 0) + 1, 9999); this.saveMeta(); return true; },
   // v0.50 P2: 训练场升级（消耗灵石永久+属性）
   getTrainingLevel() { return this.meta.trainingLevel || 0; },
   upgradeTraining() { if (!this.meta) return false; var lv = this.meta.trainingLevel || 0; if (lv >= 5) return false; var costs = [0, 10, 25, 50, 80, 120]; if ((this.meta.stones || 0) < costs[lv + 1]) return false; this.meta.stones -= costs[lv + 1]; this.meta.trainingLevel = (lv || 0) + 1; this.saveMeta(); return true; },
-  addForgeStones(n) { if (!this.meta) return; this.meta.forgeStones = Math.min((this.meta.forgeStones || 0) + n, 999); this.saveMeta(); },
-  addMaterials(n) { if (!this.meta) return; this.meta.materials = Math.min((this.meta.materials || 0) + n, 999); this.saveMeta(); },
+  addForgeStones(n) { if (!this.meta) return; this.meta.forgeStones = Math.min((this.meta.forgeStones || 0) + n, 999); trackValue('forgeStones', this.meta.forgeStones); this.saveMeta(); },
+  addMaterials(n) { if (!this.meta) return; this.meta.materials = Math.min((this.meta.materials || 0) + n, 999); trackValue('materials', this.meta.materials); this.saveMeta(); },
+  addJadeSpirits(n) { if (!this.meta) return; this.meta.jadeSpirits = Math.min((this.meta.jadeSpirits || 0) + n, 999); trackValue('jadeSpirits', this.meta.jadeSpirits); this.saveMeta(); },
 
   // ---- 天赋树 ----
   hasTalentNode(nodeId) { return (this.meta.talentNodes || []).includes(nodeId); },
@@ -1008,7 +1239,7 @@ export const Game = {
       localStorage.removeItem(CODEX_KEY);
       localStorage.removeItem(LB_KEY);
       this.state.codex = {}; // 同步清空内存图鉴
-      try { import('../platform/tapsave.js').then(function(m) { m.TapSave.clearCloud(); }); } catch(e) {}
+      import('../platform/tapsave.js').then(function(m) { m.TapSave.clearCloud(); }).catch(function() {});
     }
     this.state._appliedMutations = [];
     this.state.huntTargets = [];
