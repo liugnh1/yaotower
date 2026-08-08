@@ -5,10 +5,11 @@ import { E, Events } from '../core/event-bus.js';
 import { showBossNarrative } from '../ui/effects.js';
 
 // 根据难度获取路由choices
+// v0.85: 修复难度递进变体路由断裂 — 用 startsWith 匹配（casual_1..3 / standard_1..3 曾误入炼狱分支）
 function getChoices(entry, diff) {
   if (!entry) return [];
-  if (diff === 'casual' || diff === 'simple') return entry.choices_simple || entry.choices || [];
-  if (diff === 'standard') return entry.choices_standard || entry.choices || [];
+  if (diff === 'casual' || diff === 'simple' || (diff && diff.startsWith('casual'))) return entry.choices_simple || entry.choices || [];
+  if (diff === 'standard' || (diff && diff.startsWith('standard'))) return entry.choices_standard || entry.choices || [];
   return entry.choices_hell || entry.choices || [];
 }
 
@@ -28,7 +29,7 @@ export function initZone(zoneId) {
     switch (s._zoneMod.id) {
       case "cave_gold": s.player.def += 2; break; // 还原DEF
       case "tower_regen": s.player.regen = Math.max(0, (s.player.regen || 0) - Math.floor(s.player.maxHp * 0.03)); break;
-      case "tower_lower_drain": s.player.atk = Math.floor(s.player.atk / 1.2); break; // 还原+20%ATK
+      case "tower_lower_drain": break; // v0.85: 还原已移至 startBattle（防双重还原）
       case "frozen_mp": /* MP系统已移除，无实际效果 */ break;
       case "void_crit": /* 每场战斗重新计算，无需还原 */ break;
       case "desert_storm": /* 每场战斗重新计算 */ break;
@@ -126,9 +127,9 @@ export function checkZoneEnding() {
 
 export function getZoneEndingReward(endingType) {
   switch (endingType) {
-    case 'war': return { memoryFragments: 2, text: '⚔️ 战狂结局：血路杀出，回忆碎片+2' };
-    case 'sacrifice': return { memoryFragments: 1, materials: 5, text: '💀 献祭结局：以代价换取力量，碎片+1 素材+5' };
-    case 'perfect': return { memoryFragments: 5, essence: 10, text: '✨ 完美结局：智慧与勇气的结晶，碎片+5 灵蕴+10' };
+    case 'war': return { essence: 2, text: '⚔️ 战狂结局：血路杀出，灵蕴+2' };
+    case 'sacrifice': return { essence: 1, materials: 5, text: '💀 献祭结局：以代价换取力量，灵蕴+1 素材+5' };
+    case 'perfect': return { essence: 15, text: '✨ 完美结局：智慧与勇气的结晶，灵蕴+15' };
     default: return null;
   }
 }

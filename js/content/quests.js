@@ -14,7 +14,7 @@ R.registerAll('dailyQuests', [
   { id: "dq_potion_3",  name: "药水收藏家", desc: "使用3瓶药水",        target: 3,   reward: { essence: 3, souls: 1 }, icon: "🧪" },
   { id: "dq_relic_5",   name: "遗物收集者", desc: "累计获得5个遗物",    target: 5,   reward: { essence: 6, souls: 2 }, icon: "🔮" },
   { id: "dq_equip_5",   name: "装备大师",   desc: "累计装备5件装备",    target: 5,   reward: { essence: 4, souls: 1 }, icon: "🎒" },
-  { id: "dq_curse_cln", name: "诅咒净化",   desc: "清除1个诅咒",        target: 1,   reward: { essence: 5, souls: 2 }, icon: "🧴" },
+  { id: "dq_cleanse_1", name: "诅咒净化",   desc: "清除1个诅咒",        target: 1,   reward: { essence: 5, souls: 2 }, icon: "🧴" },
   { id: "dq_event_3",   name: "命运的抉择", desc: "触发3次随机事件",    target: 3,   reward: { essence: 4, souls: 1 }, icon: "❓" },
 ]);
 

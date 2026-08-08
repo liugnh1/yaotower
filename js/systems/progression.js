@@ -8,10 +8,18 @@ import { R } from '../core/registry.js';
 export function applyMetaBonus(p) { Game.applyMetaBonus(p); }
 
 // ---- 结算灵蕴（替代旧calcTP）----
+// v0.85: 产出×难度系数（简单0.5 / 普通0.8 / 炼狱1.3）— 鼓励高难度，防简单模式刷收益
+export function diffMul() {
+  var s = Game.state;
+  var d = s ? (s.difficulty || 'standard') : 'standard';
+  if (d === 'casual' || (d && d.startsWith('casual'))) return 0.5;
+  if (d === 'hell' || (d && d.startsWith('hell'))) return 1.3;
+  return 0.8;
+}
 export function calcEssence(floor, isWin) {
   const f = (typeof floor === 'number' && !isNaN(floor)) ? floor : 0;
-  if (isWin) return 8 + f;  // 通关: 8 + totalFloor
-  return Math.max(0, Math.floor(f / 5));  // 死亡: floor/5
+  var base = isWin ? (8 + f) : Math.max(0, Math.floor(f / 5));
+  return Math.max(1, Math.floor(base * diffMul()));
 }
 
 // ---- 角色经验结算 ----
@@ -28,18 +36,22 @@ export function getStartPotions() {
 }
 
 // ---- 结算通用素材 ----
+// v0.85: 产出×难度系数
 export function calcMaterials(floor, isBoss) {
   var base = Math.floor(floor / 5);
   if (isBoss) base += 3;
-  return Math.max(0, base);
+  return Math.max(0, Math.floor(base * diffMul()));
 }
 
 // ---- 结算锻造石 ----
+// v0.85: 产出×难度系数（锻造石全经济最紧，系数保证高难度收益）
 export function calcForgeStones(isWin, difficulty, floor) {
-  if (difficulty === 'hell' || (difficulty && difficulty.startsWith('hell'))) return isWin ? 20 : Math.max(0, Math.floor((floor||0) / 10));
-  if (isWin) return 8;
+  var mul = diffMul();
+  if (difficulty === 'hell' || (difficulty && difficulty.startsWith('hell'))) return isWin ? Math.floor(20 * mul) : Math.max(0, Math.floor((floor||0) / 10 * mul));
+  if (isWin) return Math.max(2, Math.floor(8 * mul));
   // v0.60: 死亡≥10层才给少量锻造石，防无限死亡刷收益
   var f = floor || 0;
   if (f < 10) return 0;
-  return Math.min(5, Math.floor(f / 10));
+  // v0.85: 修复 floor 吞加成 — 至少给1（10层+简单难度曾因 floor(0.8)=0 白打）
+  return Math.min(5, Math.max(1, Math.floor(f / 10 * mul)));
 }

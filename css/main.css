@@ -47,7 +47,8 @@ body{background:var(--bg-deep);color:var(--t1);display:flex;justify-content:cent
 #main:not(.hidden){background-color:#0a0a14;background-size:cover;background-position:center;background-repeat:no-repeat}
 
 .hidden{display:none!important}
-.panel{background:url('../img/tile_panel.webp') center/cover,var(--bg-panel);border:none;border-radius:var(--r-sm);padding:16px;margin-bottom:10px}
+/* v0.86: 面板纯CSS深色玻璃（替换木纹图片底图） */
+.panel{background:linear-gradient(165deg,rgba(38,32,60,.94) 0%,rgba(18,15,34,.96) 100%);border:1px solid rgba(150,130,220,.16);border-radius:12px;padding:16px;margin-bottom:10px;box-shadow:0 4px 20px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.04)}
 
 /* ===================== 序幕 ===================== */
 #prologue{display:none;position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;background:#050510;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:opacity .8s}
@@ -344,7 +345,15 @@ body{background:var(--bg-deep);color:var(--t1);display:flex;justify-content:cent
 @keyframes pulse-auto{0%,100%{opacity:.5}50%{opacity:1}}
 
 /* ===================== 弹窗 ===================== */
-.modal{display:none;background:url('../img/tile_panel.webp') center/cover,var(--bg-modal);border-radius:var(--r-xxl);padding:18px;text-align:center;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:90%;max-width:360px;z-index:200;max-height:85vh;overflow-y:auto;border:2px solid rgba(180,150,120,0.25);box-shadow:0 8px 40px rgba(0,0,0,.6)}
+/* v0.86: 纯CSS深色玻璃风格（替换木纹图片底图）+ 移动端适配 */
+.modal{display:none;background:linear-gradient(165deg,rgba(32,28,52,.98) 0%,rgba(16,13,30,.99) 100%);border-radius:16px;padding:16px;text-align:center;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:92%;max-width:380px;z-index:200;max-height:86vh;overflow-y:auto;border:1px solid rgba(150,130,220,.28);box-shadow:0 14px 48px rgba(0,0,0,.75),inset 0 1px 0 rgba(255,255,255,.06)}
+/* 手机小屏：更宽更贴边 */
+@media (max-width:420px){
+  .modal{width:96%;max-width:96%;padding:14px;border-radius:14px}
+}
+/* v0.86: 局外成长类面板 — 温和防撑高（保留各面板自身布局/间距），超高时内容区滚动 */
+#meta-panel{max-height:82vh}
+#meta-panel #meta-content{max-height:calc(82vh - 110px);overflow-y:auto}
 .modal>*{position:relative;z-index:1}
 .modal h3{margin:0 0 14px;font-size:var(--fs-h3)}
 .modal-btn{display:block;width:100%;padding:12px;margin-bottom:8px;border:1px solid #2a2040;background:linear-gradient(180deg,rgba(22,18,36,.95) 0%,rgba(16,12,28,.98) 100%);color:var(--t1);border-radius:var(--r-lg);cursor:pointer;font-size:var(--fs-h6);text-align:left;transition:all .2s;min-height:44px}
@@ -534,15 +543,67 @@ body{background:var(--bg-deep);color:var(--t1);display:flex;justify-content:cent
   radial-gradient(1.5px 1.5px at 90% 80%,rgba(170,150,230,.6),transparent);
   pointer-events:none;z-index:0;animation:riftParticles 8s ease-in-out infinite alternate}
 @keyframes riftParticles{0%{opacity:.5;transform:translateY(0)}100%{opacity:1;transform:translateY(-4px)}}
+
+/* ===== 深渊裂隙 · 入场动画 ===== */
+#rift-entrance{position:fixed;top:0;left:0;width:100%;height:100%;z-index:200;background:#000;display:none;align-items:center;justify-content:center;pointer-events:none}
+#rift-entrance .rift-crack{position:absolute;top:50%;left:50%;width:4px;height:0;background:linear-gradient(to bottom,transparent,rgba(160,80,240,.9),rgba(200,120,255,.6),transparent);transform:translate(-50%,-50%);border-radius:2px;box-shadow:0 0 30px rgba(160,60,255,.8),0 0 80px rgba(140,40,220,.4)}
+#rift-entrance.animating .rift-crack{animation:riftOpen .8s cubic-bezier(.22,.61,.36,1) forwards}
+@keyframes riftOpen{
+  0%{height:0;width:4px;opacity:1}
+  30%{height:60vh;width:6px;opacity:1}
+  60%{height:90vh;width:18px;opacity:.9}
+  80%{height:120vh;width:100vw;opacity:.6}
+  100%{height:120vh;width:100vw;opacity:0}
+}
+#rift-entrance .rift-particles{position:absolute;top:50%;left:50%;width:100%;height:100%;transform:translate(-50%,-50%);pointer-events:none}
+#rift-entrance .rift-particle{position:absolute;width:3px;height:3px;background:rgba(180,120,255,.8);border-radius:50%;animation:riftParticleFly 1.2s ease-out forwards;opacity:0}
+@keyframes riftParticleFly{
+  0%{opacity:0;transform:translate(0,0) scale(0)}
+  20%{opacity:1;transform:translate(var(--px),var(--py)) scale(1.5)}
+  100%{opacity:0;transform:translate(calc(var(--px)*4),calc(var(--py)*4)) scale(0)}
+}
+#rift-entrance.fadeout{animation:riftFadeOut .4s ease-out forwards}
+@keyframes riftFadeOut{to{opacity:0}}
+.rift-body.anim-hidden{opacity:0;transition:opacity .3s}
+.rift-body.anim-show{opacity:1;transition:opacity .5s}
+
 .rift-header{margin-bottom:clamp(8px,2vw,14px);position:relative;z-index:1;background:rgba(8,6,18,.8);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(100,60,180,.25);border-radius:10px;padding:8px 12px;display:inline-block}
 .rift-header h2{color:#c0a0f0;font-size:clamp(17px,5vw,22px);margin:2px 0;text-shadow:0 0 12px rgba(160,120,220,.5)}
 .rift-resources{margin-top:3px;color:#8899bb;font-size:clamp(10px,2.5vw,12px);position:relative;z-index:1}
 .rift-resources b{color:#ffa502}
-.rift-body{display:flex;gap:10px;max-width:520px;margin:0 auto;position:relative;z-index:1;flex-wrap:wrap}
-.rift-main{flex:1 1 280px;min-width:0}
-.rift-side{flex:0 0 160px;display:flex;flex-direction:column;gap:6px}
+.rift-body{display:flex;flex-direction:column;gap:8px;max-width:520px;margin:0 auto;position:relative;z-index:1}
+.rift-main{flex:1 1 auto;min-width:0}
+/* NPC 区域 */
+.rift-npc{background:rgba(8,6,16,.85);border:1px solid rgba(80,40,130,.2);border-radius:10px;padding:10px 12px;text-align:left;position:relative;z-index:1}
+.rift-npc-header{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.rift-npc-icon{font-size:22px}
+.rift-npc-name{color:#d0c0f0;font-size:13px;font-weight:bold}
+.rift-npc-title{color:#5a4a7a;font-size:10px}
+.rift-npc-dialogue{color:#7a6aaa;font-size:10px;font-style:italic;margin-bottom:6px;padding:4px 8px;background:rgba(60,30,100,.1);border-left:2px solid rgba(100,60,180,.3);border-radius:0 4px 4px 0}
+.rift-npc-info{color:#667;font-size:10px;margin-bottom:4px}
+.rift-npc-actions{display:flex;gap:6px;flex-wrap:wrap}
+.rift-npc-btn{padding:6px 12px;font-size:11px;border-radius:6px;border:1px solid #444;cursor:pointer;font-weight:bold;transition:all .2s}
+.rift-npc-btn.forge{background:rgba(40,20,10,.8);border-color:#8a6030;color:#ffcc88}
+.rift-npc-btn.forge:hover{background:rgba(60,30,15,.9);border-color:#b08040}
+.rift-npc-btn.tower{background:rgba(20,10,30,.8);border-color:#6a40a0;color:#c8a8ff}
+.rift-npc-btn.tower:hover{background:rgba(30,15,50,.9);border-color:#9060d0}
+/* 符文展示 */
+.rift-runes{display:flex;gap:4px;margin-top:4px;flex-wrap:wrap}
+.rift-rune{width:30px;height:30px;border-radius:50%;background:rgba(10,8,18,.8);border:2px solid rgba(60,40,100,.3);display:flex;align-items:center;justify-content:center;font-size:14px;transition:all .3s}
+.rift-rune.owned{border-color:rgba(180,140,255,.6);background:rgba(20,16,40,.8);box-shadow:0 0 8px rgba(140,100,220,.3);animation:runeGlow 3s ease-in-out infinite}
+@keyframes runeGlow{0%,100%{box-shadow:0 0 6px rgba(140,100,220,.2)}50%{box-shadow:0 0 14px rgba(160,120,240,.5)}}
 .rift-section-title{color:#7a6aaa;font-size:11px;font-weight:bold;text-align:left;padding:4px 0;border-bottom:1px solid rgba(100,60,160,.2);letter-spacing:2px}
-/* 副本卡片网格 */
+/* 秘境之门 */
+.rift-portal-section{display:flex;justify-content:center;align-items:center;padding:20px 0;margin:8px 0}
+.rift-portal{position:relative;width:100px;height:100px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-direction:column;transition:transform .2s}
+.rift-portal:hover{transform:scale(1.08)}
+.rift-portal:active{transform:scale(.95)}
+.rift-portal-ring{position:absolute;width:100%;height:100%;border-radius:50%;border:3px solid rgba(140,100,220,.4);animation:portalPulse 3s ease-in-out infinite;box-shadow:0 0 20px rgba(100,40,200,.15),inset 0 0 20px rgba(100,40,200,.08)}
+.rift-portal-core{font-size:36px;position:relative;z-index:1;animation:portalSpin 8s linear infinite}
+.rift-portal-label{font-size:10px;color:#7a6aaa;margin-top:6px;position:relative;z-index:1}
+@keyframes portalPulse{0%,100%{border-color:rgba(140,100,220,.3);box-shadow:0 0 16px rgba(100,40,200,.1)}50%{border-color:rgba(160,120,240,.6);box-shadow:0 0 32px rgba(120,60,220,.25)}}
+@keyframes portalSpin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+/* 旧副本卡片（保留用于副本选择弹窗内） */
 .rift-dungeon-grid{display:flex;flex-direction:column;gap:5px}
 .rift-dungeon-card{display:flex;align-items:center;gap:8px;padding:10px 12px;background:rgba(10,8,20,.8);border:1px solid rgba(80,40,130,.2);border-radius:8px;cursor:pointer;transition:all .2s;text-align:left;position:relative;overflow:hidden}
 .rift-dungeon-card:hover{transform:translateX(2px);border-color:rgba(140,100,220,.5);box-shadow:0 2px 16px rgba(100,40,200,.15)}
@@ -559,6 +620,8 @@ body{background:var(--bg-deep);color:var(--t1);display:flex;justify-content:cent
 .rift-dg-lock{color:#4a3a5a;font-size:10px}
 /* 已选中的副本高亮 */
 .rift-dungeon-card.selected{border-color:rgba(180,140,255,.7);box-shadow:0 0 20px rgba(100,40,200,.25);background:rgba(15,10,35,.9)}
+.rift-dungeon-card.surge{border-color:rgba(0,200,200,.5);box-shadow:0 0 18px rgba(0,180,200,.2);animation:surgePulse 2s ease-in-out infinite}
+@keyframes surgePulse{0%,100%{box-shadow:0 0 12px rgba(0,180,200,.15)}50%{box-shadow:0 0 24px rgba(0,200,220,.35)}}
 /* 侧边功能卡片 */
 .rift-side-cards{display:flex;flex-direction:column;gap:4px}
 .rift-func-btn{display:flex;align-items:center;gap:6px;padding:10px;background:rgba(10,8,20,.8);border:1px solid rgba(80,40,130,.2);border-radius:8px;cursor:pointer;transition:all .2s;text-align:left;color:#c0b0e0;font-size:12px;font-weight:bold}
@@ -660,12 +723,10 @@ body{background:var(--bg-deep);color:var(--t1);display:flex;justify-content:cent
   .tome-btn-name{font-size:var(--fs-md)}
   .page-title{font-size:var(--fs-h6)}
   #compendium h3,.modal h3{font-size:var(--fs-h4)}
-  /* 裂隙移动端：侧边栏收窄 */
-  .rift-body{flex-direction:column}
-  .rift-side{flex:1 1 auto;flex-direction:row;flex-wrap:wrap;gap:4px}
-  .rift-side-cards{flex-direction:row;flex:1}
-  .rift-func-btn{flex:1;min-width:80px;font-size:10px;justify-content:center}
-  .rift-boss-marks{flex:1;justify-content:flex-end}
+  /* 裂隙移动端 */
+  .rift-body{padding:0 4px}
+  .rift-npc-actions{justify-content:center}
+  .rift-npc-btn{flex:1;min-width:70px;font-size:10px;justify-content:center;text-align:center}
 }
 @media(max-width:340px){
   .big-btn{font-size:var(--fs-md);padding:12px 0;min-height:42px}

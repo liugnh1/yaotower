@@ -166,6 +166,7 @@ export function genOutgameEquip(typeBias) {
     stat: primaryStat,
     val: statVal,
     extraVal: extraVal,
+    baseVal: statVal, // v0.85: 强化前基础值 — 归零时恢复，防无限属性增长
     effect: null, // 下面重新生成
     _effects: [], // 内部效果列表 [{key, val, desc, apply}]
     enhanceLv: 0,
@@ -280,9 +281,13 @@ export function enhanceEquip(equipId) {
   // 判定
   if (Math.random() < cost.rate) {
     equip.enhanceLv = lv + 1;
-    equip.val += 1 + Math.floor(Math.random() * 3); // 成功：stat +1~3
+    // v0.85: 记录每级增益 — 降级时精确回滚，防无限堆属性
+    var gain = 1 + Math.floor(Math.random() * 3); // 成功：stat +1~3
+    equip.val += gain;
+    if (!equip._enhanceGain) equip._enhanceGain = [];
+    equip._enhanceGain[equip.enhanceLv] = gain;
     Game.saveMeta();
-    return { success: true, msg: '强化成功！+' + equip.enhanceLv, lv: equip.enhanceLv };
+    return { success: true, msg: '强化成功！+' + equip.enhanceLv + '（+' + gain + '）', lv: equip.enhanceLv };
   } else {
     // v0.81: 保护券 — 失败时自动消耗，不降级
     if ((meta.protectCharm || 0) > 0 && cost.penalty < 0) {
@@ -293,10 +298,21 @@ export function enhanceEquip(equipId) {
     // 失败惩罚
     if (cost.penalty === -99) {
       equip.enhanceLv = 0; // +10失败归零
+      // v0.85: 归零恢复基础值（含升阶后的 baseVal），清空全部增益记录
+      if (equip.baseVal) equip.val = equip.baseVal;
+      equip._enhanceGain = [];
       Game.saveMeta();
       return { success: false, msg: '强化失败…归零', lv: 0 };
     } else if (cost.penalty < 0) {
-      equip.enhanceLv = Math.max(0, lv + cost.penalty);
+      var newLv = Math.max(0, lv + cost.penalty);
+      // v0.85: 降级精确回滚 — 减掉被降掉各级的增益（防 +2↔+3 反复刷无限堆val）
+      for (var g = lv; g > newLv; g--) {
+        if (equip._enhanceGain && equip._enhanceGain[g]) {
+          equip.val = Math.max(equip.baseVal || 0, equip.val - equip._enhanceGain[g]);
+          equip._enhanceGain[g] = 0;
+        }
+      }
+      equip.enhanceLv = newLv;
       Game.saveMeta();
       return { success: false, msg: '强化失败…降为+' + equip.enhanceLv, lv: equip.enhanceLv };
     }
@@ -318,33 +334,39 @@ export function dismantleEquip(equipId) {
   var d = quality.dismantle;
 
   // 返还符文
+  // v0.85: 修复符文丢失 — meta.dungeon 缺失时惰性初始化，保证符文必返还
   if (equip.runes && equip.runes.length > 0) {
     var dg = Game.meta.dungeon;
-    if (dg && dg.forge) {
-      equip.runes.forEach(function(r){ if (dg.forge.runes.indexOf(r) < 0) dg.forge.runes.push(r); });
-    }
+    if (!dg) { dg = Game.meta.dungeon = { keys:0, keyFragments:0, totalCleared:0, bossMarks:{}, clears:{}, forge:{runes:[]}, tower:{} }; }
+    if (!dg.forge) dg.forge = { runes: [] };
+    if (!dg.forge.runes) dg.forge.runes = [];
+    equip.runes.forEach(function(r){ if (dg.forge.runes.indexOf(r) < 0) dg.forge.runes.push(r); });
   }
 
-  // 强化返还30%
-  var enhanceRefund = 0;
+  // 强化返还30%（v0.85: 修复只退素材 — 灵石/魂晶同样按30%返还）
+  var enhanceRefund = { mats:0, stones:0, souls:0 };
   if (equip.enhanceLv > 0) {
-    for (var i = 0; i < equip.enhanceLv; i++) {
-      var costTable = [
-        { mats:1, stones:3, souls:5 }, { mats:2, stones:5, souls:8 }, { mats:3, stones:8, souls:12 },
-        { mats:4, stones:12, souls:16 }, { mats:5, stones:16, souls:20 }, { mats:6, stones:20, souls:25 },
-        { mats:8, stones:25, souls:30 }, { mats:10, stones:32, souls:36 }, { mats:12, stones:40, souls:42 }, { mats:15, stones:50, souls:50 }
-      ];
-      if (i < costTable.length) { enhanceRefund += costTable[i].mats; }
+    var costTable = [
+      { mats:1, stones:3, souls:5 }, { mats:2, stones:5, souls:8 }, { mats:3, stones:8, souls:12 },
+      { mats:4, stones:12, souls:16 }, { mats:5, stones:16, souls:20 }, { mats:6, stones:20, souls:25 },
+      { mats:8, stones:25, souls:30 }, { mats:10, stones:32, souls:36 }, { mats:12, stones:40, souls:42 }, { mats:15, stones:50, souls:50 }
+    ];
+    for (var i = 0; i < equip.enhanceLv && i < costTable.length; i++) {
+      enhanceRefund.mats += costTable[i].mats;
+      enhanceRefund.stones += costTable[i].stones;
+      enhanceRefund.souls += costTable[i].souls;
     }
-    enhanceRefund = Math.floor(enhanceRefund * 0.3);
+    enhanceRefund.mats = Math.floor(enhanceRefund.mats * 0.3);
+    enhanceRefund.stones = Math.floor(enhanceRefund.stones * 0.3);
+    enhanceRefund.souls = Math.floor(enhanceRefund.souls * 0.3);
   }
 
-  meta.materials = (meta.materials || 0) + d.mats + enhanceRefund;
-  meta.stones = (meta.stones || 0) + d.stones;
-  meta.souls = (meta.souls || 0) + d.souls;
+  meta.materials = (meta.materials || 0) + d.mats + enhanceRefund.mats;
+  meta.stones = (meta.stones || 0) + d.stones + enhanceRefund.stones;
+  meta.souls = (meta.souls || 0) + d.souls + enhanceRefund.souls;
   meta.outgameEquip.splice(idx, 1);
   Game.saveMeta();
-  return { success: true, msg: '分解成功！+' + (d.mats+enhanceRefund) + '材料 +' + d.stones + '灵石 +' + d.souls + '魂晶' };
+  return { success: true, msg: '分解成功！+' + (d.mats+enhanceRefund.mats) + '材料 +' + (d.stones+enhanceRefund.stones) + '灵石 +' + (d.souls+enhanceRefund.souls) + '魂晶' };
 }
 
 // ---- 符文操作 ----
@@ -403,7 +425,10 @@ export function upgradeQuality(equipId) {
   equip.qualityName = nextQ.name;
   equip.color = QUALITY_COLORS[nextQ.id] || '#ccc';
   equip.runeSlots = nextQ.runeSlots;
-  equip.val = Math.floor(equip.val * (nextQ.mul / QUALITIES[qi].mul));
+  var upRatio = nextQ.mul / QUALITIES[qi].mul;
+  equip.val = Math.floor(equip.val * upRatio);
+  // v0.85: 同步 baseVal — 否则强化归零会恢复到升阶前的旧值，吞掉升阶收益
+  if (equip.baseVal) equip.baseVal = Math.floor(equip.baseVal * upRatio);
   equip._upgraded = true;
   Game.saveMeta();
   return { success: true, msg: '升阶成功！' + nextQ.name };

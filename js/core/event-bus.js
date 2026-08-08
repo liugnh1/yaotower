@@ -60,6 +60,7 @@ export const E = {
   REGISTRY_UPDATED:'registry:updated',
   // v0.80: 替代 window._* 全局函数
   EQUIP_DISCARD:   'equip:discard',
+  EQUIP_FULL:      'equip:full',
   RELICS_FULL:     'relics:full',
   SHOW_ACH_PANEL:  'ui:showAchPanel',
   // v0.83: 深渊裂隙

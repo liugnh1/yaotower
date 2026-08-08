@@ -73,13 +73,3 @@ R.registerAll('dungeonRunes', [
   { id:'light',   name:'光符文', icon:'✨', desc:'每回合回复2%HP', effect:'regen' },
   { id:'thunder', name:'雷符文', icon:'⚡', desc:'暴击连锁伤害+30%', effect:'chain' }
 ]);
-
-// 天梯词缀（与 CHAOS_MODS 互补，偏地下城风格）
-R.registerAll('towerMods', [
-  { name:'饥荒', desc:'生命回复效果减半', apply:function(s){ s._towerHealHalf=true; } },
-  { name:'钢铁', desc:'敌人防御+30%', apply:function(s){ s._towerDefUp=true; } },
-  { name:'狂暴', desc:'敌人每回合攻击+5%(可叠加)', apply:function(s){ s._towerRage=true; } },
-  { name:'诅咒之地', desc:'每回合损失2%最大生命', apply:function(s){ s._towerDrain=true; } },
-  { name:'元素抗性', desc:'敌人免疫燃烧和迟缓', apply:function(s){ s._towerImmune=true; } },
-  { name:'双生', desc:'每层额外多1个精英怪', apply:function(s){ s._towerExtra=true; } }
-]);

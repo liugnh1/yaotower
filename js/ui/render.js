@@ -37,9 +37,14 @@ var TITLES = [
 var STAT_LABEL = { atk: '⚔️攻击', def: '🛡️防御', maxHp: '❤️生命', critRate: '💥暴击', dodge: '🍃闪避', maxEnergy: '⚡能量' };
 var BUFF_MAP = { burn: '🔥', poison: '☠️', slow: '❄️', stun: '💫', crystal: '💎' };
 var _cachedRelics = null;
+var _cachedRelicList = null;
 function _getRelicsTotal() {
   if (!_cachedRelics) _cachedRelics = (R.get('relics') || []).length;
   return _cachedRelics;
+}
+function _getRelicsList() {
+  if (!_cachedRelicList) _cachedRelicList = R.get('relics') || [];
+  return _cachedRelicList;
 }
 
 // ===== 缓存套装映射 (O(n*m) → O(1)) =====
@@ -121,10 +126,17 @@ export function render(s) {
   if (cb) cb.style.display = Game.hasSave() ? "block" : "none";
 
   // 遗物进度
+  // v0.85: 过滤已失效的遗物ID（旧版本删除的遗物），避免发现数超过总数
   var relProgress = $("relic-progress");
   if (relProgress) {
-    var discovered = (Game.meta && Game.meta.discoveredRelics) ? Game.meta.discoveredRelics.length : 0;
-    var total = _getRelicsTotal();
+    var _allRelics = _getRelicsList();
+    var discovered = 0;
+    if (Game.meta && Game.meta.discoveredRelics) {
+      discovered = Game.meta.discoveredRelics.filter(function(id) {
+        return _allRelics.some(function(r) { return r.id === id; });
+      }).length;
+    }
+    var total = _allRelics.length;
     relProgress.textContent = '📚 遗物 ' + discovered + '/' + total;
     relProgress.style.color = discovered >= total ? '#ffa502' : '#667788';
   }
@@ -140,8 +152,14 @@ export function render(s) {
   // 战斗遗物计数
   var rcBar = $("relic-count-bar");
   if (rcBar) {
-    var d2 = (Game.meta && Game.meta.discoveredRelics) ? Game.meta.discoveredRelics.length : 0;
-    var t2 = _getRelicsTotal();
+    var _rl = _getRelicsList();
+    var d2 = 0;
+    if (Game.meta && Game.meta.discoveredRelics) {
+      d2 = Game.meta.discoveredRelics.filter(function(id) {
+        return _rl.some(function(r) { return r.id === id; });
+      }).length;
+    }
+    var t2 = _rl.length;
     rcBar.textContent = '🔮' + d2 + '/' + t2;
     rcBar.style.color = d2 >= t2 ? '#ffa502' : '#667788';
   }

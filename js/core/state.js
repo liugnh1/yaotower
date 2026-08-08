@@ -60,7 +60,9 @@ function _packSlotData(meta, save, floor, className) {
   };
 }
 function _unpackSlotData(packed) {
-  if (!packed || packed.version !== SAVE_VERSION) return null;
+  if (!packed) return null;
+  // 版本不匹配：不丢数据，标记旧版本供上层处理
+  if (packed.version !== SAVE_VERSION) return { _versionMismatch: true, version: packed.version, raw: packed };
   // 全局校验
   var combined = (packed.meta || "") + "|" + (packed.save || "empty") + "|" + (packed.floor || 0);
   if (!verifyChecksum(combined, packed._globalCS)) {
@@ -101,12 +103,13 @@ function _forceRender(s) { if (_render) { _renderPending = false; _render(s); } 
 function fix(v, d) { return (typeof v === "number" && !isNaN(v)) ? v : d; }
 
 // 深度合并meta对象：defaults为基础，parsed覆盖，但缺失字段保留默认值
+// 重要：parsed 中 defaults 未定义的新字段必须保留（防版本升级/新功能数据丢失）
 function deepMergeMeta(defaults, parsed) {
   var out = {};
   Object.keys(defaults).forEach(function(k) {
     if (parsed.hasOwnProperty(k)) {
       var pv = parsed[k], dv = defaults[k];
-      // 对象类型递归合并（如upgrades, soulUpgrades, buildingLevels等）
+      // 对象类型递归合并（如upgrades, stars等）
       if (dv && typeof dv === 'object' && !Array.isArray(dv) && pv && typeof pv === 'object' && !Array.isArray(pv)) {
         out[k] = deepMergeMeta(dv, pv);
       } else if (pv === undefined || pv === null || (typeof dv === 'number' && (typeof pv !== 'number' || isNaN(pv)))) {
@@ -118,6 +121,12 @@ function deepMergeMeta(defaults, parsed) {
       }
     } else {
       out[k] = defaults[k]; // 缺失字段用默认
+    }
+  });
+  // 保留 parsed 中 defaults 没有的新字段（如 discoveredRelics 等动态解锁数据）
+  Object.keys(parsed).forEach(function(k) {
+    if (!out.hasOwnProperty(k) && parsed[k] !== undefined && parsed[k] !== null) {
+      out[k] = parsed[k];
     }
   });
   return out;
@@ -266,15 +275,12 @@ function defMeta() {
     awakenedClasses: {},
 
     // === 旧系统保留 ===
-    upgrades: {}, soulUpgrades: {}, highestSimple: 0, highestNormal: 0,
+    upgrades: {}, highestNormal: 0,
     adWatched: 0, adDate: "", totalRuns: 0, totalWins: 0, totalDeaths: 0,
-    buildingLevels: {},
-    dailyBest: 0, dailyDate: "", achievements: [],
     totalKills: 0, clearedClasses: [],
+    dailyBest: 0, dailyDate: "", achievements: [],
 
     // === 局外装备 ===
-    outgameEquip: [],   // 局外装备 ⭐NEW
-    decorations: [],    // 城镇装饰 ⭐NEW
     trainingLevel: 0,   // 训练场等级 v0.50 P2
     lastFreeReset: '',  // 天赋树每周免费重置日期戳 v0.51
 
@@ -284,14 +290,8 @@ function defMeta() {
     // === 命运烙印 ===
     unlockedBrands: [], equippedBrands: [], brandLevels: {}, // ⭐NEW
 
-    // === 回忆 ===
-    memoryFragments: 0, unlockedLore: [], // ⭐NEW
-
     // === 技能合成 ===
     synthSkills: [], // 合成的技能 ⭐NEW
-
-    // === 隐藏装备 ===
-    hiddenEquipFound: [], // ⭐NEW
 
     // === Boss专属遗物 ===
     bossRelicsFound: [],
@@ -312,8 +312,8 @@ function defMeta() {
     },
     // 局外装备（DNF纸娃娃）
     outgameEquipped: { weapon:null, helm:null, armor:null, ringL:null, ringR:null, braceletL:null, braceletR:null, amulet:null, belt:null, medal:null },
+    // v0.85: 移除重复键 outgameEquip（284行已有）+ 死字段 outgameInventory
     outgameEquip: [],
-    outgameInventory: [],
     // v0.81: 灵玉（广告点）
     jadeSpirits: 0,
 
@@ -461,8 +461,13 @@ export const Game = {
     const raw = localStorage.getItem(SAVE_KEY); if (!raw) return false;
     try {
       const d = JSON.parse(raw), s = this.state;
-      // 版本不兼容：自动重置存档
-      if (d.version !== SAVE_VERSION) { console.warn("存档版本不兼容，已重置"); this.deleteSave(); return false; }
+      // 版本不兼容：先备份旧档再重置（防版本更新丢数据）
+      if (d.version !== SAVE_VERSION) {
+        console.warn("[妖塔勇者录] 存档版本不兼容 v" + d.version + " → v" + SAVE_VERSION + "，已备份旧档");
+        try { localStorage.setItem(SAVE_KEY + "_backup_v" + d.version, raw); } catch(e) {}
+        this.deleteSave();
+        return false;
+      }
       s.seed = d.seed || ("" + Date.now()); s.rng = new RNG(s.seed);
       s.mode = d.mode || "simple"; s.difficulty = d.difficulty || "standard";
       s.zoneIndex = d.zoneIndex || 0; s.floorInZone = d.floorInZone || 1;
@@ -533,9 +538,18 @@ export const Game = {
     if (typeof this.meta.adWatched !== 'number' || isNaN(this.meta.adWatched) || this.meta.adWatched < 0 || this.meta.adWatched > 50) {
       this.meta.adWatched = 0;
     }
-    // 版本迁移：meta.version 不存在 → 旧版本升级，重置广告计数
-    if (!this.meta._version || this.meta._version < 2) {
-      this.meta.adWatched = 0;
+    // 版本迁移表：每个版本号对应的迁移函数（按序执行，保证老存档平滑升级不丢数据）
+    // 新增版本时：META_MIGRATIONS[新版本号] = function(m){ ...迁移逻辑...; m._version = 新版本号; }
+    var META_MIGRATIONS = {
+      2: function(m) { m.adWatched = 0; }
+    };
+    var curVer = this.meta._version || 1;
+    if (curVer < 2) {
+      var ver = curVer;
+      while (ver < 2) {
+        ver++;
+        if (META_MIGRATIONS[ver]) META_MIGRATIONS[ver](this.meta);
+      }
       this.meta._version = 2;
       this.saveMeta();
     }
@@ -581,6 +595,10 @@ export const Game = {
         console.warn("[妖塔勇者录] 槽位" + slotIndex + "校验失败，存档已损坏或被篡改");
         return { error: "checksum_failed" };
       }
+      if (data._versionMismatch) {
+        console.warn("[妖塔勇者录] 槽位" + slotIndex + "版本不兼容 v" + data.version + "，数据已保留未删除");
+        return { error: "version_mismatch", version: data.version };
+      }
       return data;
     } catch(e) { console.error("[妖塔勇者录] 读取槽位失败", e); return null; }
   },
@@ -624,11 +642,6 @@ export const Game = {
   getEssence() { return this.meta.essence || 0; },
   addSouls(n) { if (!this.meta) return; this.meta.souls = Math.min((this.meta.souls || 0) + n, 9999); trackValue('souls', this.meta.souls); this.saveMeta(); },
   addStones(n) { if (!this.meta) return; this.meta.stones = Math.min((this.meta.stones || 0) + n, 9999); trackValue('stones', this.meta.stones); this.saveMeta(); },
-  // v0.50 P2: 灵石兑换魂晶 (10:1)
-  exchangeStonesForSouls() { if (!this.meta) return false; if ((this.meta.stones || 0) < 10) return false; this.meta.stones -= 10; this.meta.souls = Math.min((this.meta.souls || 0) + 1, 9999); this.saveMeta(); return true; },
-  // v0.50 P2: 训练场升级（消耗灵石永久+属性）
-  getTrainingLevel() { return this.meta.trainingLevel || 0; },
-  upgradeTraining() { if (!this.meta) return false; var lv = this.meta.trainingLevel || 0; if (lv >= 5) return false; var costs = [0, 10, 25, 50, 80, 120]; if ((this.meta.stones || 0) < costs[lv + 1]) return false; this.meta.stones -= costs[lv + 1]; this.meta.trainingLevel = (lv || 0) + 1; this.saveMeta(); return true; },
   addForgeStones(n) { if (!this.meta) return; this.meta.forgeStones = Math.min((this.meta.forgeStones || 0) + n, 999); trackValue('forgeStones', this.meta.forgeStones); this.saveMeta(); },
   addMaterials(n) { if (!this.meta) return; this.meta.materials = Math.min((this.meta.materials || 0) + n, 999); trackValue('materials', this.meta.materials); this.saveMeta(); },
   addJadeSpirits(n) { if (!this.meta) return; this.meta.jadeSpirits = Math.min((this.meta.jadeSpirits || 0) + n, 999); trackValue('jadeSpirits', this.meta.jadeSpirits); this.saveMeta(); },
@@ -637,8 +650,22 @@ export const Game = {
   hasTalentNode(nodeId) { return (this.meta.talentNodes || []).includes(nodeId); },
   unlockTalentNode(nodeId) {
     if (!this.meta.talentNodes) this.meta.talentNodes = [];
+    // v0.85: 防御性上限 — 与UI一致（根节点上限3/5层，非根节点唯一），防绕过UI无限叠加
+    var tree = R.get('talentTree') || [];
+    var node = tree.find(function(n) { return n.id === nodeId; });
+    if (!node) return false;
+    var owned = 0;
+    for (var i = 0; i < this.meta.talentNodes.length; i++) { if (this.meta.talentNodes[i] === nodeId) owned++; }
+    if (node.branch === 'root') {
+      var oStage = this.meta.onboardingStage || 0;
+      var rootMax = oStage >= 2 ? 5 : 3;
+      if (owned >= rootMax) return false;
+    } else {
+      if (owned >= 1) return false;
+    }
     this.meta.talentNodes.push(nodeId); // 允许重复购买（根节点叠加层数）
     this.saveMeta();
+    return true;
   },
   resetAllTalents() { this.meta.talentNodes = []; this.saveMeta(); },
   resetTalentBranch(nodes) {
@@ -792,10 +819,11 @@ export const Game = {
     // v0.50 P0平衡：记录原始基准值用于硬上限计算
     var baseAtk = p.atk, baseHp = p.maxHp, baseDef = p.def, baseCrit = p.critRate;
     // 天赋树加成（应用衰减）
+    // v0.85: 不用 Math.floor — 小基数(如atk 15)取整会把衰减后的百分比加成吞成0
     var tb = this.getTalentBonuses();
-    if (tb.atkMul) p.atk = Math.floor(p.atk * (1 + tb.atkMul * decay));
-    if (tb.hpMul) { p.maxHp = Math.floor(p.maxHp * (1 + tb.hpMul * decay)); p.hp = Math.floor(p.hp * (1 + tb.hpMul * decay)); }
-    if (tb.defMul) p.def = Math.floor(p.def * (1 + tb.defMul * decay));
+    if (tb.atkMul) p.atk = p.atk * (1 + tb.atkMul * decay);
+    if (tb.hpMul) { p.maxHp = p.maxHp * (1 + tb.hpMul * decay); p.hp = p.hp * (1 + tb.hpMul * decay); }
+    if (tb.defMul) p.def = p.def * (1 + tb.defMul * decay);
     if (tb.critRate) p.critRate += tb.critRate * decay;
     if (tb.critMul) p.critMul = (p.critMul || 1.5) + tb.critMul * decay;
     if (tb.lifeSteal) p.lifeSteal = (p.lifeSteal || 0) + tb.lifeSteal * decay;
@@ -822,28 +850,9 @@ export const Game = {
     if (tb.eliteRate) p._talentEliteRate = (p._talentEliteRate || 0) + tb.eliteRate;
     if (tb.curseReduce) p._talentCurseReduce = (p._talentCurseReduce || 0) + tb.curseReduce;
 
-    // 城镇装饰加成（应用衰减）
-    var decs = this.meta.decorations || [];
-    decs.forEach(function(d) {
-      if (d.effect === 'atk') p.atk += Math.floor(2 * decay);
-      if (d.effect === 'hp') { p.maxHp += Math.floor(15 * decay); p.hp += Math.floor(15 * decay); }
-      if (d.effect === 'gold') p.goldMul = (p.goldMul || 1) + 0.2 * decay;
-    });
-
     // v0.50 P2: 训练场永久属性加成
     var tl = this.meta.trainingLevel || 0;
     if (tl > 0) { p.atk += tl; p.maxHp += tl * 5; p.hp += tl * 5; p.def += tl; }
-
-    // v0.60 转生飞升永久加成（不受衰减，转生清空进度的补偿）
-    var rb = this.meta.rebirthBonus;
-    if (rb) {
-      if (rb.atk) p.atk += rb.atk;
-      if (rb.hp) { p.maxHp += rb.hp; p.hp += rb.hp; }
-      if (rb.def) p.def += rb.def;
-      if (rb.luck) p._rebirthLuck = (p._rebirthLuck || 0) + rb.luck;
-      if (rb.gold) p.goldMul = (p.goldMul || 1) * (1 + rb.gold);
-      if (rb.exp) p._rebirthExp = (p._rebirthExp || 0) + rb.exp;
-    }
 
     // v0.60 合成遗物：下局开局自动获得
     var forgedId = this.meta.forgedRelic;
@@ -883,6 +892,69 @@ export const Game = {
     p.critRate = Math.min(p.critRate, baseCrit + MAX_CRIT_BONUS);
     p.dodge = Math.min(0.75, p.dodge || 0); // 闪避硬上限75%
     p.lifeSteal = Math.min(0.40, p.lifeSteal || 0); // 吸血硬上限40%
+  },
+
+  // v0.83: 裂隙专用加成（仅天赋树+精炼+附魔，不含成就/修炼/精通/进阶/觉醒/铭牌/星图）
+  applyRiftBonuses(p) {
+    var s = this.state;
+    // 保存基础值用于硬上限计算
+    var baseAtk = p.atk, baseHp = p.maxHp, baseDef = p.def, baseCrit = p.critRate;
+
+    // 1. 天赋树加成（裂隙中100%生效，不衰减）
+    // 注意：不用 Math.floor —— 固定模板基数小(18攻/5防)，取整会把百分比加成吞成0
+    var tb = this.getTalentBonuses();
+    if (tb.atkMul) p.atk = p.atk * (1 + tb.atkMul);
+    if (tb.hpMul) { p.maxHp = p.maxHp * (1 + tb.hpMul); p.hp = p.hp * (1 + tb.hpMul); }
+    if (tb.defMul) p.def = p.def * (1 + tb.defMul);
+    if (tb.critRate) p.critRate += tb.critRate;
+    if (tb.critMul) p.critMul = (p.critMul || 1.5) + tb.critMul;
+    if (tb.lifeSteal) p.lifeSteal = (p.lifeSteal || 0) + tb.lifeSteal;
+    if (tb.pen) p.pen = (p.pen || 0) + tb.pen;
+    if (tb.dodge) p.dodge = Math.min(0.75, (p.dodge || 0) + tb.dodge);
+    if (tb.dmgReduce) p.dmgReduce = (p.dmgReduce || 0) + tb.dmgReduce;
+    if (tb.goldMul) p.goldMul = (p.goldMul || 1) * (1 + tb.goldMul);
+    // 非数值型天赋
+    if (tb.skillCDR) p.skillCDR = true;
+    if (tb.keystone_break) p._keystoneBreak = true;
+    if (tb.keystone_immortal) p._keystoneImmortal = true;
+    if (tb.keystone_doubleChest) p._keystoneDoubleChest = true;
+    if (tb.keystone_startRareRelic) p._keystoneStartRareRelic = true;
+    if (tb.startShield) p._talentStartShield = (p._talentStartShield || 0) + tb.startShield;
+    if (tb.regenPct) p._talentRegenPct = (p._talentRegenPct || 0) + tb.regenPct;
+    if (tb.relicSlots) p._talentRelicSlots = (p._talentRelicSlots || 0) + tb.relicSlots;
+    if (tb.chestBonus) p._talentChestBonus = (p._talentChestBonus || 0) + tb.chestBonus;
+    if (tb.relicChoice) p._talentRelicChoice = (p._talentRelicChoice || 0) + tb.relicChoice;
+    if (tb.relicRate) p._talentRelicRate = (p._talentRelicRate || 0) + tb.relicRate;
+    if (tb.shopDiscount) p._talentShopDiscount = (p._talentShopDiscount || 0) + tb.shopDiscount;
+    if (tb.eventGood) p._talentEventGood = (p._talentEventGood || 0) + tb.eventGood;
+    if (tb.rareWeight) p._talentRareWeight = (p._talentRareWeight || 0) + tb.rareWeight;
+    if (tb.eliteRate) p._talentEliteRate = (p._talentEliteRate || 0) + tb.eliteRate;
+    if (tb.curseReduce) p._talentCurseReduce = (p._talentCurseReduce || 0) + tb.curseReduce;
+
+    // 2. 硬上限（只封「基础+天赋」— v0.85: 精炼/附魔/装备不受限，与主世界装备同规则）
+    var MAX_ATK_BONUS = 0.40, MAX_HP_BONUS = 0.50, MAX_DEF_BONUS = 0.35, MAX_CRIT_BONUS = 0.30;
+    p.atk = Math.min(p.atk, Math.floor(baseAtk * (1 + MAX_ATK_BONUS)));
+    p.maxHp = Math.min(p.maxHp, Math.floor(baseHp * (1 + MAX_HP_BONUS)));
+    p.hp = Math.min(p.hp, p.maxHp);
+    p.def = Math.min(p.def, Math.floor(baseDef * (1 + MAX_DEF_BONUS)));
+    p.critRate = Math.min(p.critRate, baseCrit + MAX_CRIT_BONUS);
+    p.dodge = Math.min(0.75, p.dodge || 0);
+    p.lifeSteal = Math.min(0.40, p.lifeSteal || 0);
+
+    // 3. 裂隙锻造加成（精炼+附魔）— 硬上限之后叠加，作为核心养成不受局外加成上限约束
+    var dg = this.meta.dungeon;
+    if (dg && dg.forge) {
+      var f = dg.forge;
+      if (f.enchantAtk) p.atk += f.enchantAtk * 8;
+      if (f.enchantHp) { p.maxHp += f.enchantHp * 25; p.hp += f.enchantHp * 25; }
+      if (f.enchantDef) p.def += f.enchantDef * 4;
+      if (f.enchantCrit) p.critRate += f.enchantCrit * 0.03;
+      if (f.enchantPen) p.pen = (p.pen || 0) + f.enchantPen * 0.05;
+      if (f.enchantVamp) p.lifeSteal = (p.lifeSteal || 0) + f.enchantVamp * 0.04;
+      if (f.refineAtk) p.atk += f.refineAtk;
+      if (f.refineHp) { p.maxHp += f.refineHp * 5; p.hp += f.refineHp * 5; }
+      if (f.refineDef) p.def += f.refineDef;
+    }
   },
 
   // 获取开局药水数量（修复 startPotion 陷阱 — v0.50 合并成就加成）

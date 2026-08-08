@@ -8,12 +8,14 @@ import { log, toast } from '../ui/effects.js';
 
 // 应用装备属性到玩家
 export function applyEquipStats(p, eq) {
+  // v0.85: 修复 extraVal（5%极品暴击）从未生效 — 主属性含 extraVal
+  var baseVal = (eq.val || 0) + (eq.extraVal || 0);
   switch (eq.stat) {
-    case "maxHp": p.maxHp += eq.val; p.hp = Math.min(p.hp + eq.val, p.maxHp); break;
-    case "atk": p.atk += eq.val; break;
-    case "def": p.def += eq.val; break;
-    case "critRate": p.critRate += eq.val / 100; break;
-    case "dodge": p.dodge = (p.dodge||0) + eq.val / 100; break;
+    case "maxHp": p.maxHp += baseVal; p.hp = Math.min(p.hp + baseVal, p.maxHp); break;
+    case "atk": p.atk += baseVal; break;
+    case "def": p.def += baseVal; break;
+    case "critRate": p.critRate += baseVal / 100; break;
+    case "dodge": p.dodge = (p.dodge||0) + baseVal / 100; break;
     default: break;
   }
   if (eq._extraStats) {
@@ -37,12 +39,14 @@ export function applyEquipStats(p, eq) {
 
 // 移除装备属性
 export function removeEquipStats(p, eq) {
+  // v0.85: 对称处理 extraVal
+  var baseVal = (eq.val || 0) + (eq.extraVal || 0);
   switch (eq.stat) {
-    case "maxHp": p.maxHp = Math.max(1, p.maxHp - eq.val); p.hp = Math.min(p.hp, p.maxHp); break;
-    case "atk": p.atk = Math.max(1, p.atk - eq.val); break;
-    case "def": p.def = Math.max(0, p.def - eq.val); break;
-    case "critRate": p.critRate = Math.max(0, p.critRate - eq.val / 100); break;
-    case "dodge": p.dodge = Math.max(0, (p.dodge||0) - eq.val / 100); break;
+    case "maxHp": p.maxHp = Math.max(1, p.maxHp - baseVal); p.hp = Math.min(p.hp, p.maxHp); break;
+    case "atk": p.atk = Math.max(1, p.atk - baseVal); break;
+    case "def": p.def = Math.max(0, p.def - baseVal); break;
+    case "critRate": p.critRate = Math.max(0, p.critRate - baseVal / 100); break;
+    case "dodge": p.dodge = Math.max(0, (p.dodge||0) - baseVal / 100); break;
     default: break;
   }
   if (eq._extraStats) {
@@ -72,11 +76,10 @@ export function getEquipLimit(s) {
 export function addEquip(eq, trackQuestFn, onFull) {
   var s = Game.state;
   if (s.equip.length >= getEquipLimit(s)) {
+    // v0.85: 满槽 → 弹置换面板（事件驱动，覆盖所有获得路径：战斗/商店/事件）
     if (onFull) { onFull(eq); return; }
-    // v0.82: 无回调时兜底 — 丢弃最旧装备
-    var oldest = s.equip.shift();
-    if (oldest) removeEquipStats(s.player, oldest);
-    Events.emit(E.EQUIP_DISCARD, { index: 0 });
+    Events.emit(E.EQUIP_FULL, { equip: eq });
+    return;
   }
   s.equip.push(eq);
   applyEquipStats(s.player, eq);

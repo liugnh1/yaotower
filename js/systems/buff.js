@@ -9,6 +9,8 @@ import { E, Events } from '../core/event-bus.js';
 // buff: { id, name, turns, onTick, onRemove, data? }
 export function addBuff(target, buff) {
   if (!target._buffs) target._buffs = [];
+  // 天梯/副本精英&Boss免疫硬控（眩晕/冻结/石化）
+  if (target._towerImmune && (buff.id === 'stun' || buff.id === 'freeze' || buff.id === 'stone')) return;
   // 同 id 覆盖（刷新持续时间）
   const existing = target._buffs.find(b => b.id === buff.id);
   if (existing) {

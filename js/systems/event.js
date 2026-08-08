@@ -44,9 +44,5 @@ export function randomEventType(s) {
 // 返回增强后的概率：baseChance × (1 + eventGood bonus)
 export function goodEventChance(s, baseChance) {
   var bonus = (s.player && s.player._talentEventGood) ? s.player._talentEventGood : 0;
-  // 装饰「占星台」加成
-  var decoBonus = 0;
-  var decs = (Game.meta && Game.meta.decorations) ? Game.meta.decorations : [];
-  decs.forEach(function(d) { if (d.effect === 'eventGood') decoBonus += 0.10; });
-  return s.rng.chance(Math.min(0.95, baseChance * (1 + bonus + decoBonus)));
+  return s.rng.chance(Math.min(0.95, baseChance * (1 + bonus)));
 }

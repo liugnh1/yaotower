@@ -85,6 +85,53 @@ export function showJadeShop() {
     content.appendChild(card);
   });
 
+  // v0.85: 灵蕴兑换（灵蕴通胀回收；兑换率略低于灵玉直换，防套利）
+  var essenceExchange = [
+    { label:'💀 魂晶 ×5',  cost:10, fn:function(m){ m.souls = (m.souls||0) + 5; return '魂晶 +5'; } },
+    { label:'💎 灵石 ×6',  cost:10, fn:function(m){ m.stones = (m.stones||0) + 6; return '灵石 +6'; } },
+    { label:'⚒️ 锻石 ×2',  cost:10, fn:function(m){ m.forgeStones = (m.forgeStones||0) + 2; return '锻石 +2'; } },
+    { label:'📦 材料 ×2',  cost:10, fn:function(m){ m.materials = (m.materials||0) + 2; return '材料 +2'; } },
+    { label:'🔑 钥匙碎片 ×2', cost:10, fn:function(m){ if(!m.dungeon) m.dungeon={keys:0,keyFragments:0}; m.dungeon.keyFragments = (m.dungeon.keyFragments||0) + 2; return '钥匙碎片 +2'; } },
+  ];
+  var essTitle = document.createElement('div');
+  essTitle.style.cssText = 'text-align:center;margin:12px 0 4px;padding:6px;background:#1a1228;border-radius:8px;font-size:12px;color:#c8a8ff';
+  essTitle.innerHTML = '🔮 灵蕴兑换 <span style="font-size:10px;color:#667">当前 <b style="color:#ffa502">' + (meta.essence||0) + '</b></span>';
+  content.appendChild(essTitle);
+  essenceExchange.forEach(function(rate) {
+    var card = document.createElement('div');
+    card.style.cssText = 'display:flex;align-items:center;padding:7px 10px;margin:3px 0;background:#0d1117;border-radius:6px;cursor:pointer;transition:all .15s';
+    card.onmouseenter = function(){ this.style.background = '#1a1a2e'; };
+    card.onmouseleave = function(){ this.style.background = '#0d1117'; };
+
+    var labelSpan = document.createElement('span');
+    labelSpan.style.cssText = 'flex:1;font-size:12px;font-weight:bold;color:#c8a8ff';
+    labelSpan.textContent = rate.label;
+
+    var costSpan = document.createElement('span');
+    costSpan.style.cssText = 'font-size:11px;color:#667;margin-right:8px';
+    costSpan.textContent = '🔮×' + rate.cost;
+
+    var buyBtn = document.createElement('button');
+    buyBtn.style.cssText = 'font-size:10px;padding:4px 12px;background:#1a1a2a;border:1px solid #5a4080;color:#c8a8ff;border-radius:4px;cursor:pointer';
+    buyBtn.textContent = '兑换';
+    var canBuy = (meta.essence || 0) >= rate.cost;
+    buyBtn.disabled = !canBuy;
+    buyBtn.onclick = function(e) {
+      e.stopPropagation();
+      if ((meta.essence || 0) < rate.cost) return;
+      meta.essence -= rate.cost;
+      var msg = rate.fn(meta);
+      Game.saveMeta();
+      toast('✅ ' + msg);
+      showJadeShop();
+    };
+
+    card.appendChild(labelSpan);
+    card.appendChild(costSpan);
+    card.appendChild(buyBtn);
+    content.appendChild(card);
+  });
+
   // 保护券说明
   if ((meta.protectCharm || 0) > 0) {
     var protectInfo = document.createElement('div');

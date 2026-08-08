@@ -107,6 +107,10 @@ export function startBattle(type) {
   if (s._despAtkDoubled && s.player) { s.player.atk = Math.floor(s.player.atk / 2); }
   s._desperationUsed = false; s._despAtkDoubled = false;
   s._acting = false; s._winning = false;
+  // v0.85: 修复水晶def泄漏 — 清零前先减回已加的防御
+  if (s.player && s.player._crystalStacks) { s.player.def = Math.max(0, s.player.def - s.player._crystalStacks * 2); }
+  // v0.85: 修复沙漠debuff不重置 — 每场清零（原跨场永久累积至100%减伤）
+  if (s.player) { s.player._desertDebuff = 0; }
   if (s.player) { s.player._drumAtk = 0; s.player._tempHp = 0; s.player._mageNextAtk = false; s.player._desertNext = false; s.player._brandDodgeAtkNext = false; s.player._crystalStacks = 0; s.player._extraTurn = false; delete s.player._stoneGaze; }
   s._attackedThisTurn = false; s._voidRifts = []; // v0.51: boss遗物/羁绊追踪
   // v0.51 天赋·护体：每场战斗开始获得护盾
@@ -116,7 +120,7 @@ export function startBattle(type) {
   s._shadowUsed = false; s._deathGamble = false; s._shadowDmgMul = 0;
   s._enemyIntent = null; s._eliteMod = null; s._eliteVenom = 0;
   s.adDiscount = false; s.adRefreshCount = 0;
-  s._healOnKill = 0; s._healOnKillTracked = false; s._equipLifesteal = 0;
+  s._healOnKill = 0; s._healOnKillTracked = false; s._equipLifesteal = 0; s._equipLifestealTracked = false;
   // v0.60 防止混沌词条跨战斗泄漏
   s.enemyHpMul = undefined; s.enemyAtkMul = undefined; s.enemyDefMul = undefined;
   s._chaosCdPenalty = undefined; s._chaosCdrBonus = undefined; // v0.70 混沌CD运行时标记
@@ -135,6 +139,8 @@ export function startBattle(type) {
   if (s.player && s.player._sinWrathDef) { s.player.def += s.player._sinWrathDef; s.player._sinWrathDef = 0; }
   // 如果调用方已预设了敌人（如心魔镜像/困兽斗），跳过生成，仅做难度缩放
   const hasPreset = s.enemy && s.enemy.hp > 0 && s.enemy.atk > 0;
+  // v0.85: 修复幽灵第二波 — 预设战斗前先清空波次状态（防止继承上一场精英的残留波数据）
+  s._waves = []; s._waveIndex = 0; s._waveTotal = 0;
   if (!hasPreset) s.enemy = null;
   if (hasPreset) {
     // 预设敌人：只做难度/Zone缩放，不重新生成
@@ -160,6 +166,8 @@ export function startBattle(type) {
   var enemies = [];
   if (type === "boss") {
     var bossKey = s.zone ? s.zone.id : 'plains';
+    // v0.85: 修复副本Boss全是深渊领主 — dungeon模式用副本id作bossKey（bosses表按zone id键）
+    if (s.mode === 'dungeon' && s.dungeonId) bossKey = s.dungeonId;
     var isHell = s.difficulty && (s.difficulty === 'hell' || s.difficulty.startsWith('hell_'));
     var boss = isHell ? (R.get('bosses_hell', bossKey) || R.get('bosses', bossKey)) : R.get('bosses', bossKey);
     const endless = R.get('endlessBosses');
@@ -248,7 +256,8 @@ export function startBattle(type) {
     // 装备套装效果：先还原旧加成，再应用新加成
     if (s.player._set_atk) s.player.atk -= s.player._set_atk;
     if (s.player._set_def) s.player.def -= s.player._set_def;
-    if (s.player._set_maxHp) { s.player.maxHp -= s.player._set_maxHp; s.player.hp -= s.player._set_maxHp; }
+    // v0.85: 修复套装还原HP — 用 clamp 防 hp 超出新上限（原减法会留下超上限的hp）
+    if (s.player._set_maxHp) { s.player.maxHp = Math.max(1, s.player.maxHp - s.player._set_maxHp); s.player.hp = Math.min(s.player.hp, s.player.maxHp); }
     if (s.player._set_dodge) s.player.dodge = (s.player.dodge||0) - s.player._set_dodge;
     if (s.player._set_lifeSteal) s.player.lifeSteal = (s.player.lifeSteal||0) - s.player._set_lifeSteal;
     if (s.player._set_critRate) s.player.critRate -= s.player._set_critRate;
@@ -296,9 +305,18 @@ export function startBattle(type) {
     if (diff2.doubleTag && s.rng.chance(0.5)) { addTag(s); addTag(s); }
     // 风险门：额外词条
     if (s._riskRoom) { addTag(s); s._riskReward = true; s._riskRoom = false; }
+    // v0.85: 修复区域mod每场叠加 — 先还原上一场的加成，再应用本场（对称逻辑）
+    if (s.player) {
+      if (s._zoneModPrevAtk) { s.player.atk = Math.floor(s.player.atk / (1 + s._zoneModPrevAtk)); s._zoneModPrevAtk = 0; }
+      if (s._zoneModPrevCrit) { s.player.critRate = Math.max(0, s.player.critRate - s._zoneModPrevCrit); s._zoneModPrevCrit = 0; }
+      if (s._zoneModPrevCritMul) { s.player.critMul = Math.max(1, (s.player.critMul || 1.5) - s._zoneModPrevCritMul); s._zoneModPrevCritMul = 0; }
+    }
     // 新Zone环境：魔塔下层扣血+攻 / 魔塔上层+暴击
-    if (s._zoneMod?.id === "tower_lower_drain" && s.player) { s.player.atk = Math.floor(s.player.atk * 1.2); }
-    if (s._zoneMod?.id === "tower_upper_seal" && s.player) { s.player.critRate += 0.25; }
+    if (s._zoneMod?.id === "tower_lower_drain" && s.player) { s._zoneModPrevAtk = 0.2; s.player.atk = Math.floor(s.player.atk * 1.2); }
+    if (s._zoneMod?.id === "tower_upper_seal" && s.player) { s._zoneModPrevCrit = 0.25; s.player.critRate += 0.25; }
+    if (s._zoneMod?.id === "void_crit") { if (s.player) { s._zoneModPrevCritMul = 0.5; s.player.critMul += 0.5; } s.enemies.forEach(function(e) { e.critMul = (e.critMul || 1.5) + 0.5; }); }
+    // v0.85: frozen_mp 修复 — 原实现永久扣减maxEnergy（打3场变1，无法放技能）
+    // 正确效果：灵力回复减半（在击杀回能处实现），不扣永久属性
     // 恢复意图系统
     s.enemies.forEach(function(em) { if (em.hp > 0) updateIntentFor(em, s); });
     Events.emit(E.BATTLE_START, { type: type, floor: s.totalFloor, zone: s.zone });
@@ -315,6 +333,10 @@ export function startBattle(type) {
     if (s._chaosExtraEnemy && s.enemies && s.enemies.length > 0) {
       var extra = { ...s.enemies[0], name: (s.enemies[0].name || '敌人') + '(混沌)', hp: Math.floor(s.enemies[0].hp * 0.7), maxHp: Math.floor(s.enemies[0].hp * 0.7) };
       s.enemies.push(extra);
+    }
+    // 天梯/副本模式：精英&Boss免疫硬控
+    if ((s.mode === 'tower' || s.mode === 'dungeon') && (type === 'boss' || type === 'elite')) {
+      s.enemies.forEach(function(em) { em._towerImmune = true; });
     }
     Game.sync();
   }
@@ -531,7 +553,9 @@ export function doSkill(skillIdx) {
   if (s.player._echoStone) {
     s.player._echoCount = (s.player._echoCount || 0) + 1;
     if (s.player._echoCount >= 5) {
-      s.player._echoCount = 0; s.skillCooldowns[cdKey] = 0; s.player.energy = Math.min(s.player.maxEnergy, s.player.energy + 1);
+      s.player._echoCount = 0; s.skillCooldowns[cdKey] = 0;
+      // v0.85: 修复仍耗能量 — 返还本次技能实际消耗（cost 在526行已扣）
+      s.player.energy = Math.min((s.player.maxEnergy || 3) + 2, s.player.energy + cost);
       bigFloat("🪨 回音！", "float-dmg", 600);
     }
   }
@@ -545,8 +569,9 @@ export function doSkill(skillIdx) {
   }
   // 升级附加效果
   if (sk.immune) { s.defending = true; }
-  if (sk.dmgRed) { s.player.dmgReduce = (s.player.dmgReduce || 0) + sk.dmgRed; s._tempDmgRed = (s._tempDmgRed || 0) + sk.dmgRed; }
-  if (sk.selfDef) { s.player.def += sk.selfDef; s._tempDefBonus = (s._tempDefBonus || 0) + sk.selfDef; }
+  // v0.85: 修复键名不匹配 — 写 player 对象（startBattle 从 player 清理），防临时加成永久叠加
+  if (sk.dmgRed) { s.player.dmgReduce = (s.player.dmgReduce || 0) + sk.dmgRed; s.player._tempDmgRed = (s.player._tempDmgRed || 0) + sk.dmgRed; }
+  if (sk.selfDef) { s.player.def += sk.selfDef; s.player._tempDefBonus = (s.player._tempDefBonus || 0) + sk.selfDef; }
   if (sk.defBreak && s.enemy) { s.enemy.def = Math.max(0, (s.enemy.def || 0) - sk.defBreak); }
   if (sk.permAtk) { s.player.atk += sk.permAtk; }
   if (sk.permDef) { s.player.def += sk.permDef; }
@@ -743,7 +768,7 @@ function endTurnHeal(s) {
     // v0.51: brand — 治疗时对随机敌人造成30%ATK伤害
     if (p._brandHealDmgProc && healAmt > 0 && s.enemies && s.enemies.length > 0) {
       var alive2 = s.enemies.filter(function(ee){return ee && ee.hp > 0;});
-      if (alive2.length > 0) { var target2 = alive2[Math.floor(Math.random()*alive2.length)]; target2.hp -= Math.floor(p.atk * p._brandHealDmgProc); }
+      if (alive2.length > 0) { var target2 = alive2[Math.floor(s.rng.next()*alive2.length)]; target2.hp -= Math.floor(p.atk * p._brandHealDmgProc); }
     }
     if (healAmt > 0) log('<span class="heal">💤 剩余能量转化为' + healAmt + '点治疗</span>');
   }
@@ -767,7 +792,7 @@ function endTurnHeal(s) {
     if (actualHeal > 0 && s.enemies && s.enemies.length > 0) {
       var alive = s.enemies.filter(function(ee){return ee && ee.hp > 0;});
       if (alive.length > 0) {
-        var target = alive[Math.floor(Math.random() * alive.length)];
+        var target = alive[Math.floor(s.rng.next() * alive.length)];
         target.hp -= Math.floor(actualHeal * 0.5);
         bigFloat('-' + Math.floor(actualHeal * 0.5) + '✨', 'float-heal', 400);
       }
@@ -775,7 +800,7 @@ function endTurnHeal(s) {
     // v0.51: brand — 治疗时对随机敌人造成30%ATK伤害
     if (p._brandHealDmgProc && lightHeal > 0 && s.enemies && s.enemies.length > 0) {
       var alive2b = s.enemies.filter(function(ee){return ee && ee.hp > 0;});
-      if (alive2b.length > 0) { var target2b = alive2b[Math.floor(Math.random()*alive2b.length)]; target2b.hp -= Math.floor(p.atk * p._brandHealDmgProc); }
+      if (alive2b.length > 0) { var target2b = alive2b[Math.floor(s.rng.next()*alive2b.length)]; target2b.hp -= Math.floor(p.atk * p._brandHealDmgProc); }
     }
   }
 }
@@ -817,8 +842,7 @@ function calcDmg(sk, targetEnemy) {
   // v0.50 P2: 护甲减伤公式 — def越高收益越递减
   let dmg = Math.floor(atk * (1 - def / (def + 100)));
   dmg = Math.max(1, dmg);
-  // v0.51: 铁壁药剂 — 玩家防御+50%（减伤50%）
-  if (s.potionDef) dmg = Math.floor(dmg * (1 - s.potionDef));
+  // v0.85: 铁壁药剂已移至敌人攻击伤害处（原位置错误地减少了玩家自己的输出）
   // 【破绽系统】每3回合敌人露破绽，技能和普攻均享受3倍伤害
   if (s.turnInFloor > 0 && s.turnInFloor % 3 === 0 && !s._weakSpotShown) {
     dmg = Math.floor(dmg * 3); s._weakSpotShown = true;
@@ -850,11 +874,13 @@ function calcDmg(sk, targetEnemy) {
   // v0.51: ice_chain_3 — 冰冻敌人伤害翻倍
   if (p._iceChain >= 3 && e._buffs && e._buffs.some(function(b){return b.id==='stun';})) dmg = Math.floor(dmg * 2);
   // v0.51: mastery_shadow — 对满血敌人+50%伤害
-  if (p._mastery_shadow && e.hp >= e.maxHp) dmg = Math.floor(dmg * 1.5);
+  if (p._mastery_shadow && e.hp >= e.maxHp) dmg = Math.floor(dmg * 1.3);
   // v0.70: 暗影弱点 — 持有核心暗影时对暗影弱点敌人穿透+30%
   if (e.weakness === '暗影' && p._coreShadow) { totalPen = Math.min(0.8, totalPen + 0.3); def = Math.floor(e.def * (1 - totalPen)); var shadowDmgBonus = Math.floor(atk * (1 - def / (def + 100))); dmg = Math.max(dmg, shadowDmgBonus); }
   // v0.51: boss_tower — Boss战伤害+40%
   if (p._bossTower && s._currentRoomType === 'boss') dmg = Math.floor(dmg * 1.4);
+  // 沙漠风暴：命中率降低 → 有概率伤害减半
+  if (p._desertDebuff && s.rng.chance(p._desertDebuff)) { dmg = Math.floor(dmg * 0.5); }
   // v0.51: brand — 有护盾时ATK+20%
   if (p._brandShieldAtkBoost && (p._tempHp || 0) > 0) dmg = Math.floor(dmg * (1 + p._brandShieldAtkBoost));
   // v0.51: brand — 每诅咒+ATK
@@ -866,7 +892,7 @@ function calcDmg(sk, targetEnemy) {
   }
   // v0.81: curse_lord 已合并到上面的 curseBonus 统一计算+上限
   // v0.51: mastery_mage — 技能后下次普攻+30%伤害
-  if (p._mageNextAtk && !isSkill) { dmg = Math.floor(dmg * 1.3); p._mageNextAtk = false; }
+  if (p._mageNextAtk && !isSkill) { dmg = Math.floor(dmg * 1.2); p._mageNextAtk = false; }
   // v0.51: boss_desert — 闪避后下次攻击+50%伤害
   if (p._desertNext && !isSkill) { dmg = Math.floor(dmg * 1.5); p._desertNext = false; }
   // v0.51: brand — 闪避后下次攻击ATK+30%（直接乘算dmg，避免丢失前置加成）
@@ -997,7 +1023,7 @@ function applyDmg(dmg, skill, targetEnemy, forceCrit) {
 
   s.relics.forEach(r => { if (r.onAttack) r.onAttack(p, dmg, s, e); });
   // v0.51: mastery_archer — 暴击时额外造成30%ATK伤害
-  if (crit && p._mastery_archer) { e.hp -= Math.floor(p.atk * 0.3); bigFloat('🏹 +' + Math.floor(p.atk*0.3), 'float-crit', 400); }
+  if (crit && p._mastery_archer) { e.hp -= Math.floor(p.atk * 0.2); bigFloat('🏹 +' + Math.floor(p.atk*0.2), 'float-crit', 400); }
   // v0.51: boss_ruins — 攻击附加随机debuff（燃烧/迟缓/中毒）
   if (p._bossRuins && e.hp > 0 && s.rng) {
     var debuffs = [
@@ -1059,8 +1085,15 @@ function applyDmg(dmg, skill, targetEnemy, forceCrit) {
       var swampHeal = Math.floor(p.maxHp * 0.10); p.hp = Math.min(p.maxHp, p.hp + swampHeal);
       bigFloat('🌿 +' + swampHeal + 'HP', 'float-heal', 500);
     }
-    // v0.51: mastery_warrior — 击杀后ATK+3永久叠加
-    if (p._mastery_warrior) { p.atk += 3; bigFloat('🛡️ ATK+3！', 'float-gold', 500); }
+    // v0.51: mastery_warrior — 击杀后ATK+3（v0.85: 上限10层=+30，不再无限叠加）
+    if (p._mastery_warrior) {
+      if (!p._masteryWarriorStacks) p._masteryWarriorStacks = 0;
+      if (p._masteryWarriorStacks < 10) {
+        p._masteryWarriorStacks++;
+        p.atk += 3;
+        bigFloat('🛡️ ATK+3！(' + p._masteryWarriorStacks + '/10)', 'float-gold', 500);
+      }
+    }
     // v0.81: 暗符文·破军 — 击杀回复8%HP
     if (p._runeDark) { var darkHeal = Math.floor(p.maxHp * 0.08); p.hp = Math.min(p.maxHp, p.hp + darkHeal); }
     // v0.51: brand — 灼烧击杀+1能量
@@ -1154,8 +1187,11 @@ function applyEquipCombatEffects(s, targetEnemy) {
         }
         break;
       case "lifesteal":
-        // 改为在applyDmg中基于实际伤害计算（此处仅标记）
-        s._equipLifesteal = (s._equipLifesteal || 0) + (fx.value || 0.08);
+        // v0.85: 修复每击叠加 — 每场战斗只统计一次（对齐 heal_on_kill 的守卫模式）
+        if (!s._equipLifestealTracked) {
+          s._equipLifesteal = (s._equipLifesteal || 0) + (fx.value || 0.08);
+          s._equipLifestealTracked = true;
+        }
         break;
 	      case "heal_on_kill":
 	        if (!s._healOnKillTracked) {
@@ -1351,6 +1387,8 @@ function enemyTurn() {
     if (e.weakness === '圣光' && p._coreLight) { e.lifeSteal = 0; bigFloat('🌟弱点！', 'float-dmg', 400); }
     if (e.weakness === '暗影' && p._coreShadow) { bossAtk = Math.floor(bossAtk * 0.7); bigFloat('🌑弱点！', 'float-dmg', 400); }
     var dmg = Math.floor(bossAtk * (1 - p.def / (p.def + 100)));
+    // v0.85: 铁壁药剂 — 玩家受击减伤（修复：原来错误地减了玩家自己的输出）
+    if (s.potionDef) dmg = Math.floor(dmg * (1 - s.potionDef));
     dmg = Math.max(1, dmg);
     // 重击：伤害×1.5
     if (intent && intent.type === 'heavy') { dmg = Math.floor(dmg * 1.5); }
@@ -1465,6 +1503,16 @@ function enemyTurn() {
     var rSk = s.activeSkills[rIdx];
     if (rSk && rSk.id) s.skillCooldowns[rSk.id] = Math.max((s.skillCooldowns[rSk.id] || 0), 1);
   }
+  // 森林瘴气：每3回合中毒
+  if (s._zoneMod?.id === "forest_poison" && s.turnInFloor % 3 === 0 && s.player) {
+    s.player.hp = Math.max(0, s.player.hp - Math.floor(s.player.maxHp * 0.04));
+    bigFloat('🌲 瘴气！', 'float-dmg', 400);
+  }
+  // 沙漠风暴：每5回合降低10%命中率
+  if (s._zoneMod?.id === "desert_storm" && s.turnInFloor % 5 === 0 && s.player) {
+    s.player._desertDebuff = (s.player._desertDebuff || 0) + 0.1;
+    bigFloat('🏜️ 沙暴！命中率-10%', 'float-dmg', 500);
+  }
   // 时间加速突变：每回合过2回合
   if (s._mutationTime) { s.turn++; s.turnInFloor++; if (s.skillCooldowns) { Object.keys(s.skillCooldowns).forEach(function(k) { if (s.skillCooldowns[k] > 0) s.skillCooldowns[k]--; }); } }
   // 亡灵天灾：被击杀敌人3回合后复活
@@ -1494,7 +1542,7 @@ function enemyTurn() {
   if (s.player._godHand && s.turnInFloor % 3 === 0 && s.activeSkills && s.activeSkills.length > 0) {
     var ghSkills = s.activeSkills.filter(function(sk, i) { var k = sk.id || ('skill_'+i); return (s.skillCooldowns[k]||0) === 0; });
     if (ghSkills.length > 0) {
-      var gSk = ghSkills[Math.floor(Math.random() * ghSkills.length)];
+      var gSk = ghSkills[Math.floor(s.rng.next() * ghSkills.length)];
       var gIdx = s.activeSkills.indexOf(gSk);
       if (gIdx >= 0) {
         var saveE = s.player.energy; s.player.energy = Math.max(s.player.energy, (gSk.energyCost||1));
@@ -1571,6 +1619,8 @@ function strike(dmg, e) {
     Events.emit(E.BATTLE_START, { type: 'dodge' });
     return;
   }
+  // void_crit: 敌人暴击（基础暴率15%，暴伤由zoneMod设定）
+  if (s._zoneMod?.id === "void_crit" && e.critMul && s.rng.chance(0.15)) { dmg = Math.floor(dmg * e.critMul); bigFloat('💥 敌人暴击！', 'big-crit', 600); }
   if (s._mutationGhost) dmg = Math.floor(dmg * 2); // 幽灵模式受伤翻倍
   if (s._mutationBlood && p.hp < p.maxHp * 0.5) dmg = Math.floor(dmg * 0.7); // 血月低血减伤
   // v0.50 复仇者受击累积ATK
@@ -1633,6 +1683,10 @@ function win() {
   s.relics.forEach(function(r) { if (r.onWaveEnd) r.onWaveEnd(s.player, s); });
   if (s._waveIndex + 1 < s._waveTotal && s._waves && s._waves[s._waveIndex + 1]) {
     s._waveIndex++;
+    // v0.85: 修复第二波玩家0行动 — 重置行动/防御计数（否则继承第一波残留导致玩家被锁）
+    s._actionsThisTurn = 0; s._defendedThisTurn = false;
+    // v0.85: 修复波次击杀漏计 — 切换前记录上一波敌人数（win() 按当前波统计会漏掉第一波）
+    s._prevWaveKills = (s._prevWaveKills || 0) + (s.enemies ? s.enemies.length : 0);
     var wasAuto = s.auto; var wasSpeed = s._speedMode; var wasTurbo = s._turboMode;
     var nextWave = s._waves[s._waveIndex];
     var dScale = R.get('difficulties', s.difficulty) || {};
@@ -1682,17 +1736,20 @@ function win() {
   if (s.enemies) s.enemies.forEach(function(e) { Game.recordKill(e.name, s.totalFloor, e); });
   // v0.70: 亡灵天灾队列已迁移至applyDmg中逐敌入队，此处不再重复
   if (s.totalFloor > s.highest) s.highest = s.totalFloor;
-  let g = 10 + s.rng.range(0, 15) + Math.floor(s.totalFloor / 2);
+  let g = 6 + s.rng.range(0, 6) + Math.floor(s.totalFloor / 5); // v0.85: 金币下调（玩家常限时击杀×2）
   if (s.player.goldMul) g = Math.floor(g * s.player.goldMul);
   if (s.enemyGoldMul) g = Math.floor(g * s.enemyGoldMul);
   const lim = s.totalFloor <= 10 ? 15 : (s.totalFloor === 99 ? 30 : 20);
   const fast = s.turnInFloor <= lim;
   if (fast) { g = Math.floor(g * 2); if (s._currentRoomType === "boss") checkAchievement(s, "speed_demon"); }
   s.gold += g;
-  s._runKills = (s._runKills || 0) + (s.enemies ? s.enemies.length : 0);
+  // v0.85: 击杀统计含切换前的波次（_prevWaveKills），修复精英战第一波漏计
+  var waveKills = (s.enemies ? s.enemies.length : 0) + (s._prevWaveKills || 0);
+  s._prevWaveKills = 0;
+  s._runKills = (s._runKills || 0) + waveKills;
   // 累计击杀（跨局）追踪
   if (!Game.meta.totalKills) Game.meta.totalKills = 0;
-  Game.meta.totalKills += (s.enemies ? s.enemies.length : 0);
+  Game.meta.totalKills += waveKills;
   // v0.50 战斗结束清理战斗频道事件
   Events.clearChannel('battle');
   if (Game.meta.totalKills >= 100) checkAchievement(s, "kill_100");
@@ -1701,9 +1758,14 @@ function win() {
   if (s.player && s.player.hp > 0 && s.player.maxHp > 0 && s.player.hp < s.player.maxHp * 0.05) checkAchievement(s, "survivor");
   Events.emit(E.GOLD_CHANGED, { gold: s.gold, delta: g, fast });
   // 击杀回能：每波击杀奖励1临时能量
+  // v0.85: frozen_mp（永冻冰窟）灵力回复减半 → 50%概率回能
   if (s.player && s.player.energy < (s.player.maxEnergy || MAX_ENERGY) + 2) {
-    s.player.energy = Math.min(s.player.energy + 1, (s.player.maxEnergy || MAX_ENERGY) + 2);
-    bigFloat('⚡ +1能量', 'float-gold', 500);
+    if (s._zoneMod?.id === "frozen_mp" && !s.rng.chance(0.5)) {
+      /* 极寒刺骨：回复减半，本次不回 */
+    } else {
+      s.player.energy = Math.min(s.player.energy + 1, (s.player.maxEnergy || MAX_ENERGY) + 2);
+      bigFloat('⚡ +1能量', 'float-gold', 500);
+    }
   }
   // v0.60: 魂晶+灵石+素材掉落
   const roomType = s._currentRoomType || '';
@@ -1749,7 +1811,7 @@ function win() {
   if (s.gold >= 200) checkAchievement(s, "gold_200");
   if (s.relics.length >= 6) checkAchievement(s, "six_relics");
   if (s.equip.length >= 6) checkAchievement(s, "six_equips");
-  if (s.equip.length >= 10) checkAchievement(s, "ten_equips");
+  if (s.equip.length >= 6) checkAchievement(s, "six_equips"); // v0.85: ten_equips成就不存在（上限8槽），改用已定义的six_equips
   if (s.curses.length >= 3) checkAchievement(s, "three_curses");
   if (s.totalFloor >= 30 && s.endless) checkAchievement(s, "endless_30");
   // _furyActive 由 startBattle() 清除，此处不再清零（否则狂战士之魂永远不触发）

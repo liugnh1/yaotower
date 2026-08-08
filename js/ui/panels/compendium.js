@@ -190,7 +190,10 @@ function renderCompRelics(content) {
   content.innerHTML = '';
   const relics = R.get('relics') || [];
   if (!Game.meta.discoveredRelics) Game.meta.discoveredRelics = [];
-  var discovered = Game.meta.discoveredRelics;
+  // v0.85: 过滤已失效的遗物ID（旧版本删除的遗物），避免发现数超过总数
+  var discovered = Game.meta.discoveredRelics.filter(function(id) {
+    return relics.some(function(r) { return r.id === id; });
+  });
   const RARITY_ORDER = ['legendary','epic','rare','common'];
   const RARITY_LABEL = { legendary:'传说', epic:'史诗', rare:'稀有', common:'普通' };
   const RARITY_ICON = { legendary:'🟠', epic:'🟣', rare:'🔵', common:'⚪' };

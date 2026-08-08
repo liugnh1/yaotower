@@ -15,7 +15,8 @@ function weightedPick(arr, rng) {
 }
 
 // ---- 装备生成（v0.35：区域套装+深度缩放）----
-export function genEquip(zoneId) {
+// v0.85: 新增 depthBoost — Boss等高阶掉落品质加权（传说/神话权重提升）
+export function genEquip(zoneId, depthBoost) {
   const s = Game.state;
   const rng = (s && s.rng) ? s.rng : { next: () => Math.random(), pick: (arr) => arr[Math.floor(Math.random() * arr.length)], chance: (p) => Math.random() < p, range: (min, max) => min + Math.floor(Math.random() * (max - min + 1)), shuffle: (arr) => { var a = arr.slice(); for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; } };
   const qualities = R.get('equipQualities');
@@ -26,9 +27,11 @@ export function genEquip(zoneId) {
     return { icon: "🗡️", name: "破剑", prefix: "", fullName: "破剑", stat: "atk", val: 3, color: "#8899bb", qualityName: "普通", type: "weapon", _combatEffect: null, _zoneSet: null };
   }
 
-  // 深度缩放：随总层数提高品质权重
+  // 深度缩放：随总层数提高品质权重（v0.85: depthBoost 提升品质档，仅传说/神话权重受益）
+  // 注意：boost×2 在低层实际收益约×1.5（如30层 1.9→2.8），随层数趋近×2
   const depth = s ? (s.totalFloor || 1) : 1;
-  const depthMul = Math.min(3, 1 + depth * 0.03); // 1.0 ~ 3.0
+  const boost = depthBoost || 1;
+  const depthMul = Math.min(3 * boost, 1 + depth * 0.03 * boost); // 1.0 ~ 3.0（boss ×2 → 上限6）
   const scaledQualities = qualities.map(q => {
     let w = q.weight;
     if (q.mul >= 4.0) w = Math.floor(w * depthMul);        // 传说/神话在高层的权重提高

@@ -177,9 +177,10 @@
       <div class="zone-npcs" id="zone-npcs-plaza"></div>
     </div>
   </div>
-  <div id="city-decorations" style="padding:6px;font-size:10px;color:#667;text-align:center;margin-top:4px"></div>
 </div>
 
+<!-- 深渊裂隙 · 入场动画 -->
+<div id="rift-entrance"><div class="rift-crack"></div><div class="rift-particles"></div></div>
 <!-- 深渊裂隙 · 地下城主界面 -->
 <div id="dungeon-hub" class="hidden">
   <div class="rift-header">
@@ -188,17 +189,54 @@
     <div class="rift-resources" id="rift-resources"></div>
   </div>
   <div class="rift-body">
-    <!-- 左侧：副本列表 -->
-    <div class="rift-main">
-      <div class="rift-section-title">🌑 秘境副本</div>
-      <div class="rift-dungeon-grid" id="rift-dungeon-list"></div>
+    <!-- 秘境之门（点击选择副本） -->
+    <div class="rift-portal-section">
+      <div class="rift-portal" id="rift-portal" title="点击进入秘境">
+        <div class="rift-portal-ring"></div>
+        <div class="rift-portal-core">🌑</div>
+        <div class="rift-portal-label">秘境之门</div>
+      </div>
     </div>
-    <!-- 右侧：功能入口 -->
-    <div class="rift-side">
-      <div class="rift-section-title">⚒️ 裂隙工坊</div>
-      <div class="rift-side-cards" id="rift-side-cards"></div>
-      <div class="rift-section-title" style="margin-top:12px">🏆 狩猎记录</div>
+    <!-- NPC：老铁匠 -->
+    <div class="rift-npc" id="rift-npc-smith">
+      <div class="rift-npc-header">
+        <span class="rift-npc-icon">👨‍🏭</span>
+        <span class="rift-npc-name">老铁匠·赫菲斯托</span>
+        <span class="rift-npc-title">— 裂隙工坊</span>
+      </div>
+      <div class="rift-npc-dialogue" id="rift-smith-dialogue">"材料带来了吗？"</div>
+      <div class="rift-npc-actions">
+        <button class="rift-npc-btn forge" id="btn-rift-forge">🔨 精炼</button>
+        <button class="rift-npc-btn forge" id="btn-rift-enchant">✨ 附魔</button>
+      </div>
+    </div>
+    <!-- NPC：守门人 -->
+    <div class="rift-npc" id="rift-npc-keeper">
+      <div class="rift-npc-header">
+        <span class="rift-npc-icon">🗿</span>
+        <span class="rift-npc-name">守门人·塔纳托斯</span>
+        <span class="rift-npc-title">— 无尽天梯</span>
+      </div>
+      <div class="rift-npc-dialogue" id="rift-keeper-dialogue">"只有强者能通过..."</div>
+      <div class="rift-npc-info" id="rift-keeper-info"></div>
+      <div class="rift-npc-actions">
+        <button class="rift-npc-btn tower" id="btn-rift-tower">🏔️ 挑战天梯</button>
+        <button class="rift-npc-btn tower" id="btn-rift-wheel">🎰 命运转盘</button>
+      </div>
+    </div>
+    <!-- NPC：旅法师 -->
+    <div class="rift-npc" id="rift-npc-sage">
+      <div class="rift-npc-header">
+        <span class="rift-npc-icon">📜</span>
+        <span class="rift-npc-name">旅法师·卡珊德拉</span>
+        <span class="rift-npc-title">— 万象记录</span>
+      </div>
+      <div class="rift-npc-dialogue" id="rift-sage-dialogue">"让我看看你的旅程..."</div>
       <div class="rift-boss-marks" id="rift-boss-marks"></div>
+      <div class="rift-runes" id="rift-runes-display"></div>
+      <div class="rift-npc-actions">
+        <button class="rift-npc-btn sage" id="btn-rift-runes">💠 符文</button>
+      </div>
     </div>
   </div>
   <!-- 锻造/天梯覆盖层 -->
@@ -450,12 +488,11 @@
   <button class="restart-btn" style="background:#4a3b8b" id="btn-show-lb">📊 排行榜</button>
 </div>
 
-<!-- 局外成长 -->
+<!-- 局外成长（v0.86: 移除旧通用关闭按钮btn-close-meta — 各面板自带关闭，防双关闭） -->
 <div id="meta-panel" class="modal">
   <h3 id="meta-title">🔮 局外成长</h3>
   <div style="color:#ffa502;margin-bottom:10px" id="meta-subtitle">天赋点: <b id="meta-tp">0</b></div>
-  <div id="meta-content" style="text-align:left;font-size:13px;max-height:50vh;overflow-y:auto"></div>
-  <button class="restart-btn" style="margin-top:10px;width:100%;display:none" id="btn-close-meta">关闭</button>
+  <div id="meta-content" style="text-align:left;font-size:13px;overflow-y:auto"></div>
 </div>
 
 <!-- 设置面板 -->
@@ -592,6 +629,5 @@
 </div>
 
 <script type="module" src="js/core/main.js"></script>
-<script>document.getElementById("btn-close-meta").onclick=()=>{document.getElementById("meta-panel").style.display="none";};</script>
 </body>
 </html>

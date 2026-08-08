@@ -91,17 +91,10 @@ export function acquireRelic(rel) {
   // v0.51: 天赋树遗物槽+1
   var maxRelics = 6 + (s.player && s.player._talentRelicSlots ? s.player._talentRelicSlots : 0);
   if (s.relics.length >= maxRelics) {
-    // v0.80: 通知UI面板处理（同步），若面板未打开则自动丢弃最旧的
+    // v0.85: 满槽 → 弹置换面板，由玩家决定丢弃/取消；不自动添加
+    // （修复：旧的"emit后检查长度"永远在玩家交互前执行 → 双重添加bug）
     Events.emit(E.RELICS_FULL, { relic: rel });
-    if (s.relics.length >= maxRelics) {
-      // Fallback: UI面板未打开，自动丢弃最旧的遗物
-      const old = s.relics[0];
-      if (old && old.onRemove) old.onRemove(s.player);
-      Events.emit(E.RELIC_REMOVED, { relic: old });
-      s.relics.shift();
-    } else {
-      return; // UI面板已处理替换
-    }
+    return;
   }
   if (rel.onAcquire && !rel._acquired) { rel.onAcquire(s.player, s); rel._acquired = true; }
   if (rel.passive && !rel.applied) { rel.passive(s.player); rel.applied = true; }

@@ -282,7 +282,7 @@ function launchBuildChallenge() {
     if (!sk) { var mSkills = R.get('classMasterySkills'); if (mSkills && mSkills[cls.id]) sk = mSkills[cls.id].find(function(x){return x.id===sid;}); }
     if (sk) s.activeSkills.push({...sk});
   });
-  if (s.activeSkills.length === 0) { var defSk = cls.skills[Math.floor(Math.random() * cls.skills.length)]; s.activeSkills.push({...defSk}); }
+  if (s.activeSkills.length === 0) { var defSk = cls.skills[Math.floor(s.rng.next() * cls.skills.length)]; s.activeSkills.push({...defSk}); } // v0.85: Math.random→s.rng 保种子
   s.activeSkill = s.activeSkills[0]; s.skillLevels = {}; s.activeSkills.forEach(function(sk){s.skillLevels[sk.id]=1;});
   var allRelics = R.get('relics') || [];
   var loadRelic = function(rid) {

@@ -185,10 +185,10 @@ R.registerAll('classMasterySkills', {
 
 // ===== v0.50 职业专属遗物（Lv5解锁，开局自动获得）=====
 R.registerAll('classMasteryRelics', {
-  warrior: { id: "mastery_warrior", name: "狂战徽章", icon: "🛡️", rarity: "epic", desc: "击杀后ATK+3（本局永久叠加）", _masteryRelic: true },
-  mage:    { id: "mastery_mage",    name: "元素结晶", icon: "💎", rarity: "epic", desc: "每使用技能，下次普攻+30%伤害", _masteryRelic: true },
-  shadow:  { id: "mastery_shadow",  name: "暗杀者匕首", icon: "🗡️", rarity: "epic", desc: "对满血敌人伤害+50%", _masteryRelic: true },
-  archer:  { id: "mastery_archer",  name: "鹰眼透镜", icon: "🔭", rarity: "epic", desc: "暴击时额外造成30%ATK伤害", _masteryRelic: true },
+  warrior: { id: "mastery_warrior", name: "狂战徽章", icon: "🛡️", rarity: "epic", desc: "击杀后ATK+3（最多叠加10层）", _masteryRelic: true },
+  mage:    { id: "mastery_mage",    name: "元素结晶", icon: "💎", rarity: "epic", desc: "每使用技能，下次普攻+20%伤害", _masteryRelic: true },
+  shadow:  { id: "mastery_shadow",  name: "暗杀者匕首", icon: "🗡️", rarity: "epic", desc: "对满血敌人伤害+30%", _masteryRelic: true },
+  archer:  { id: "mastery_archer",  name: "鹰眼透镜", icon: "🔭", rarity: "epic", desc: "暴击时额外造成20%ATK伤害", _masteryRelic: true },
   monk:    { id: "mastery_monk",    name: "金刚念珠", icon: "📿", rarity: "epic", desc: "每回合回复5%最大生命", _masteryRelic: true }
 });
 
